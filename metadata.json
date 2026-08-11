@@ -1,0 +1,6 @@
+{
+  "name": "Nursery Manager",
+  "description": "Logistics and inventory management app for plant nurseries featuring barcode scanning, holding location assignment, data uploads, and order processing.",
+  "requestFramePermissions": ["camera", "geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

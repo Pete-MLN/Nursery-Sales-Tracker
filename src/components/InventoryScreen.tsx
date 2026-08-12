@@ -7,12 +7,17 @@ import {
   Plus, 
   Minus, 
   Barcode, 
-  Filter, 
   Package, 
-  RefreshCw,
   Sun,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Tag,
+  MapPin,
+  DollarSign,
+  X,
+  Layers,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 
 interface InventoryScreenProps {
@@ -28,16 +33,24 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy'>('all');
+  const [expandedPricesItemId, setExpandedPricesItemId] = useState<string | null>(null);
 
   const criticalCount = inventory.filter(i => i.status === 'critical').length;
   const warningCount = inventory.filter(i => i.status === 'warning').length;
   const healthyCount = inventory.filter(i => i.status === 'healthy').length;
 
   const filteredInventory = inventory.filter(item => {
+    const term = searchTerm.toLowerCase();
     const matchesSearch = 
-      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      item.barcode.includes(searchTerm) ||
-      item.lightRequirement.toLowerCase().includes(searchTerm.toLowerCase());
+      item.name.toLowerCase().includes(term) ||
+      (item.botanicalName && item.botanicalName.toLowerCase().includes(term)) ||
+      (item.commonName && item.commonName.toLowerCase().includes(term)) ||
+      (item.itemNo && item.itemNo.toLowerCase().includes(term)) ||
+      (item.size && item.size.toLowerCase().includes(term)) ||
+      (item.category && item.category.toLowerCase().includes(term)) ||
+      (item.holdingLocation && item.holdingLocation.toLowerCase().includes(term)) ||
+      item.barcode.includes(term) ||
+      item.lightRequirement.toLowerCase().includes(term);
     
     if (statusFilter === 'all') return matchesSearch;
     return matchesSearch && item.status === statusFilter;
@@ -127,10 +140,10 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           <div>
             <h2 className="font-bold text-lg text-[#012d1d] flex items-center gap-2">
               <Package className="w-5 h-5 text-[#0e6c4a]" />
-              <span>Plant Stock & Alerts</span>
+              <span>POS Plant Stock & Inventory</span>
             </h2>
             <p className="text-xs text-[#414844] mt-0.5">
-              Real-time plant stock levels, barcodes, and sunlight requirements.
+              Live plant inventory with POS Item #, Botanical names, sizes, and pricing levels.
             </p>
           </div>
 
@@ -151,7 +164,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               type="text"
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search plant name, barcode, or light needs..."
+              placeholder="Search by Item #, Botanical, Common Name, Size, or Location..."
               className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
             />
           </div>
@@ -211,68 +224,138 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   ? { label: 'LOW STOCK', bg: 'bg-[#fef9c3] text-[#854d0e] border-[#ca8a04]/30' }
                   : { label: 'IN STOCK', bg: 'bg-[#a0f4c8] text-[#0e6c4a] border-[#0e6c4a]/30' };
 
+              const isPricesExpanded = expandedPricesItemId === item.id;
+
               return (
                 <div
                   key={item.id}
-                  className={`p-3.5 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                  className={`p-3.5 rounded-xl border transition-all flex flex-col gap-3 ${
                     item.status === 'critical' 
                       ? 'bg-[#fff5f5] border-[#ba1a1a]/40' 
                       : 'bg-[#f9faf6] border-[#c1c8c2]/80 hover:border-[#012d1d]'
                   }`}
                 >
-                  <div className="flex items-center gap-3 min-w-0">
-                    <img
-                      src={item.image || DEFAULT_PLANT_IMAGE}
-                      alt={item.name}
-                      className="w-14 h-14 rounded-xl object-cover shrink-0 border border-[#c1c8c2]/50 shadow-2xs"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                    />
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div className="flex items-start gap-3 min-w-0">
+                      <img
+                        src={item.image || DEFAULT_PLANT_IMAGE}
+                        alt={item.name}
+                        className="w-14 h-14 rounded-xl object-cover shrink-0 border border-[#c1c8c2]/50 shadow-2xs mt-0.5"
+                        referrerPolicy="no-referrer"
+                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                      />
 
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <h3 className="font-bold text-sm text-[#1a1c1a] truncate">{item.name}</h3>
-                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${statusBadge.bg}`}>
-                          {statusBadge.label}
-                        </span>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {item.itemNo && (
+                            <span className="bg-[#012d1d] text-white font-mono text-[10px] font-bold px-1.5 py-0.5 rounded">
+                              #{item.itemNo}
+                            </span>
+                          )}
+                          <h3 className="font-bold text-sm text-[#1a1c1a] truncate">{item.name}</h3>
+                          {item.size && (
+                            <span className="bg-[#461702] text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                              {item.size}
+                            </span>
+                          )}
+                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${statusBadge.bg}`}>
+                            {statusBadge.label}
+                          </span>
+                        </div>
+
+                        {item.botanicalName && item.botanicalName !== item.name && (
+                          <p className="text-xs italic text-[#414844] mt-0.5">
+                            {item.botanicalName}
+                          </p>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-[#414844]">
+                          {item.holdingLocation && (
+                            <span className="flex items-center gap-1 font-semibold text-[#0e6c4a] bg-[#a0f4c8]/30 px-1.5 py-0.5 rounded">
+                              <MapPin className="w-3 h-3 text-[#0e6c4a]" />
+                              Loc: {item.holdingLocation}
+                            </span>
+                          )}
+                          {item.category && (
+                            <span className="text-[11px] font-semibold text-[#717973] bg-[#e2e3df] px-1.5 py-0.5 rounded">
+                              {item.category}
+                            </span>
+                          )}
+                          <span className="font-mono text-[#717973]">UPC: #{item.barcode}</span>
+                          <span className="font-bold text-[#012d1d] text-sm">${item.price.toFixed(2)} <span className="text-[10px] font-normal text-[#717973]">(Retail)</span></span>
+                        </div>
                       </div>
+                    </div>
 
-                      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-[#414844]">
-                        <span className="flex items-center gap-1">
-                          <Sun className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                          {item.lightRequirement}
-                        </span>
-                        <span className="font-mono text-[#717973]">#{item.barcode}</span>
-                        <span className="font-bold text-[#012d1d]">${item.price.toFixed(2)}</span>
+                    {/* Stock & Pricing Actions */}
+                    <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-0 border-[#e2e3df]">
+                      <button
+                        onClick={() => setExpandedPricesItemId(isPricesExpanded ? null : item.id)}
+                        className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                          isPricesExpanded
+                            ? 'bg-[#012d1d] text-white border-[#012d1d]'
+                            : 'bg-white text-[#012d1d] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+                        }`}
+                        title="View POS Price Levels 1-5"
+                      >
+                        <Tag className="w-3.5 h-3.5" />
+                        <span>Prices</span>
+                        {isPricesExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+                      </button>
+
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center bg-white border border-[#c1c8c2] rounded-xl overflow-hidden shadow-2xs">
+                          <button
+                            onClick={() => onUpdateStock(item.id, Math.max(0, item.stock - 1))}
+                            className="p-2 text-[#414844] hover:bg-[#f3f4f0] active:scale-95 transition-all"
+                            title="Decrease Stock"
+                          >
+                            <Minus className="w-3.5 h-3.5" />
+                          </button>
+                          <span className="px-3 font-bold text-sm font-mono text-[#012d1d] min-w-[2.5rem] text-center">
+                            {String(item.stock).padStart(2, '0')}
+                          </span>
+                          <button
+                            onClick={() => onUpdateStock(item.id, item.stock + 1)}
+                            className="p-2 text-[#414844] hover:bg-[#f3f4f0] active:scale-95 transition-all"
+                            title="Increase Stock"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                     </div>
                   </div>
 
-                  {/* Stock Level Controls */}
-                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-2 sm:pt-0 border-t sm:border-0 border-[#e2e3df]">
-                    <div className="flex items-center gap-2">
-                      <span className="text-xs font-semibold text-[#414844] sm:hidden">Stock Count:</span>
-                      <div className="flex items-center bg-white border border-[#c1c8c2] rounded-xl overflow-hidden shadow-2xs">
-                        <button
-                          onClick={() => onUpdateStock(item.id, Math.max(0, item.stock - 1))}
-                          className="p-2 text-[#414844] hover:bg-[#f3f4f0] active:scale-95 transition-all"
-                          title="Decrease Stock"
-                        >
-                          <Minus className="w-3.5 h-3.5" />
-                        </button>
-                        <span className="px-3 font-bold text-sm font-mono text-[#012d1d] min-w-[2.5rem] text-center">
-                          {String(item.stock).padStart(2, '0')}
+                  {/* Collapsible Pricing Tiers Display */}
+                  {isPricesExpanded && (
+                    <div className="bg-white border border-[#c1c8c2] rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs animate-fade-in">
+                      <div className="bg-[#f9faf6] p-2 rounded-lg border border-[#e2e3df]">
+                        <span className="block text-[10px] font-bold text-[#717973] uppercase">Level 1 - Retail</span>
+                        <span className="font-bold text-sm text-[#012d1d]">
+                          {item.prices?.retail !== undefined ? `$${item.prices.retail.toFixed(2)}` : `$${item.price.toFixed(2)}`}
                         </span>
-                        <button
-                          onClick={() => onUpdateStock(item.id, item.stock + 1)}
-                          className="p-2 text-[#414844] hover:bg-[#f3f4f0] active:scale-95 transition-all"
-                          title="Increase Stock"
-                        >
-                          <Plus className="w-3.5 h-3.5" />
-                        </button>
+                      </div>
+                      <div className="bg-[#f9faf6] p-2 rounded-lg border border-[#e2e3df]">
+                        <span className="block text-[10px] font-bold text-[#717973] uppercase">Level 3 - Wholesale</span>
+                        <span className="font-bold text-sm text-[#0e6c4a]">
+                          {item.prices?.wholesale !== undefined ? `$${item.prices.wholesale.toFixed(2)}` : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="bg-[#f9faf6] p-2 rounded-lg border border-[#e2e3df]">
+                        <span className="block text-[10px] font-bold text-[#717973] uppercase">Level 4 - Garden Ctr</span>
+                        <span className="font-bold text-sm text-[#461702]">
+                          {item.prices?.gardenCenter !== undefined ? `$${item.prices.gardenCenter.toFixed(2)}` : 'N/A'}
+                        </span>
+                      </div>
+                      <div className="bg-[#f9faf6] p-2 rounded-lg border border-[#e2e3df]">
+                        <span className="block text-[10px] font-bold text-[#717973] uppercase">Level 5 - Elite</span>
+                        <span className="font-bold text-sm text-[#854d0e]">
+                          {item.prices?.elite !== undefined ? `$${item.prices.elite.toFixed(2)}` : 'N/A'}
+                        </span>
                       </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               );
             })
@@ -282,3 +365,4 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     </div>
   );
 };
+

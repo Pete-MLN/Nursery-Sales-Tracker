@@ -25,6 +25,26 @@ const ORDERS_COL = 'orders';
 const UPLOADS_COL = 'uploads';
 
 /**
+ * Helper to recursively strip undefined properties from an object prior to Firestore operations
+ */
+export function cleanForFirestore<T>(obj: T): T {
+  if (obj === null || obj === undefined) return obj;
+  if (Array.isArray(obj)) {
+    return obj.map(cleanForFirestore) as unknown as T;
+  }
+  if (typeof obj === 'object') {
+    const cleaned: any = {};
+    for (const [key, value] of Object.entries(obj)) {
+      if (value !== undefined) {
+        cleaned[key] = cleanForFirestore(value);
+      }
+    }
+    return cleaned as T;
+  }
+  return obj;
+}
+
+/**
  * Seed initial mock data into Firestore if collections are empty
  */
 export async function seedInitialFirestoreData() {
@@ -34,7 +54,7 @@ export async function seedInitialFirestoreData() {
       const batch = writeBatch(db);
       INITIAL_PLANTS.forEach((plant) => {
         const ref = doc(db, PLANTS_COL, plant.id);
-        batch.set(ref, plant);
+        batch.set(ref, cleanForFirestore(plant));
       });
       await batch.commit();
       console.log('Firestore: Plants initialized');
@@ -45,7 +65,7 @@ export async function seedInitialFirestoreData() {
       const batch = writeBatch(db);
       INITIAL_CUSTOMERS.forEach((customer) => {
         const ref = doc(db, CUSTOMERS_COL, customer.id);
-        batch.set(ref, customer);
+        batch.set(ref, cleanForFirestore(customer));
       });
       await batch.commit();
       console.log('Firestore: Customers initialized');
@@ -56,7 +76,7 @@ export async function seedInitialFirestoreData() {
       const batch = writeBatch(db);
       INITIAL_EMPLOYEES.forEach((emp) => {
         const ref = doc(db, EMPLOYEES_COL, emp.id);
-        batch.set(ref, emp);
+        batch.set(ref, cleanForFirestore(emp));
       });
       await batch.commit();
       console.log('Firestore: Employees initialized');
@@ -67,7 +87,7 @@ export async function seedInitialFirestoreData() {
       const batch = writeBatch(db);
       INITIAL_ORDERS.forEach((order) => {
         const ref = doc(db, ORDERS_COL, order.id);
-        batch.set(ref, order);
+        batch.set(ref, cleanForFirestore(order));
       });
       await batch.commit();
       console.log('Firestore: Orders initialized');
@@ -78,7 +98,7 @@ export async function seedInitialFirestoreData() {
       const batch = writeBatch(db);
       INITIAL_UPLOADS.forEach((upload) => {
         const ref = doc(db, UPLOADS_COL, upload.id);
-        batch.set(ref, upload);
+        batch.set(ref, cleanForFirestore(upload));
       });
       await batch.commit();
       console.log('Firestore: Uploads initialized');
@@ -143,15 +163,33 @@ export function subscribeToUploads(callback: (uploads: RecentUpload[]) => void) 
 /* --- CRUD Helpers --- */
 
 export async function savePlantToFirestore(plant: PlantItem) {
-  await setDoc(doc(db, PLANTS_COL, plant.id), plant, { merge: true });
+  await setDoc(doc(db, PLANTS_COL, plant.id), cleanForFirestore(plant), { merge: true });
+}
+
+export async function batchSavePlantsToFirestore(plants: PlantItem[]) {
+  try {
+    // Firestore batch limit is 500
+    const chunkSize = 400;
+    for (let i = 0; i < plants.length; i += chunkSize) {
+      const chunk = plants.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((plant) => {
+        const ref = doc(db, PLANTS_COL, plant.id);
+        batch.set(ref, cleanForFirestore(plant), { merge: true });
+      });
+      await batch.commit();
+    }
+  } catch (err) {
+    console.error('Error batch saving plants to Firestore:', err);
+  }
 }
 
 export async function saveCustomerToFirestore(customer: Customer) {
-  await setDoc(doc(db, CUSTOMERS_COL, customer.id), customer, { merge: true });
+  await setDoc(doc(db, CUSTOMERS_COL, customer.id), cleanForFirestore(customer), { merge: true });
 }
 
 export async function saveEmployeeToFirestore(employee: Employee) {
-  await setDoc(doc(db, EMPLOYEES_COL, employee.id), employee, { merge: true });
+  await setDoc(doc(db, EMPLOYEES_COL, employee.id), cleanForFirestore(employee), { merge: true });
 }
 
 export async function deleteEmployeeFromFirestore(id: string) {
@@ -159,9 +197,9 @@ export async function deleteEmployeeFromFirestore(id: string) {
 }
 
 export async function saveOrderToFirestore(order: Order) {
-  await setDoc(doc(db, ORDERS_COL, order.id), order, { merge: true });
+  await setDoc(doc(db, ORDERS_COL, order.id), cleanForFirestore(order), { merge: true });
 }
 
 export async function saveUploadToFirestore(upload: RecentUpload) {
-  await setDoc(doc(db, UPLOADS_COL, upload.id), upload, { merge: true });
+  await setDoc(doc(db, UPLOADS_COL, upload.id), cleanForFirestore(upload), { merge: true });
 }

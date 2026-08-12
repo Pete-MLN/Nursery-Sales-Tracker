@@ -20,6 +20,7 @@ import {
   subscribeToOrders,
   subscribeToUploads,
   savePlantToFirestore,
+  batchSavePlantsToFirestore,
   saveCustomerToFirestore,
   saveEmployeeToFirestore,
   deleteEmployeeFromFirestore,
@@ -165,14 +166,15 @@ export default function App() {
   };
 
   // Handle uploading dataset in Data Management
-  const handleAddUpload = (filename: string) => {
+  const handleAddUpload = (filename: string, size?: string, recordsCount?: number) => {
+    const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const newUpload: RecentUpload = {
       id: `u-${Date.now()}`,
       filename: filename,
-      date: 'Today',
+      date: todayStr,
       time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      size: '1.2 MB',
-      recordsCount: Math.floor(200 + Math.random() * 1000)
+      size: size || '1.2 MB',
+      recordsCount: recordsCount || Math.floor(100 + Math.random() * 500)
     };
     setUploads(prev => [newUpload, ...prev]);
     saveUploadToFirestore(newUpload);
@@ -186,6 +188,11 @@ export default function App() {
   const handleLogout = () => {
     setUser(prev => ({ ...prev, isLoggedIn: false }));
     setCurrentScreen('login');
+  };
+
+  const handleImportInventoryPlants = (newPlants: PlantItem[]) => {
+    setInventory(newPlants);
+    batchSavePlantsToFirestore(newPlants);
   };
 
   if (!user.isLoggedIn || currentScreen === 'login') {
@@ -256,6 +263,7 @@ export default function App() {
             onAddEmployee={handleAddEmployee}
             onDeleteEmployee={handleDeleteEmployee}
             onUpdateEmployee={handleUpdateEmployee}
+            onImportInventoryPlants={handleImportInventoryPlants}
           />
         )}
 

@@ -11,13 +11,29 @@ export type ScreenType =
 
 export interface PlantItem {
   id: string;
-  name: string;
-  lightRequirement: string; // e.g., 'LOW LIGHT', 'BRIGHT INDIRECT', 'FULL SUN'
-  price: number;
+  name: string; // Common name or description
+  botanicalName?: string; // DESCR (e.g. Spiraea jap. Little Princess)
+  commonName?: string; // ADDL_DESCR_1 (e.g. Little Princess Japanese Spirea)
+  itemNo?: string; // ITEM_NO (e.g. 1000)
+  size?: string; // STK_UNIT (e.g. 3 GAL, 5 GAL 18/24")
+  lightRequirement: string; // e.g., 'LOW LIGHT', 'BRIGHT INDIRECT', 'FULL SUN', 'PARTIAL SUN'
+  price: number; // Primary Retail Price (INV_PRC_1)
+  prices?: {
+    retail?: number; // INV_PRC_1
+    wholesale?: number; // INV_PRC_3
+    gardenCenter?: number; // INV_PRC_4
+    elite?: number; // INV_PRC_5
+  };
   image: string;
-  stock: number;
+  stock: number; // QTY_AVAIL
+  quantityCommitted?: number; // QTY_COMMIT
   status: 'critical' | 'warning' | 'healthy';
-  barcode: string;
+  barcode: string; // BARCOD
+  category?: string; // CATEG_SUBCAT (e.g. G_HOUSE/, RE_WHOLE/)
+  holdingLocation?: string; // ADDL_DESCR_2 (e.g. F4B)
+  subCategoryCode?: string; // SUBCAT_COD
+  statusActive?: boolean; // STAT ('A' = active)
+  storeLocId?: string; // LOC_ID (e.g. 101)
 }
 
 export interface OrderCartItem {

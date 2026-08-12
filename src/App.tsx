@@ -22,6 +22,8 @@ import {
   savePlantToFirestore,
   batchSavePlantsToFirestore,
   saveCustomerToFirestore,
+  batchSaveCustomersToFirestore,
+  deleteCustomerFromFirestore,
   saveEmployeeToFirestore,
   deleteEmployeeFromFirestore,
   saveOrderToFirestore,
@@ -195,6 +197,30 @@ export default function App() {
     batchSavePlantsToFirestore(newPlants);
   };
 
+  const handleImportCustomers = (newCustomers: Customer[]) => {
+    setCustomers(newCustomers);
+    batchSaveCustomersToFirestore(newCustomers);
+  };
+
+  const handleAddCustomer = (custData: Omit<Customer, 'id'>) => {
+    const newCust: Customer = {
+      ...custData,
+      id: `c-${Date.now()}`
+    };
+    setCustomers(prev => [...prev, newCust]);
+    saveCustomerToFirestore(newCust);
+  };
+
+  const handleDeleteCustomer = (id: string) => {
+    setCustomers(prev => prev.filter(c => c.id !== id));
+    deleteCustomerFromFirestore(id);
+  };
+
+  const handleUpdateCustomer = (updatedCust: Customer) => {
+    setCustomers(prev => prev.map(c => c.id === updatedCust.id ? updatedCust : c));
+    saveCustomerToFirestore(updatedCust);
+  };
+
   if (!user.isLoggedIn || currentScreen === 'login') {
     return <LoginScreen onLogin={handleLogin} />;
   }
@@ -263,6 +289,11 @@ export default function App() {
             onAddEmployee={handleAddEmployee}
             onDeleteEmployee={handleDeleteEmployee}
             onUpdateEmployee={handleUpdateEmployee}
+            customers={customers}
+            onAddCustomer={handleAddCustomer}
+            onDeleteCustomer={handleDeleteCustomer}
+            onUpdateCustomer={handleUpdateCustomer}
+            onImportCustomers={handleImportCustomers}
             onImportInventoryPlants={handleImportInventoryPlants}
           />
         )}

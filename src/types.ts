@@ -63,6 +63,11 @@ export interface Customer {
   id: string;
   name: string;
   type: 'RETAIL' | 'WHOLESALE' | 'COMMERCIAL';
+  accountNo?: string;
+  company?: string;
+  email?: string;
+  phone?: string;
+  address?: string;
   recent?: boolean;
 }
 

@@ -188,6 +188,27 @@ export async function saveCustomerToFirestore(customer: Customer) {
   await setDoc(doc(db, CUSTOMERS_COL, customer.id), cleanForFirestore(customer), { merge: true });
 }
 
+export async function batchSaveCustomersToFirestore(customers: Customer[]) {
+  try {
+    const chunkSize = 400;
+    for (let i = 0; i < customers.length; i += chunkSize) {
+      const chunk = customers.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((cust) => {
+        const ref = doc(db, CUSTOMERS_COL, cust.id);
+        batch.set(ref, cleanForFirestore(cust), { merge: true });
+      });
+      await batch.commit();
+    }
+  } catch (err) {
+    console.error('Error batch saving customers to Firestore:', err);
+  }
+}
+
+export async function deleteCustomerFromFirestore(id: string) {
+  await deleteDoc(doc(db, CUSTOMERS_COL, id));
+}
+
 export async function saveEmployeeToFirestore(employee: Employee) {
   await setDoc(doc(db, EMPLOYEES_COL, employee.id), cleanForFirestore(employee), { merge: true });
 }

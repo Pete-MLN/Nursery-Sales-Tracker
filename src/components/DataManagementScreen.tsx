@@ -1,6 +1,7 @@
 import React, { useState, useRef } from 'react';
-import { ScreenType, RecentUpload, Employee, PlantItem } from '../types';
+import { ScreenType, RecentUpload, Employee, PlantItem, Customer } from '../types';
 import { parsePosCsvToPlants, parsePosFileToPlants } from '../utils/posCsvParser';
+import { parseCustomerFileToCustomers } from '../utils/customerParser';
 import { 
   UploadCloud, 
   FileText, 
@@ -18,7 +19,9 @@ import {
   UserCheck,
   Plus,
   AlertCircle,
-  FileCode
+  FileCode,
+  Building,
+  Hash
 } from 'lucide-react';
 
 interface DataManagementScreenProps {
@@ -29,6 +32,11 @@ interface DataManagementScreenProps {
   onAddEmployee: (employee: Omit<Employee, 'id'>) => void;
   onDeleteEmployee: (id: string) => void;
   onUpdateEmployee: (employee: Employee) => void;
+  customers?: Customer[];
+  onAddCustomer?: (customer: Omit<Customer, 'id'>) => void;
+  onDeleteCustomer?: (id: string) => void;
+  onUpdateCustomer?: (customer: Customer) => void;
+  onImportCustomers?: (customers: Customer[]) => void;
   onImportInventoryPlants?: (plants: PlantItem[]) => void;
 }
 
@@ -40,6 +48,11 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
   onAddEmployee,
   onDeleteEmployee,
   onUpdateEmployee,
+  customers = [],
+  onAddCustomer,
+  onDeleteCustomer,
+  onUpdateCustomer,
+  onImportCustomers,
   onImportInventoryPlants
 }) => {
   const [activeUploadModal, setActiveUploadModal] = useState<'inventory' | 'customer' | 'employee' | null>(null);
@@ -62,8 +75,19 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
   const [empRole, setEmpRole] = useState<string>('Inventory Specialist');
   const [empDept, setEmpDept] = useState<string>('Logistics');
 
-  // Employee search state
+  // Add / Edit Customer Modal State
+  const [showCustomerModal, setShowCustomerModal] = useState<boolean>(false);
+  const [editingCustId, setEditingCustId] = useState<string | null>(null);
+  const [custName, setCustName] = useState<string>('');
+  const [custType, setCustType] = useState<'RETAIL' | 'WHOLESALE' | 'COMMERCIAL'>('RETAIL');
+  const [custAccountNo, setCustAccountNo] = useState<string>('');
+  const [custCompany, setCustCompany] = useState<string>('');
+  const [custPhone, setCustPhone] = useState<string>('');
+  const [custEmail, setCustEmail] = useState<string>('');
+
+  // Search states
   const [employeeSearch, setEmployeeSearch] = useState<string>('');
+  const [customerSearch, setCustomerSearch] = useState<string>('');
 
   const handleOpenUploadModal = (type: 'inventory' | 'customer' | 'employee') => {
     setSelectedFile(null);
@@ -179,6 +203,23 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
         console.error('Error parsing uploaded POS inventory spreadsheet:', err);
       }
       finishUpload(estimatedRecords || 50);
+    } else if (activeUploadModal === 'customer') {
+      try {
+        const parsedCusts = await parseCustomerFileToCustomers(selectedFile);
+        if (parsedCusts && parsedCusts.length > 0) {
+          if (onImportCustomers) {
+            onImportCustomers(parsedCusts);
+          }
+          finishUpload(
+            parsedCusts.length,
+            `Successfully imported ${parsedCusts.length} customer records from ${selectedFile.name}`
+          );
+          return;
+        }
+      } catch (err) {
+        console.error('Error parsing uploaded customer spreadsheet:', err);
+      }
+      finishUpload(estimatedRecords || 40);
     } else {
       setTimeout(() => {
         finishUpload(estimatedRecords || Math.floor(100 + Math.random() * 400));
@@ -240,11 +281,76 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     setTimeout(() => setUploadSuccessMsg(null), 4000);
   };
 
+  const openAddCustomerModal = () => {
+    setEditingCustId(null);
+    setCustName('');
+    setCustType('RETAIL');
+    setCustAccountNo('');
+    setCustCompany('');
+    setCustPhone('');
+    setCustEmail('');
+    setShowCustomerModal(true);
+  };
+
+  const openEditCustomerModal = (cust: Customer) => {
+    setEditingCustId(cust.id);
+    setCustName(cust.name);
+    setCustType(cust.type || 'RETAIL');
+    setCustAccountNo(cust.accountNo || '');
+    setCustCompany(cust.company || '');
+    setCustPhone(cust.phone || '');
+    setCustEmail(cust.email || '');
+    setShowCustomerModal(true);
+  };
+
+  const handleSaveCustomer = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!custName.trim()) {
+      alert('Please enter a Customer Name.');
+      return;
+    }
+
+    if (editingCustId && onUpdateCustomer) {
+      onUpdateCustomer({
+        id: editingCustId,
+        name: custName.trim(),
+        type: custType,
+        accountNo: custAccountNo.trim() || undefined,
+        company: custCompany.trim() || undefined,
+        phone: custPhone.trim() || undefined,
+        email: custEmail.trim() || undefined
+      });
+      setUploadSuccessMsg(`Updated customer record for ${custName}`);
+    } else if (onAddCustomer) {
+      onAddCustomer({
+        name: custName.trim(),
+        type: custType,
+        accountNo: custAccountNo.trim() || undefined,
+        company: custCompany.trim() || undefined,
+        phone: custPhone.trim() || undefined,
+        email: custEmail.trim() || undefined
+      });
+      setUploadSuccessMsg(`Added new customer: ${custName}`);
+    }
+
+    setShowCustomerModal(false);
+    setTimeout(() => setUploadSuccessMsg(null), 4000);
+  };
+
   const filteredEmployees = employees.filter(emp => 
     emp.name.toLowerCase().includes(employeeSearch.toLowerCase()) ||
     emp.email.toLowerCase().includes(employeeSearch.toLowerCase()) ||
     emp.phone.includes(employeeSearch) ||
     emp.role.toLowerCase().includes(employeeSearch.toLowerCase())
+  );
+
+  const filteredCustomers = customers.filter(cust => 
+    cust.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
+    (cust.company && cust.company.toLowerCase().includes(customerSearch.toLowerCase())) ||
+    (cust.accountNo && cust.accountNo.toLowerCase().includes(customerSearch.toLowerCase())) ||
+    (cust.email && cust.email.toLowerCase().includes(customerSearch.toLowerCase())) ||
+    (cust.phone && cust.phone.includes(customerSearch)) ||
+    (cust.type && cust.type.toLowerCase().includes(customerSearch.toLowerCase()))
   );
 
   const lastInventoryUpload = uploads.find(u => 
@@ -398,6 +504,154 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
         </div>
       </div>
 
+      {/* Customer Accounts Section */}
+      <section className="bg-white rounded-2xl p-5 border border-[#c1c8c2] flex flex-col gap-4 shadow-2xs">
+        <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[#f3f4f0] pb-3">
+          <div>
+            <h3 className="font-bold text-lg text-[#012d1d] flex items-center gap-2">
+              <span>Customer Accounts Directory</span>
+              <span className="bg-[#a0f4c8] text-[#19724f] text-xs px-2 py-0.5 rounded-full font-bold">
+                {customers.length}
+              </span>
+            </h3>
+            <p className="text-xs text-[#414844] mt-0.5">
+              Wholesale, retail, and commercial customer list for orders and scan tag lookup.
+            </p>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openAddCustomerModal}
+              className="bg-[#0e6c4a] hover:bg-[#012d1d] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              <Plus className="w-4 h-4" />
+              <span>Add Customer</span>
+            </button>
+            <button
+              onClick={() => handleOpenUploadModal('customer')}
+              className="bg-white hover:bg-[#e7e9e5] border border-[#c1c8c2] px-3 py-2 rounded-xl text-xs font-bold text-[#012d1d] transition-colors flex items-center gap-1.5 cursor-pointer"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Upload CSV/Excel</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Search Bar */}
+        <div className="relative">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
+          <input
+            type="text"
+            value={customerSearch}
+            onChange={(e) => setCustomerSearch(e.target.value)}
+            placeholder="Search customer by name, company, account #, phone, email, or type..."
+            className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+          />
+        </div>
+
+        {/* Customer Rows */}
+        <div className="flex flex-col gap-3">
+          {filteredCustomers.length === 0 ? (
+            <div className="p-8 text-center bg-[#f3f4f0] rounded-xl text-[#717973] border border-dashed border-[#c1c8c2]">
+              <p className="text-xs font-medium">No customer accounts found matching filter.</p>
+              <button
+                onClick={openAddCustomerModal}
+                className="mt-2 text-xs font-bold text-[#0e6c4a] hover:underline"
+              >
+                + Add New Customer Account
+              </button>
+            </div>
+          ) : (
+            filteredCustomers.map((cust) => (
+              <div
+                key={cust.id}
+                className="bg-[#f9faf6] p-3.5 rounded-xl border border-[#c1c8c2]/70 hover:border-[#012d1d] transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+              >
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-full bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold text-sm shrink-0 border border-[#19724f]/20">
+                    {cust.name.split(' ').map(n => n[0]).join('') || 'C'}
+                  </div>
+
+                  <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h4 className="font-bold text-sm text-[#1a1c1a]">{cust.name}</h4>
+                      {cust.type && (
+                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
+                          cust.type === 'WHOLESALE' 
+                            ? 'bg-[#19724f] text-white' 
+                            : cust.type === 'COMMERCIAL'
+                            ? 'bg-[#461702] text-white'
+                            : 'bg-[#e2e3df] text-[#414844]'
+                        }`}>
+                          {cust.type}
+                        </span>
+                      )}
+                      {cust.accountNo && (
+                        <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-[#f3f4f0] text-[#717973] border border-[#c1c8c2]">
+                          #{cust.accountNo}
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 mt-1 text-xs text-[#414844]">
+                      {cust.company && (
+                        <span className="flex items-center gap-1 font-medium text-[#1a1c1a]">
+                          <Building className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                          <span>{cust.company}</span>
+                        </span>
+                      )}
+                      {cust.email && (
+                        <a
+                          href={`mailto:${cust.email}`}
+                          className="flex items-center gap-1 hover:text-[#012d1d] hover:underline"
+                        >
+                          <Mail className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                          <span>{cust.email}</span>
+                        </a>
+                      )}
+                      {cust.phone && (
+                        <a
+                          href={`tel:${cust.phone}`}
+                          className="flex items-center gap-1 hover:text-[#012d1d] hover:underline font-mono"
+                        >
+                          <Phone className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                          <span>{cust.phone}</span>
+                        </a>
+                      )}
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2 self-end sm:self-auto pt-2 sm:pt-0 border-t sm:border-0 border-[#e2e3df]">
+                  <button
+                    onClick={() => openEditCustomerModal(cust)}
+                    className="p-1.5 rounded-lg text-[#414844] hover:bg-[#e2e3df] hover:text-[#012d1d] transition-colors"
+                    title="Edit Customer"
+                  >
+                    <Edit3 className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (confirm(`Remove ${cust.name} from customer directory?`)) {
+                        if (onDeleteCustomer) {
+                          onDeleteCustomer(cust.id);
+                        }
+                        setUploadSuccessMsg(`Removed ${cust.name} from directory.`);
+                        setTimeout(() => setUploadSuccessMsg(null), 3000);
+                      }
+                    }}
+                    className="p-1.5 rounded-lg text-[#ba1a1a] hover:bg-[#ffdad6] transition-colors"
+                    title="Delete Customer"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+      </section>
+
       {/* Employee List / Directory Section */}
       <section className="bg-white rounded-2xl p-5 border border-[#c1c8c2] flex flex-col gap-4 shadow-2xs">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[#f3f4f0] pb-3">
@@ -550,6 +804,128 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
           ))}
         </div>
       </section>
+
+      {/* Manual Add/Edit Customer Modal */}
+      {showCustomerModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in">
+            <div className="flex justify-between items-center border-b border-[#f3f4f0] pb-3">
+              <h3 className="font-bold text-lg text-[#012d1d]">
+                {editingCustId ? 'Edit Customer Account' : 'Add New Customer'}
+              </h3>
+              <button
+                onClick={() => setShowCustomerModal(false)}
+                className="text-[#717973] hover:text-[#1a1c1a]"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleSaveCustomer} className="flex flex-col gap-3.5">
+              <div>
+                <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                  Customer Name *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={custName}
+                  onChange={(e) => setCustName(e.target.value)}
+                  placeholder="e.g. John Smith"
+                  className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                    Account Type
+                  </label>
+                  <select
+                    value={custType}
+                    onChange={(e) => setCustType(e.target.value as any)}
+                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                  >
+                    <option value="RETAIL">Retail</option>
+                    <option value="WHOLESALE">Wholesale</option>
+                    <option value="COMMERCIAL">Commercial</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                    Account #
+                  </label>
+                  <input
+                    type="text"
+                    value={custAccountNo}
+                    onChange={(e) => setCustAccountNo(e.target.value)}
+                    placeholder="e.g. C-1042"
+                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                  Company / Farm Name
+                </label>
+                <input
+                  type="text"
+                  value={custCompany}
+                  onChange={(e) => setCustCompany(e.target.value)}
+                  placeholder="e.g. Green Valley Landscapes"
+                  className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                    Phone
+                  </label>
+                  <input
+                    type="tel"
+                    value={custPhone}
+                    onChange={(e) => setCustPhone(e.target.value)}
+                    placeholder="e.g. (555) 000-0000"
+                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                    Email
+                  </label>
+                  <input
+                    type="email"
+                    value={custEmail}
+                    onChange={(e) => setCustEmail(e.target.value)}
+                    placeholder="e.g. john@example.com"
+                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                  />
+                </div>
+              </div>
+
+              <div className="flex justify-end gap-2 mt-3 pt-3 border-t border-[#f3f4f0]">
+                <button
+                  type="button"
+                  onClick={() => setShowCustomerModal(false)}
+                  className="px-4 py-2 rounded-lg text-xs font-semibold text-[#414844] hover:bg-[#f3f4f0]"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="bg-[#0e6c4a] hover:bg-[#012d1d] text-white px-5 py-2.5 rounded-lg text-xs font-bold transition-all shadow-xs"
+                >
+                  {editingCustId ? 'Save Changes' : 'Add Customer'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
       {/* Manual Add/Edit Employee Modal */}
       {showEmployeeModal && (

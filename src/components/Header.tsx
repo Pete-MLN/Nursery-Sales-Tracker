@@ -25,12 +25,13 @@ export const Header: React.FC<HeaderProps> = ({
 
   if (currentScreen === 'login') return null;
 
+  const vercelUrl = 'https://nursery-sales-tracker.vercel.app';
   const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ais-dev-zvevl3ioe7v7ohcm2amabq-809006327917.us-east1.run.app';
   const devUrl = 'https://ais-dev-zvevl3ioe7v7ohcm2amabq-809006327917.us-east1.run.app';
   const preUrl = 'https://ais-pre-zvevl3ioe7v7ohcm2amabq-809006327917.us-east1.run.app';
 
-  const [selectedUrlType, setSelectedUrlType] = useState<'dev' | 'pre'>('dev');
-  const appUrl = selectedUrlType === 'dev' ? (currentUrl || devUrl) : preUrl;
+  const [selectedUrlType, setSelectedUrlType] = useState<'vercel' | 'dev' | 'pre'>('vercel');
+  const appUrl = selectedUrlType === 'vercel' ? vercelUrl : selectedUrlType === 'dev' ? (currentUrl || devUrl) : preUrl;
 
   const handleCopy = () => {
     navigator.clipboard.writeText(appUrl);
@@ -162,28 +163,39 @@ export const Header: React.FC<HeaderProps> = ({
               </p>
 
               {/* Mode Switcher */}
-              <div className="flex bg-[#f3f4f0] p-1 rounded-xl border border-[#e2e3df] mt-3">
+              <div className="flex bg-[#f3f4f0] p-1 rounded-xl border border-[#e2e3df] mt-3 gap-0.5">
+                <button
+                  type="button"
+                  onClick={() => setSelectedUrlType('vercel')}
+                  className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
+                    selectedUrlType === 'vercel'
+                      ? 'bg-[#19724f] text-white shadow-2xs'
+                      : 'text-[#414844] hover:text-[#002113]'
+                  }`}
+                >
+                  Vercel App
+                </button>
                 <button
                   type="button"
                   onClick={() => setSelectedUrlType('dev')}
-                  className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                  className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
                     selectedUrlType === 'dev'
                       ? 'bg-[#19724f] text-white shadow-2xs'
                       : 'text-[#414844] hover:text-[#002113]'
                   }`}
                 >
-                  Active App (Requires Google Sign-in)
+                  Active Dev
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedUrlType('pre')}
-                  className={`flex-1 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                  className={`flex-1 py-1 text-[10px] font-bold rounded-lg transition-all ${
                     selectedUrlType === 'pre'
                       ? 'bg-[#19724f] text-white shadow-2xs'
                       : 'text-[#414844] hover:text-[#002113]'
                   }`}
                 >
-                  Shared Link (Public Access)
+                  Shared Link
                 </button>
               </div>
 

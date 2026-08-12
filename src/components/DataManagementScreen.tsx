@@ -347,7 +347,6 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
   const filteredCustomers = customers.filter(cust => 
     cust.name.toLowerCase().includes(customerSearch.toLowerCase()) ||
     (cust.company && cust.company.toLowerCase().includes(customerSearch.toLowerCase())) ||
-    (cust.accountNo && cust.accountNo.toLowerCase().includes(customerSearch.toLowerCase())) ||
     (cust.email && cust.email.toLowerCase().includes(customerSearch.toLowerCase())) ||
     (cust.phone && cust.phone.includes(customerSearch)) ||
     (cust.type && cust.type.toLowerCase().includes(customerSearch.toLowerCase()))
@@ -373,11 +372,45 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
   return (
     <div className="flex-1 px-4 py-6 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-6">
-      {/* Intro Header */}
-      <div>
+      {/* Intro Header & Cloud Storage Info */}
+      <div className="flex flex-col gap-3">
         <p className="text-sm text-[#414844] leading-relaxed font-medium">
           Manage your nursery's core datasets. Keep inventory, customer records, and employee contact lists up to date for smooth operational workflows.
         </p>
+
+        {/* Database & Storage Status Panel */}
+        <div className="bg-[#012d1d] text-white p-4 rounded-2xl border border-[#0e6c4a]/40 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shrink-0 font-bold">
+              <FileCode className="w-5 h-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="font-bold text-sm text-white">Database Storage & Real-Time Cloud Sync</h4>
+                <span className="bg-[#a0f4c8] text-[#002113] text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Firestore Active
+                </span>
+              </div>
+              <p className="text-xs text-[#a0f4c8]/90 mt-0.5 leading-snug">
+                Uploaded data is stored in <strong className="text-white">Google Cloud Firestore</strong> (<code className="bg-[#002113] px-1.5 py-0.5 rounded text-[11px] text-[#a0f4c8]">customers</code> collection). Real-time listeners automatically update your device and order forms.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-3 shrink-0 self-end md:self-auto border-t md:border-t-0 md:border-l border-[#0e6c4a]/60 pt-3 md:pt-0 md:pl-4 text-xs">
+            <div className="text-right">
+              <span className="block text-[10px] font-bold text-[#a0f4c8]/80 uppercase">STORED CUSTOMERS</span>
+              <span className="text-base font-extrabold text-white">{customers.length.toLocaleString()} Records</span>
+            </div>
+            <button
+              onClick={() => handleOpenUploadModal('customer')}
+              className="bg-[#a0f4c8] hover:bg-[#a0f4c8]/90 text-[#002113] font-bold px-3 py-2 rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+            >
+              <UploadCloud className="w-4 h-4 text-[#002113]" />
+              <span>Upload File</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {/* Success Notification */}
@@ -442,22 +475,27 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
               <h3 className="text-lg font-bold text-[#1a1c1a]">Customer List</h3>
             </div>
 
-            <div className="relative z-10">
-              <span className="block text-[10px] font-bold text-[#414844] uppercase tracking-wider">
-                LAST UPLOAD
-              </span>
-              <span className="block text-sm font-bold text-[#1a1c1a] mt-0.5">
-                {lastCustomerDate}
+            <div className="relative z-10 flex flex-col gap-1">
+              <div>
+                <span className="block text-[10px] font-bold text-[#414844] uppercase tracking-wider">
+                  STORED IN FIRESTORE
+                </span>
+                <span className="block text-sm font-bold text-[#012d1d] mt-0.5">
+                  {customers.length.toLocaleString()} Active Accounts
+                </span>
+              </div>
+              <span className="text-[11px] text-[#717973] font-medium">
+                Last sync: {lastCustomerDate}
               </span>
             </div>
           </div>
 
           <button
             onClick={() => handleOpenUploadModal('customer')}
-            className="relative z-10 w-full bg-white hover:bg-[#e7e9e5] border border-[#0e6c4a] active:scale-[0.99] text-[#19724f] font-bold py-2.5 px-3 rounded-xl text-xs transition-all flex justify-center items-center gap-1.5 cursor-pointer mt-1"
+            className="relative z-10 w-full bg-[#0e6c4a] hover:bg-[#012d1d] active:scale-[0.99] text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all flex justify-center items-center gap-1.5 cursor-pointer mt-1 shadow-2xs"
           >
             <UploadCloud className="w-4 h-4" />
-            <span>Upload Data</span>
+            <span>Upload / Re-Import File</span>
           </button>
         </div>
 
@@ -544,7 +582,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
             type="text"
             value={customerSearch}
             onChange={(e) => setCustomerSearch(e.target.value)}
-            placeholder="Search customer by name, company, account #, phone, email, or type..."
+            placeholder="Search customer by name, company, phone, email, or type..."
             className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
           />
         </div>
@@ -584,11 +622,6 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                             : 'bg-[#e2e3df] text-[#414844]'
                         }`}>
                           {cust.type}
-                        </span>
-                      )}
-                      {cust.accountNo && (
-                        <span className="text-[10px] font-mono font-medium px-1.5 py-0.5 rounded bg-[#f3f4f0] text-[#717973] border border-[#c1c8c2]">
-                          #{cust.accountNo}
                         </span>
                       )}
                     </div>
@@ -836,34 +869,19 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-2">
-                <div>
-                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
-                    Account Type
-                  </label>
-                  <select
-                    value={custType}
-                    onChange={(e) => setCustType(e.target.value as any)}
-                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
-                  >
-                    <option value="RETAIL">Retail</option>
-                    <option value="WHOLESALE">Wholesale</option>
-                    <option value="COMMERCIAL">Commercial</option>
-                  </select>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
-                    Account #
-                  </label>
-                  <input
-                    type="text"
-                    value={custAccountNo}
-                    onChange={(e) => setCustAccountNo(e.target.value)}
-                    placeholder="e.g. C-1042"
-                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
-                  />
-                </div>
+              <div>
+                <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                  Account Type
+                </label>
+                <select
+                  value={custType}
+                  onChange={(e) => setCustType(e.target.value as any)}
+                  className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                >
+                  <option value="RETAIL">Retail</option>
+                  <option value="WHOLESALE">Wholesale</option>
+                  <option value="COMMERCIAL">Commercial</option>
+                </select>
               </div>
 
               <div>
@@ -1036,8 +1054,8 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
       {/* Dataset File Import Modal */}
       {activeUploadModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 pt-8 md:pt-14 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-2xl flex flex-col gap-4 animate-fade-in my-auto md:my-0">
             {/* Hidden HTML File Input */}
             <input
               ref={fileInputRef}

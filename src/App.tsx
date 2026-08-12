@@ -29,6 +29,7 @@ import {
   saveOrderToFirestore,
   saveUploadToFirestore
 } from './services/firebaseService';
+import { sanitizeCustomerName } from './utils/customerNameCleaner';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
@@ -56,7 +57,9 @@ export default function App() {
       if (data && data.length > 0) setInventory(data);
     });
     const unsubCustomers = subscribeToCustomers((data) => {
-      if (data && data.length > 0) setCustomers(data);
+      if (data && data.length > 0) {
+        setCustomers(data);
+      }
     });
     const unsubEmployees = subscribeToEmployees((data) => {
       if (data && data.length > 0) setEmployees(data);

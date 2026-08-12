@@ -160,9 +160,21 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     onNavigate('holding_location');
   };
 
+  const matchingCustomers = customers.filter(c => {
+    if (!customerSearch.trim()) return true;
+    const q = customerSearch.toLowerCase();
+    return (
+      c.name.toLowerCase().includes(q) ||
+      (c.company && c.company.toLowerCase().includes(q)) ||
+      (c.email && c.email.toLowerCase().includes(q)) ||
+      (c.phone && c.phone.includes(q)) ||
+      c.type.toLowerCase().includes(q)
+    );
+  });
+
   return (
     <div className="flex-1 px-4 py-4 w-full max-w-2xl mx-auto pb-44 animate-fade-in flex flex-col gap-4">
-      {/* Customer Search & Account Bar */}
+      {/* Customer Search Bar */}
       <section className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
           {/* Searchable Dropdown Container */}
@@ -178,7 +190,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   setSelectedCustomer(e.target.value);
                   setIsDropdownOpen(true);
                 }}
-                placeholder="Search customer account or company..."
+                placeholder="Search customer name or company..."
                 className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-16 py-2 text-sm font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white transition-all shadow-2xs"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
@@ -212,11 +224,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-[#c1c8c2] rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto animate-fade-in">
                 <div className="p-1.5 flex flex-col gap-0.5">
                   <div className="px-3 py-1.5 text-[10px] font-bold text-[#717973] uppercase tracking-wider bg-[#f9faf6] rounded-md flex justify-between items-center">
-                    <span>Customer Accounts ({customers.filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.type.toLowerCase().includes(customerSearch.toLowerCase())).length})</span>
-                    <span className="text-[9px] font-normal text-[#717973]">Type to filter</span>
+                    <span>Customer Accounts ({matchingCustomers.length})</span>
+                    <span className="text-[9px] font-normal text-[#717973]">Type name or company to filter</span>
                   </div>
 
-                  {customers.filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.type.toLowerCase().includes(customerSearch.toLowerCase())).length === 0 ? (
+                  {matchingCustomers.length === 0 ? (
                     <div className="p-3 text-center text-xs text-[#717973]">
                       <span>No matching customers found.</span>
                       {customerSearch && (
@@ -234,48 +246,55 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       )}
                     </div>
                   ) : (
-                    customers
-                      .filter(c => c.name.toLowerCase().includes(customerSearch.toLowerCase()) || c.type.toLowerCase().includes(customerSearch.toLowerCase()))
-                      .map((cust) => {
-                        const isSelected = selectedCustomer === cust.name;
-                        return (
-                          <button
-                            key={cust.id}
-                            type="button"
-                            onClick={() => {
-                              setSelectedCustomer(cust.name);
-                              setCustomerSearch(cust.name);
-                              if (cust.type === 'WHOLESALE' || cust.type === 'RETAIL') {
-                                setCustomerType(cust.type);
-                              }
-                              setIsDropdownOpen(false);
-                            }}
-                            className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
-                              isSelected
-                                ? 'bg-[#012d1d] text-white font-bold'
-                                : 'hover:bg-[#f3f4f0] text-[#1a1c1a]'
-                            }`}
-                          >
-                            <div className="flex items-center gap-2">
-                              <User className={`w-3.5 h-3.5 ${isSelected ? 'text-[#a0f4c8]' : 'text-[#0e6c4a]'}`} />
-                              <span>{cust.name}</span>
-                            </div>
-
-                            <div className="flex items-center gap-1.5">
-                              <span
-                                className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
-                                  isSelected
-                                    ? 'bg-[#a0f4c8] text-[#002113]'
-                                    : 'bg-[#e2e3df] text-[#414844]'
-                                }`}
-                              >
-                                {cust.type}
+                    matchingCustomers.map((cust) => {
+                      const isSelected = selectedCustomer === cust.name;
+                      return (
+                        <button
+                          key={cust.id}
+                          type="button"
+                          onClick={() => {
+                            setSelectedCustomer(cust.name);
+                            setCustomerSearch(cust.name);
+                            if (cust.type === 'WHOLESALE' || cust.type === 'RETAIL') {
+                              setCustomerType(cust.type);
+                            }
+                            setIsDropdownOpen(false);
+                          }}
+                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                            isSelected
+                              ? 'bg-[#012d1d] text-white font-bold'
+                              : 'hover:bg-[#f3f4f0] text-[#1a1c1a]'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2 min-w-0">
+                            <User className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#a0f4c8]' : 'text-[#0e6c4a]'}`} />
+                            <div className="flex flex-col min-w-0">
+                              <span className={`font-bold text-xs truncate ${isSelected ? 'text-white' : 'text-[#1a1c1a]'}`}>
+                                {cust.name}
                               </span>
-                              {isSelected && <Check className="w-3.5 h-3.5 text-[#a0f4c8]" />}
+                              {cust.company && cust.company !== cust.name && (
+                                <span className={`text-[10px] truncate ${isSelected ? 'text-[#a0f4c8]/80' : 'text-[#717973]'}`}>
+                                  {cust.company}
+                                </span>
+                              )}
                             </div>
-                          </button>
-                        );
-                      })
+                          </div>
+
+                          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                            <span
+                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                                isSelected
+                                  ? 'bg-[#a0f4c8] text-[#002113]'
+                                  : 'bg-[#e2e3df] text-[#414844]'
+                              }`}
+                            >
+                              {cust.type}
+                            </span>
+                            {isSelected && <Check className="w-3.5 h-3.5 text-[#a0f4c8]" />}
+                          </div>
+                        </button>
+                      );
+                    })
                   )}
                 </div>
               </div>
@@ -296,27 +315,30 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           <span className="text-[#414844] font-semibold tracking-wider text-[11px] uppercase shrink-0">
             Quick Select:
           </span>
-          {customers.map((cust) => (
-            <button
-              key={cust.id}
-              type="button"
-              onClick={() => {
-                setSelectedCustomer(cust.name);
-                setCustomerSearch(cust.name);
-                if (cust.type === 'WHOLESALE' || cust.type === 'RETAIL') {
-                  setCustomerType(cust.type);
-                }
-                setIsDropdownOpen(false);
-              }}
-              className={`px-3 py-1 rounded-full text-xs transition-all shrink-0 cursor-pointer ${
-                selectedCustomer === cust.name
-                  ? 'bg-[#012d1d] text-[#a0f4c8] font-bold shadow-2xs'
-                  : 'bg-[#e2e3df] text-[#1a1c1a] hover:bg-[#d9dad7]'
-              }`}
-            >
-              {cust.name}
-            </button>
-          ))}
+          {customers.map((cust) => {
+            const isSelected = selectedCustomer === cust.name;
+            return (
+              <button
+                key={cust.id}
+                type="button"
+                onClick={() => {
+                  setSelectedCustomer(cust.name);
+                  setCustomerSearch(cust.name);
+                  if (cust.type === 'WHOLESALE' || cust.type === 'RETAIL') {
+                    setCustomerType(cust.type);
+                  }
+                  setIsDropdownOpen(false);
+                }}
+                className={`px-3 py-1 rounded-full text-xs transition-all shrink-0 cursor-pointer ${
+                  isSelected
+                    ? 'bg-[#012d1d] text-[#a0f4c8] font-bold shadow-2xs'
+                    : 'bg-[#e2e3df] text-[#1a1c1a] hover:bg-[#d9dad7]'
+                }`}
+              >
+                {cust.name}
+              </button>
+            );
+          })}
         </div>
       </section>
 

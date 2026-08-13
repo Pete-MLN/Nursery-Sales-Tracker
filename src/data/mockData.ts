@@ -182,6 +182,31 @@ export const INITIAL_PLANTS: PlantItem[] = [
     holdingLocation: 'F4B',
     statusActive: true,
     storeLocId: '101'
+  },
+  {
+    id: 'p41796',
+    itemNo: '41796',
+    name: 'Emerald Green Arborvitae',
+    commonName: 'Emerald Green Arborvitae',
+    botanicalName: 'Thuja occidentalis Emerald',
+    size: '3 GAL',
+    lightRequirement: 'FULL SUN',
+    price: 38.50,
+    prices: {
+      retail: 38.50,
+      wholesale: 29.00,
+      gardenCenter: 24.00,
+      elite: 22.00
+    },
+    image: DEFAULT_PLANT_IMAGE,
+    stock: 28,
+    quantityCommitted: 0,
+    status: 'healthy',
+    barcode: '41796',
+    category: 'EVERGREEN/',
+    holdingLocation: 'E2A',
+    statusActive: true,
+    storeLocId: '101'
   }
 ];
 

@@ -3,6 +3,7 @@ import { ScreenType, PlantItem, OrderCartItem, Customer } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2 } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
+import { findPlantByBarcode } from '../utils/barcodeUtils';
 
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -87,20 +88,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       try { navigator.vibrate(100); } catch (e) {}
     }
 
-    const cleanLower = cleanCode.toLowerCase();
-    let matchedPlant = inventory.find(item => 
-      (item.barcode && item.barcode.trim().toLowerCase() === cleanLower) ||
-      (item.itemNo && item.itemNo.trim().toLowerCase() === cleanLower) ||
-      (item.id && item.id.trim().toLowerCase() === cleanLower)
-    );
-
-    if (!matchedPlant) {
-      matchedPlant = inventory.find(item =>
-        item.name.toLowerCase().includes(cleanLower) ||
-        (item.botanicalName && item.botanicalName.toLowerCase().includes(cleanLower)) ||
-        (item.commonName && item.commonName.toLowerCase().includes(cleanLower))
-      );
-    }
+    const matchedPlant = findPlantByBarcode(cleanCode, inventory);
 
     if (matchedPlant) {
       setCartItems(prev => {
@@ -643,10 +631,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             Test Barcodes:
           </span>
           {[
-            { code: '41198', label: 'Golden Pothos' },
+            { code: '41796', label: 'Arborvitae' },
+            { code: '041796', label: 'iPhone Lead Zero' },
+            { code: '41198', label: 'Blue Prince' },
             { code: '41688', label: 'Kickin Aster' },
-            { code: '10008', label: 'Black-Eyed Susan' },
-            { code: '1000', label: 'Item #1000' }
+            { code: '10008', label: 'Black-Eyed Susan' }
           ].map((preset) => (
             <button
               key={preset.code}

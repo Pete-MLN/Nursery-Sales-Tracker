@@ -636,20 +636,20 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           className="flex items-center gap-2"
         >
           <div className="relative flex-1">
-            <Barcode className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
+            <Barcode className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
             <input
               type="text"
               value={manualBarcodeInput}
               onChange={(e) => setManualBarcodeInput(e.target.value)}
               placeholder="Enter or paste barcode / SKU..."
-              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-3 py-2 text-xs text-[#1a1c1a] outline-none focus:border-[#012d1d] font-mono"
+              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-10 pr-3 py-3 text-base text-[#1a1c1a] outline-none focus:border-[#012d1d] font-mono font-medium"
             />
           </div>
           <button
             type="submit"
-            className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+            className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-bold px-4 py-3 rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
           >
-            <Search className="w-3.5 h-3.5" />
+            <Search className="w-4 h-4" />
             <span>Scan Code</span>
           </button>
         </form>

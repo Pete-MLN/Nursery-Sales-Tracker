@@ -116,15 +116,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
       {/* Main Container */}
       <main className="relative z-10 w-full max-w-md mx-auto my-auto">
-        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#c1c8c2] p-6 md:p-8 flex flex-col gap-5 animate-fade-in">
+        <div className="bg-white/95 backdrop-blur-md rounded-2xl shadow-xl border border-[#c1c8c2] p-6 md:p-8 flex flex-col gap-6 animate-fade-in">
           {/* Quick Staff Selectors (Instant Login for Nursery Personnel) - Placed at Top */}
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2.5">
             <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-[#0e6c4a] uppercase tracking-wider flex items-center gap-1">
-                <ShieldCheck className="w-4 h-4 text-[#0e6c4a]" />
+              <span className="text-xs md:text-sm font-extrabold text-[#0e6c4a] uppercase tracking-wider flex items-center gap-1.5">
+                <ShieldCheck className="w-4.5 h-4.5 text-[#0e6c4a]" />
                 Quick Staff Switch / Tap Login
               </span>
-              <span className="text-xs text-[#717973] font-medium">1-Tap Access</span>
+              <span className="text-xs text-[#717973] font-semibold">1-Tap Access</span>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
               {DEMO_STAFF_ACCOUNTS.map((staff) => (
@@ -132,12 +132,12 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   key={staff.email}
                   type="button"
                   onClick={() => handleQuickLogin(staff)}
-                  className="p-3 bg-[#f3f4f0] hover:bg-[#a0f4c8]/40 active:scale-[0.98] border border-[#c1c8c2] hover:border-[#0e6c4a] rounded-xl text-left transition-all flex flex-col cursor-pointer group shadow-2xs"
+                  className="p-3.5 bg-[#f3f4f0] hover:bg-[#a0f4c8]/40 active:scale-[0.98] border border-[#c1c8c2] hover:border-[#0e6c4a] rounded-xl text-left transition-all flex flex-col cursor-pointer group shadow-2xs"
                 >
-                  <span className="text-sm font-bold text-[#012d1d] group-hover:text-[#0e6c4a] truncate">
+                  <span className="text-base font-extrabold text-[#012d1d] group-hover:text-[#0e6c4a] truncate">
                     {staff.name}
                   </span>
-                  <span className="text-xs text-[#717973] truncate">
+                  <span className="text-xs font-medium text-[#555d58] truncate">
                     {staff.role}
                   </span>
                 </button>
@@ -147,34 +147,34 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
           <div className="relative flex items-center justify-center my-1">
             <div className="border-t border-[#e2e3df] w-full" />
-            <span className="bg-white px-3 text-xs font-bold uppercase text-[#717973] tracking-wider absolute">
+            <span className="bg-white px-3 text-xs font-extrabold uppercase text-[#717973] tracking-wider absolute">
               OR EMAIL LOGIN
             </span>
           </div>
 
           {/* Brand Header */}
-          <div className="flex flex-col items-center justify-center gap-1.5 pb-1">
-            <div className="w-12 h-12 bg-[#a0f4c8] text-[#19724f] rounded-2xl flex items-center justify-center mb-0.5 shadow-xs border border-[#0e6c4a]/20">
-              <Sprout className="w-7 h-7 text-[#0e6c4a]" />
+          <div className="flex flex-col items-center justify-center gap-2 pb-1">
+            <div className="w-14 h-14 bg-[#a0f4c8] text-[#19724f] rounded-2xl flex items-center justify-center mb-0.5 shadow-xs border border-[#0e6c4a]/20">
+              <Sprout className="w-8 h-8 text-[#0e6c4a]" />
             </div>
             <h1 className="text-2xl md:text-3xl font-extrabold text-[#012d1d] tracking-tight text-center">
               Maple Lane Nursery
             </h1>
-            <p className="text-sm text-[#414844] text-center font-medium">
+            <p className="text-sm md:text-base text-[#414844] text-center font-semibold">
               Field Sales & Inventory Management
             </p>
           </div>
 
           {/* Error Message Alert */}
           {errorMsg && (
-            <div className="p-3 bg-[#ffdad6] text-[#ba1a1a] rounded-xl text-sm flex items-center gap-2 border border-[#ffb4ab]">
-              <AlertCircle className="w-4 h-4 shrink-0" />
+            <div className="p-3.5 bg-[#ffdad6] text-[#ba1a1a] rounded-xl text-sm font-semibold flex items-center gap-2 border border-[#ffb4ab]">
+              <AlertCircle className="w-5 h-5 shrink-0" />
               <span>{errorMsg}</span>
             </div>
           )}
 
           {/* Email / Password Form */}
-          <form onSubmit={handleSubmit} className="flex flex-col gap-4">
+          <form onSubmit={handleSubmit} className="flex flex-col gap-4.5">
             {/* Username/Email */}
             <div className="flex flex-col gap-1.5">
               <label htmlFor="username" className="text-sm font-bold text-[#1a1c1a] uppercase tracking-wider">
@@ -189,7 +189,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   value={username}
                   onChange={(e) => setUsername(e.target.value)}
                   placeholder="e.g. pete@maplelanenursery.com"
-                  className="w-full bg-white border border-[#717973] rounded-xl pl-11 pr-3 py-3.5 text-base text-[#1a1c1a] placeholder:text-[#c1c8c2] focus:outline-none focus:border-[#012d1d] focus:ring-1 focus:ring-[#012d1d] transition-all"
+                  className="w-full bg-white border border-[#717973] rounded-xl pl-11 pr-3 py-3.5 text-base md:text-lg font-medium text-[#1a1c1a] placeholder:text-[#c1c8c2] focus:outline-none focus:border-[#012d1d] focus:ring-1 focus:ring-[#012d1d] transition-all"
                 />
               </div>
             </div>
@@ -203,7 +203,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 <a
                   href="#forgot"
                   onClick={(e) => { e.preventDefault(); alert('Password reset request sent to system administrator.'); }}
-                  className="text-xs font-semibold text-[#0e6c4a] hover:text-[#012d1d] hover:underline"
+                  className="text-xs md:text-sm font-bold text-[#0e6c4a] hover:text-[#012d1d] hover:underline"
                 >
                   Forgot Password?
                 </a>
@@ -217,7 +217,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
                   placeholder="••••••••"
-                  className="w-full bg-white border border-[#717973] rounded-xl pl-11 pr-11 py-3.5 text-base text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:ring-1 focus:ring-[#012d1d] transition-all"
+                  className="w-full bg-white border border-[#717973] rounded-xl pl-11 pr-11 py-3.5 text-base md:text-lg font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:ring-1 focus:ring-[#012d1d] transition-all"
                 />
                 <button
                   type="button"
@@ -232,15 +232,15 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
 
             {/* Persistence Option */}
             <div className="flex items-center justify-between mt-1">
-              <label htmlFor="remember" className="flex items-center gap-2 cursor-pointer select-none">
+              <label htmlFor="remember" className="flex items-center gap-2.5 cursor-pointer select-none">
                 <input
                   id="remember"
                   type="checkbox"
                   checked={keepSignedIn}
                   onChange={(e) => setKeepSignedIn(e.target.checked)}
-                  className="w-4.5 h-4.5 rounded border-[#717973] text-[#012d1d] focus:ring-[#012d1d] cursor-pointer"
+                  className="w-5 h-5 rounded border-[#717973] text-[#012d1d] focus:ring-[#012d1d] cursor-pointer"
                 />
-                <span className="text-xs md:text-sm text-[#414844] font-medium">
+                <span className="text-sm md:text-base text-[#414844] font-semibold">
                   Keep me signed in on this device
                 </span>
               </label>
@@ -250,10 +250,10 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
             <button
               type="submit"
               disabled={isLoading}
-              className="mt-2 w-full bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50 text-base"
+              className="mt-2 w-full bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-white font-extrabold py-4 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2.5 cursor-pointer disabled:opacity-50 text-base md:text-lg"
             >
               {isLoading ? (
-                <span className="text-sm">Signing in...</span>
+                <span className="text-base">Signing in...</span>
               ) : (
                 <>
                   <span>Sign In</span>
@@ -267,7 +267,7 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
               type="button"
               onClick={handleGoogleSignIn}
               disabled={isLoading}
-              className="w-full bg-white hover:bg-[#f3f4f0] active:scale-[0.98] text-[#1a1c1a] font-semibold py-3.5 px-4 rounded-xl border border-[#c1c8c2] transition-all flex items-center justify-center gap-2.5 cursor-pointer text-sm"
+              className="w-full bg-white hover:bg-[#f3f4f0] active:scale-[0.98] text-[#1a1c1a] font-extrabold py-3.5 px-4 rounded-xl border border-[#c1c8c2] transition-all flex items-center justify-center gap-2.5 cursor-pointer text-base"
             >
               <svg className="w-5 h-5" viewBox="0 0 24 24">
                 <path
@@ -293,8 +293,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
         </div>
 
         {/* Footer info */}
-        <div className="mt-4 text-center text-[11px] font-bold text-[#717973] uppercase tracking-wider flex items-center justify-center gap-1.5">
-          <CheckCircle2 className="w-3.5 h-3.5 text-[#0e6c4a]" />
+        <div className="mt-4 text-center text-xs font-extrabold text-[#717973] uppercase tracking-wider flex items-center justify-center gap-1.5">
+          <CheckCircle2 className="w-4 h-4 text-[#0e6c4a]" />
           Session Persistence Active
         </div>
       </main>

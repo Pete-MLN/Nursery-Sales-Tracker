@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee } from './types';
+import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings } from './types';
 import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, INITIAL_EMPLOYEES } from './data/mockData';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -48,6 +48,24 @@ export default function App() {
   const [activeOrder, setActiveOrder] = useState<Order | null>(INITIAL_ORDERS[2]); // ORD-90210-A
   const [screenHistory, setScreenHistory] = useState<ScreenType[]>(['home']);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
+
+  // Global Stock Alert Thresholds State with local persistence
+  const [stockAlertSettings, setStockAlertSettings] = useState<StockAlertSettings>(() => {
+    const saved = localStorage.getItem('nursery_stock_alert_settings');
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {
+        // Fallback to default
+      }
+    }
+    return { criticalThreshold: 0, warningThreshold: 5, alertsEnabled: true };
+  });
+
+  const handleUpdateStockAlertSettings = (newSettings: StockAlertSettings) => {
+    setStockAlertSettings(newSettings);
+    localStorage.setItem('nursery_stock_alert_settings', JSON.stringify(newSettings));
+  };
 
   // Initialize and subscribe to real-time Firestore updates for multi-device syncing
   useEffect(() => {
@@ -265,6 +283,7 @@ export default function App() {
             onNavigate={navigateTo}
             inventory={inventory}
             onUpdateStock={handleUpdateStock}
+            stockAlertSettings={stockAlertSettings}
           />
         )}
 
@@ -315,6 +334,8 @@ export default function App() {
             user={user}
             onLogout={handleLogout}
             onNavigate={navigateTo}
+            stockAlertSettings={stockAlertSettings}
+            onUpdateStockAlertSettings={handleUpdateStockAlertSettings}
           />
         )}
       </main>
@@ -324,7 +345,11 @@ export default function App() {
         currentScreen={currentScreen}
         onNavigate={navigateTo}
         pendingOrdersCount={orders.filter(o => o.status === 'Pending').length}
-        criticalAlertsCount={inventory.filter(i => i.status === 'critical').length}
+        criticalAlertsCount={
+          stockAlertSettings.alertsEnabled
+            ? inventory.filter(i => i.stock <= stockAlertSettings.criticalThreshold).length
+            : 0
+        }
       />
     </div>
   );

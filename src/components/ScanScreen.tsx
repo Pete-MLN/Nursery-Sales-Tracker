@@ -31,8 +31,28 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       [plantId]: prev[plantId] === 'Pick-up/Delivery' ? 'Take Now' : 'Pick-up/Delivery'
     }));
   };
+  const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+
+  // Attach camera stream to video element when camera becomes active or stream changes
+  useEffect(() => {
+    if (cameraActive && cameraStream && videoRef.current) {
+      videoRef.current.srcObject = cameraStream;
+      videoRef.current.play().catch(err => {
+        console.warn('Video play error:', err);
+      });
+    }
+  }, [cameraActive, cameraStream]);
+
+  // Clean up camera stream on unmount
+  useEffect(() => {
+    return () => {
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+      }
+    };
+  }, [cameraStream]);
 
   // Close dropdown on click outside
   useEffect(() => {
@@ -89,21 +109,30 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   // Enable actual webcam feed if requested or permitted
   const toggleCameraFeed = async () => {
     if (cameraActive) {
-      if (videoRef.current && videoRef.current.srcObject) {
-        const stream = videoRef.current.srcObject as MediaStream;
-        stream.getTracks().forEach(track => track.stop());
+      if (cameraStream) {
+        cameraStream.getTracks().forEach(track => track.stop());
+        setCameraStream(null);
+      }
+      if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
       setCameraActive(false);
     } else {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } });
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
+        let stream: MediaStream;
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
+          });
+        } catch (e) {
+          // Fallback to basic video request if environment camera constraint failed
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
         }
+
+        setCameraStream(stream);
         setCameraActive(true);
       } catch (err) {
-        // Fallback to animated simulated camera
+        console.error('Camera access error:', err);
         setCameraActive(false);
         simulateScanItem();
       }

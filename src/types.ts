@@ -96,3 +96,10 @@ export interface User {
   role: string;
   isLoggedIn: boolean;
 }
+
+export interface StockAlertSettings {
+  criticalThreshold: number;
+  warningThreshold: number;
+  alertsEnabled: boolean;
+}
+

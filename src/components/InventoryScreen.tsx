@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScreenType, PlantItem } from '../types';
+import { ScreenType, PlantItem, StockAlertSettings } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { 
   AlertTriangle, 
@@ -24,21 +24,32 @@ interface InventoryScreenProps {
   onNavigate: (screen: ScreenType) => void;
   inventory: PlantItem[];
   onUpdateStock: (id: string, newStock: number) => void;
+  stockAlertSettings?: StockAlertSettings;
 }
 
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   onNavigate,
   inventory,
-  onUpdateStock
+  onUpdateStock,
+  stockAlertSettings
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy'>('all');
   const [minQtyOneOnly, setMinQtyOneOnly] = useState<boolean>(true);
   const [expandedPricesItemId, setExpandedPricesItemId] = useState<string | null>(null);
 
-  const criticalCount = inventory.filter(i => i.status === 'critical').length;
-  const warningCount = inventory.filter(i => i.status === 'warning').length;
-  const healthyCount = inventory.filter(i => i.status === 'healthy').length;
+  const critThreshold = stockAlertSettings?.criticalThreshold ?? 0;
+  const warnThreshold = stockAlertSettings?.warningThreshold ?? 5;
+
+  const getItemStatus = (item: PlantItem): 'critical' | 'warning' | 'healthy' => {
+    if (item.stock <= critThreshold) return 'critical';
+    if (item.stock <= warnThreshold) return 'warning';
+    return 'healthy';
+  };
+
+  const criticalCount = inventory.filter(i => getItemStatus(i) === 'critical').length;
+  const warningCount = inventory.filter(i => getItemStatus(i) === 'warning').length;
+  const healthyCount = inventory.filter(i => getItemStatus(i) === 'healthy').length;
 
   const filteredInventory = inventory.filter(item => {
     if (minQtyOneOnly && item.stock < 1) {
@@ -58,7 +69,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
       item.lightRequirement.toLowerCase().includes(term);
     
     if (statusFilter === 'all') return matchesSearch;
-    return matchesSearch && item.status === statusFilter;
+    return matchesSearch && getItemStatus(item) === statusFilter;
   });
 
   return (
@@ -236,10 +247,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             </div>
           ) : (
             filteredInventory.map((item) => {
+              const currentStatus = getItemStatus(item);
               const statusBadge = 
-                item.status === 'critical'
+                currentStatus === 'critical'
                   ? { label: 'CRITICAL', bg: 'bg-[#ffdad6] text-[#ba1a1a] border-[#ba1a1a]/30' }
-                  : item.status === 'warning'
+                  : currentStatus === 'warning'
                   ? { label: 'LOW STOCK', bg: 'bg-[#fef9c3] text-[#854d0e] border-[#ca8a04]/30' }
                   : { label: 'IN STOCK', bg: 'bg-[#a0f4c8] text-[#0e6c4a] border-[#0e6c4a]/30' };
 
@@ -249,7 +261,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                 <div
                   key={item.id}
                   className={`p-3.5 rounded-xl border transition-all flex flex-col gap-3 ${
-                    item.status === 'critical' 
+                    currentStatus === 'critical' 
                       ? 'bg-[#fff5f5] border-[#ba1a1a]/40' 
                       : 'bg-[#f9faf6] border-[#c1c8c2]/80 hover:border-[#012d1d]'
                   }`}

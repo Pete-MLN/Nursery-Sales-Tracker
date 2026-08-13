@@ -1,23 +1,49 @@
 import React, { useState } from 'react';
-import { ScreenType, User } from '../types';
-import { User as UserIcon, LogOut, FileSpreadsheet, MapPin, Database, Bell, Shield, Moon, Sun, Check, Smartphone, QrCode, Copy, ExternalLink, Wifi } from 'lucide-react';
+import { ScreenType, User, StockAlertSettings } from '../types';
+import { User as UserIcon, LogOut, FileSpreadsheet, MapPin, Database, Bell, Shield, Moon, Sun, Check, Smartphone, QrCode, Copy, ExternalLink, Wifi, AlertTriangle, Plus, Minus, Sliders, CheckCircle2 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface SettingsScreenProps {
   user: User;
   onLogout: () => void;
   onNavigate: (screen: ScreenType) => void;
+  stockAlertSettings: StockAlertSettings;
+  onUpdateStockAlertSettings: (newSettings: StockAlertSettings) => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   user,
   onLogout,
-  onNavigate
+  onNavigate,
+  stockAlertSettings,
+  onUpdateStockAlertSettings
 }) => {
   const [gpsEnabled, setGpsEnabled] = useState<boolean>(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
   const [darkMode, setDarkMode] = useState<boolean>(false);
   const [copied, setCopied] = useState<boolean>(false);
+  const [savedFeedback, setSavedFeedback] = useState<boolean>(false);
+
+  const handleUpdateCritical = (val: number) => {
+    onUpdateStockAlertSettings({
+      ...stockAlertSettings,
+      criticalThreshold: val
+    });
+    triggerSavedFeedback();
+  };
+
+  const handleUpdateWarning = (val: number) => {
+    onUpdateStockAlertSettings({
+      ...stockAlertSettings,
+      warningThreshold: val
+    });
+    triggerSavedFeedback();
+  };
+
+  const triggerSavedFeedback = () => {
+    setSavedFeedback(true);
+    setTimeout(() => setSavedFeedback(false), 2000);
+  };
 
   const vercelUrl = 'https://nursery-sales-tracker.vercel.app';
   const currentUrl = typeof window !== 'undefined' ? window.location.origin : 'https://ais-dev-zvevl3ioe7v7ohcm2amabq-809006327917.us-east1.run.app';
@@ -206,6 +232,178 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             Routing
           </span>
         </button>
+      </div>
+
+      {/* Global Stock Alert Thresholds Section */}
+      <div className="bg-white p-5 rounded-2xl border border-[#c1c8c2] shadow-2xs flex flex-col gap-5">
+        <div className="flex items-start justify-between gap-3 border-b border-[#f3f4f0] pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#ffdad6] text-[#ba1a1a] flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-[#012d1d]">Global Stock Alert Thresholds</h3>
+              <p className="text-xs text-[#414844]">Set inventory quantity limits for automatic restock warnings & alerts</p>
+            </div>
+          </div>
+          {savedFeedback ? (
+            <span className="bg-[#a0f4c8] text-[#002113] text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 flex items-center gap-1 animate-fade-in">
+              <CheckCircle2 className="w-3 h-3 text-[#0e6c4a]" />
+              Saved
+            </span>
+          ) : (
+            <span className="bg-[#e7e9e5] text-[#414844] text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
+              Active
+            </span>
+          )}
+        </div>
+
+        {/* Critical Restock Threshold */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-xs font-bold text-[#ba1a1a] uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#ba1a1a]" />
+                Critical Restock Level
+              </label>
+              <p className="text-xs text-[#717973] mt-0.5">
+                Stock ≤ this value flags item as Critical (Red alert)
+              </p>
+            </div>
+            <div className="flex items-center gap-1 bg-[#f3f4f0] p-1 rounded-xl border border-[#c1c8c2]">
+              <button
+                type="button"
+                onClick={() => handleUpdateCritical(Math.max(0, stockAlertSettings.criticalThreshold - 1))}
+                className="w-8 h-8 rounded-lg bg-white border border-[#c1c8c2] hover:bg-[#e7e9e5] text-[#1a1c1a] font-bold flex items-center justify-center text-sm cursor-pointer active:scale-95 transition-all"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <input
+                type="number"
+                min={0}
+                max={999}
+                value={stockAlertSettings.criticalThreshold}
+                onChange={(e) => handleUpdateCritical(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                className="w-12 text-center font-bold text-sm bg-transparent outline-none text-[#012d1d]"
+              />
+              <button
+                type="button"
+                onClick={() => handleUpdateCritical(stockAlertSettings.criticalThreshold + 1)}
+                className="w-8 h-8 rounded-lg bg-white border border-[#c1c8c2] hover:bg-[#e7e9e5] text-[#1a1c1a] font-bold flex items-center justify-center text-sm cursor-pointer active:scale-95 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className="text-[11px] font-medium text-[#717973]">Presets:</span>
+            {[0, 2, 3, 5, 10].map((val) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => handleUpdateCritical(val)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                  stockAlertSettings.criticalThreshold === val
+                    ? 'bg-[#ba1a1a] text-white border-[#ba1a1a] shadow-2xs'
+                    : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+                }`}
+              >
+                {val === 0 ? '0 (Out of stock)' : `${val} units`}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <hr className="border-[#f3f4f0]" />
+
+        {/* Low Stock Warning Threshold */}
+        <div className="flex flex-col gap-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-xs font-bold text-[#854d0e] uppercase tracking-wider flex items-center gap-1.5">
+                <span className="w-2 h-2 rounded-full bg-[#ca8a04]" />
+                Low Stock Warning Level
+              </label>
+              <p className="text-xs text-[#717973] mt-0.5">
+                Stock ≤ this value flags item as Low Stock (Yellow alert)
+              </p>
+            </div>
+            <div className="flex items-center gap-1 bg-[#f3f4f0] p-1 rounded-xl border border-[#c1c8c2]">
+              <button
+                type="button"
+                onClick={() => handleUpdateWarning(Math.max(stockAlertSettings.criticalThreshold + 1, stockAlertSettings.warningThreshold - 1))}
+                className="w-8 h-8 rounded-lg bg-white border border-[#c1c8c2] hover:bg-[#e7e9e5] text-[#1a1c1a] font-bold flex items-center justify-center text-sm cursor-pointer active:scale-95 transition-all"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <input
+                type="number"
+                min={stockAlertSettings.criticalThreshold + 1}
+                max={999}
+                value={stockAlertSettings.warningThreshold}
+                onChange={(e) => handleUpdateWarning(Math.max(stockAlertSettings.criticalThreshold + 1, parseInt(e.target.value, 10) || 1))}
+                className="w-12 text-center font-bold text-sm bg-transparent outline-none text-[#012d1d]"
+              />
+              <button
+                type="button"
+                onClick={() => handleUpdateWarning(stockAlertSettings.warningThreshold + 1)}
+                className="w-8 h-8 rounded-lg bg-white border border-[#c1c8c2] hover:bg-[#e7e9e5] text-[#1a1c1a] font-bold flex items-center justify-center text-sm cursor-pointer active:scale-95 transition-all"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className="text-[11px] font-medium text-[#717973]">Presets:</span>
+            {[5, 10, 15, 20, 25].map((val) => (
+              <button
+                key={val}
+                type="button"
+                onClick={() => handleUpdateWarning(val)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                  stockAlertSettings.warningThreshold === val
+                    ? 'bg-[#ca8a04] text-white border-[#ca8a04] shadow-2xs'
+                    : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+                }`}
+              >
+                {val} units
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <hr className="border-[#f3f4f0]" />
+
+        {/* Navigation Alert Badge Switch */}
+        <div className="flex items-center justify-between">
+          <div>
+            <span className="block text-sm font-bold text-[#1a1c1a]">Nav Bar Alert Counter Badge</span>
+            <span className="block text-xs text-[#717973]">Show critical stock count badge on bottom navigation tab</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onUpdateStockAlertSettings({
+                ...stockAlertSettings,
+                alertsEnabled: !stockAlertSettings.alertsEnabled
+              });
+              triggerSavedFeedback();
+            }}
+            className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+              stockAlertSettings.alertsEnabled ? 'bg-[#0e6c4a]' : 'bg-[#c1c8c2]'
+            }`}
+          >
+            <span
+              className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                stockAlertSettings.alertsEnabled ? 'translate-x-5' : 'translate-x-0'
+              }`}
+            />
+          </button>
+        </div>
       </div>
 
       {/* Preferences Toggles */}

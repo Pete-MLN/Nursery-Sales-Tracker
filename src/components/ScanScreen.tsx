@@ -39,6 +39,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   // Bulk Quick Selector State
   const [bulkTab, setBulkTab] = useState<'ALL' | 'MULCH' | 'STONE' | 'TOP SOIL'>('ALL');
+  const [isBulkSectionOpen, setIsBulkSectionOpen] = useState<boolean>(true);
 
   // Plant Name Search Modal & Autocomplete State
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
@@ -663,98 +664,112 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
         {/* Bulk Products Quick Selector Section */}
         <div className="bg-[#f3f4f0] p-3 rounded-2xl border border-[#c1c8c2] flex flex-col gap-2.5">
+          {/* Header & Collapse Toggle */}
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 text-xs font-bold text-[#012d1d]">
-              <div className="p-1.5 bg-[#012d1d] text-[#a0f4c8] rounded-lg">
-                <Truck className="w-3.5 h-3.5" />
+            <button
+              type="button"
+              onClick={() => setIsBulkSectionOpen(!isBulkSectionOpen)}
+              className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-[#012d1d] cursor-pointer hover:text-[#0e6c4a] transition-colors group"
+            >
+              <div className="p-1.5 bg-[#012d1d] text-[#a0f4c8] rounded-lg group-hover:bg-[#0e6c4a]">
+                <Truck className="w-4 h-4" />
               </div>
-              <span>Bulk Quick Select (MULCH • STONE • TOP SOIL):</span>
-            </div>
+              <span>Bulk Quick Select (MULCH • STONE • TOP SOIL)</span>
+              {isBulkSectionOpen ? (
+                <ChevronUp className="w-4 h-4 text-[#717973] group-hover:text-[#012d1d]" />
+              ) : (
+                <ChevronDown className="w-4 h-4 text-[#717973] group-hover:text-[#012d1d]" />
+              )}
+            </button>
 
-            {/* Category Filter Pills */}
-            <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
-              {(['ALL', 'MULCH', 'STONE', 'TOP SOIL'] as const).map((tab) => (
-                <button
-                  key={tab}
-                  type="button"
-                  onClick={() => setBulkTab(tab)}
-                  className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
-                    bulkTab === tab
-                      ? 'bg-[#012d1d] text-[#a0f4c8] shadow-2xs'
-                      : 'bg-white/80 text-[#414844] hover:bg-white border border-[#c1c8c2]'
-                  }`}
-                >
-                  {tab === 'ALL' ? 'All Bulk' : tab}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Bulk Products Cards Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-0.5">
-            {bulkItems.length === 0 ? (
-              <p className="text-xs text-[#717973] py-3 col-span-2 text-center bg-white rounded-xl border border-dashed border-[#c1c8c2]">
-                No items found under category {bulkTab}.
-              </p>
-            ) : (
-              bulkItems.map((plant) => {
-                const inCart = cartItems.find(i => i.plant.id === plant.id);
-                const isStone = (plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE');
-                const unitLabel = plant.size && plant.size.length < 8 ? plant.size : (isStone ? 'Ton' : 'Yard');
-
-                return (
-                  <div
-                    key={plant.id}
-                    className="bg-white p-2.5 rounded-xl border border-[#c1c8c2] flex flex-col justify-between gap-2 shadow-2xs hover:border-[#0e6c4a] transition-all"
+            {/* Category Filter Pills (Visible when open) */}
+            {isBulkSectionOpen && (
+              <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
+                {(['ALL', 'MULCH', 'STONE', 'TOP SOIL'] as const).map((tab) => (
+                  <button
+                    key={tab}
+                    type="button"
+                    onClick={() => setBulkTab(tab)}
+                    className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                      bulkTab === tab
+                        ? 'bg-[#012d1d] text-[#a0f4c8] shadow-2xs'
+                        : 'bg-white/80 text-[#414844] hover:bg-white border border-[#c1c8c2]'
+                    }`}
                   >
-                    <div className="flex items-start justify-between gap-2 min-w-0">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-[#012d1d] text-[#a0f4c8]">
-                            {plant.category || 'BULK'}
-                          </span>
-                          {inCart && (
-                            <span className="text-[10px] font-bold text-[#0e6c4a] bg-[#a0f4c8] px-1.5 py-0.2 rounded">
-                              {inCart.quantity} {unitLabel}(s) in order
-                            </span>
-                          )}
-                        </div>
-                        <h4 className="font-bold text-xs text-[#1a1c1a] truncate mt-1" title={plant.name}>
-                          {plant.name}
-                        </h4>
-                      </div>
-                      <span className="text-xs font-extrabold text-[#012d1d] shrink-0">
-                        ${plant.price.toFixed(2)} / {unitLabel}
-                      </span>
-                    </div>
-
-                    {/* 0.5 and 1.0 Increment Action Buttons */}
-                    <div className="flex items-center gap-1.5 pt-1 border-t border-[#f3f4f0]">
-                      <button
-                        type="button"
-                        onClick={() => addPlantToCart(plant, 0.5)}
-                        className="flex-1 bg-[#a0f4c8]/30 hover:bg-[#a0f4c8] text-[#002113] border border-[#0e6c4a]/30 text-[11px] font-extrabold py-1.5 px-2 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
-                        title={`Add 0.5 ${unitLabel} of ${plant.name}`}
-                      >
-                        <Plus className="w-3 h-3 text-[#0e6c4a]" />
-                        <span>+0.5 {unitLabel}</span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => addPlantToCart(plant, 1.0)}
-                        className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-[11px] font-extrabold py-1.5 px-2 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
-                        title={`Add 1.0 ${unitLabel} of ${plant.name}`}
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>+1.0 {unitLabel}</span>
-                      </button>
-                    </div>
-                  </div>
-                );
-              })
+                    {tab === 'ALL' ? 'All Bulk' : tab}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
+
+          {/* Collapsible Grid Content */}
+          {isBulkSectionOpen && (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-0.5 animate-fade-in pt-1">
+              {bulkItems.length === 0 ? (
+                <p className="text-xs text-[#717973] py-3 col-span-2 text-center bg-white rounded-xl border border-dashed border-[#c1c8c2]">
+                  No items found under category {bulkTab}.
+                </p>
+              ) : (
+                bulkItems.map((plant) => {
+                  const inCart = cartItems.find(i => i.plant.id === plant.id);
+                  const isStone = (plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE');
+                  const unitLabel = plant.size && plant.size.length < 8 ? plant.size : (isStone ? 'Ton' : 'Yard');
+
+                  return (
+                    <div
+                      key={plant.id}
+                      className="bg-white p-3 rounded-xl border border-[#c1c8c2] flex flex-col justify-between gap-2.5 shadow-2xs hover:border-[#0e6c4a] transition-all"
+                    >
+                      <div className="flex items-start justify-between gap-2 min-w-0">
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-[#012d1d] text-[#a0f4c8]">
+                              {plant.category || 'BULK'}
+                            </span>
+                            {inCart && (
+                              <span className="text-xs font-bold text-[#0e6c4a] bg-[#a0f4c8] px-2 py-0.5 rounded">
+                                {inCart.quantity} {unitLabel}(s) in order
+                              </span>
+                            )}
+                          </div>
+                          <h4 className="font-extrabold text-base text-[#1a1c1a] truncate mt-1" title={plant.name}>
+                            {plant.name}
+                          </h4>
+                        </div>
+                        <span className="text-base font-extrabold text-[#012d1d] shrink-0">
+                          ${plant.price.toFixed(2)} / {unitLabel}
+                        </span>
+                      </div>
+
+                      {/* 0.5 and 1.0 Increment Action Buttons */}
+                      <div className="flex items-center gap-2 pt-2 border-t border-[#f3f4f0]">
+                        <button
+                          type="button"
+                          onClick={() => addPlantToCart(plant, 0.5)}
+                          className="flex-1 bg-[#a0f4c8]/30 hover:bg-[#a0f4c8] text-[#002113] border border-[#0e6c4a]/30 text-xs sm:text-sm font-extrabold py-2 px-2.5 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                          title={`Add 0.5 ${unitLabel} of ${plant.name}`}
+                        >
+                          <Plus className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                          <span>+0.5 {unitLabel}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => addPlantToCart(plant, 1.0)}
+                          className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs sm:text-sm font-extrabold py-2 px-2.5 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                          title={`Add 1.0 ${unitLabel} of ${plant.name}`}
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>+1.0 {unitLabel}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
         </div>
       </section>
 

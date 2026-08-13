@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2 } from 'lucide-react';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -36,8 +37,190 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [activeDeviceIndex, setActiveDeviceIndex] = useState<number>(0);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
+  const [scannedFeedback, setScannedFeedback] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
+  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+  const [manualBarcodeInput, setManualBarcodeInput] = useState<string>('');
+  const [unrecognizedCode, setUnrecognizedCode] = useState<string | null>(null);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const lastScanTimeRef = useRef<number>(0);
+  const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // Web Audio BEEP feedback synthesizer
+  const playBeepSound = () => {
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (AudioCtx) {
+        const ctx = new AudioCtx();
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(1046.5, ctx.currentTime);
+        gain.gain.setValueAtTime(0.2, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.18);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start();
+        osc.stop(ctx.currentTime + 0.18);
+      }
+    } catch (e) {
+      // AudioCtx disabled or restricted
+    }
+  };
+
+  // Process detected barcode string
+  const handleScannedBarcode = (rawCode: string) => {
+    const cleanCode = rawCode.trim();
+    if (!cleanCode) return;
+
+    const now = Date.now();
+    if (lastScannedCode === cleanCode && now - lastScanTimeRef.current < 2000) {
+      return;
+    }
+
+    lastScanTimeRef.current = now;
+    setLastScannedCode(cleanCode);
+
+    playBeepSound();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(100); } catch (e) {}
+    }
+
+    const cleanLower = cleanCode.toLowerCase();
+    let matchedPlant = inventory.find(item => 
+      (item.barcode && item.barcode.trim().toLowerCase() === cleanLower) ||
+      (item.itemNo && item.itemNo.trim().toLowerCase() === cleanLower) ||
+      (item.id && item.id.trim().toLowerCase() === cleanLower)
+    );
+
+    if (!matchedPlant) {
+      matchedPlant = inventory.find(item =>
+        item.name.toLowerCase().includes(cleanLower) ||
+        (item.botanicalName && item.botanicalName.toLowerCase().includes(cleanLower)) ||
+        (item.commonName && item.commonName.toLowerCase().includes(cleanLower))
+      );
+    }
+
+    if (matchedPlant) {
+      setCartItems(prev => {
+        const existing = prev.find(i => i.plant.id === matchedPlant!.id);
+        if (existing) {
+          return prev.map(i => i.plant.id === matchedPlant!.id ? { ...i, quantity: i.quantity + 1 } : i);
+        } else {
+          return [...prev, { plant: matchedPlant!, quantity: 1 }];
+        }
+      });
+
+      setScannedFeedback({
+        message: `Scanned code "${cleanCode}": Added ${matchedPlant.name} ($${matchedPlant.price.toFixed(2)}) to cart!`,
+        type: 'success'
+      });
+    } else {
+      setUnrecognizedCode(cleanCode);
+      setScannedFeedback({
+        message: `Scanned code "${cleanCode}" - Item not found in catalog. Select plant to assign.`,
+        type: 'warning'
+      });
+    }
+
+    setTimeout(() => {
+      setScannedFeedback(null);
+    }, 4500);
+  };
+
+  // Continuous Camera Frame Barcode Scanner Loop
+  useEffect(() => {
+    if (!cameraActive || !cameraStream) return;
+
+    let isCancelled = false;
+    let intervalId: NodeJS.Timeout;
+
+    if (!zxingReaderRef.current) {
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.QR_CODE,
+        BarcodeFormat.DATA_MATRIX,
+        BarcodeFormat.ITF
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      zxingReaderRef.current = new BrowserMultiFormatReader(hints);
+    }
+
+    const reader = zxingReaderRef.current;
+    let nativeDetector: any = null;
+    if ('BarcodeDetector' in window) {
+      try {
+        nativeDetector = new (window as any).BarcodeDetector({
+          formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'data_matrix', 'itf']
+        });
+      } catch (e) {
+        nativeDetector = null;
+      }
+    }
+
+    const canvas = document.createElement('canvas');
+    const ctx = canvas.getContext('2d', { willReadFrequently: true });
+
+    const processFrame = async () => {
+      if (isCancelled) return;
+      const video = videoRef.current;
+
+      if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        let detectedRawCode: string | null = null;
+
+        // 1. Native BarcodeDetector (instant on Chrome / Android)
+        if (nativeDetector) {
+          try {
+            const barcodes = await nativeDetector.detect(video);
+            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
+              detectedRawCode = barcodes[0].rawValue;
+            }
+          } catch (e) {
+            // ignore frame error
+          }
+        }
+
+        // 2. Fallback ZXing canvas decode
+        if (!detectedRawCode && ctx) {
+          try {
+            canvas.width = Math.min(video.videoWidth, 800);
+            canvas.height = Math.min(video.videoHeight, 600);
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            const result = reader.decodeFromCanvas(canvas);
+            if (result && result.getText()) {
+              detectedRawCode = result.getText();
+            }
+          } catch (err) {
+            // Expected when frame has no barcode
+          }
+        }
+
+        if (detectedRawCode && !isCancelled) {
+          handleScannedBarcode(detectedRawCode);
+        }
+      }
+    };
+
+    intervalId = setInterval(processFrame, 220);
+
+    return () => {
+      isCancelled = true;
+      clearInterval(intervalId);
+      if (zxingReaderRef.current) {
+        try {
+          zxingReaderRef.current.reset();
+        } catch (e) {}
+      }
+    };
+  }, [cameraActive, cameraStream]);
 
   // Attach camera stream to video element whenever stream or active state changes
   useEffect(() => {
@@ -205,24 +388,14 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const simulateScanItem = () => {
     setIsScanning(true);
     setTimeout(() => {
-      // Pick a random plant or next plant from inventory
+      // Pick next plant or random plant and pass its barcode
       const unadded = inventory.filter(p => !cartItems.some(c => c.plant.id === p.id));
       const nextPlant = unadded.length > 0 ? unadded[0] : inventory[Math.floor(Math.random() * inventory.length)];
-      
-      setCartItems(prev => {
-        const existing = prev.find(item => item.plant.id === nextPlant.id);
-        if (existing) {
-          return prev.map(item => 
-            item.plant.id === nextPlant.id 
-              ? { ...item, quantity: item.quantity + 1 }
-              : item
-          );
-        } else {
-          return [...prev, { plant: nextPlant, quantity: 1 }];
-        }
-      });
+      if (nextPlant) {
+        handleScannedBarcode(nextPlant.barcode || nextPlant.itemNo || nextPlant.id);
+      }
       setIsScanning(false);
-    }, 800);
+    }, 500);
   };
 
   const updateQuantity = (plantId: string, delta: number) => {
@@ -432,6 +605,92 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           })}
         </div>
       </section>
+
+      {/* Manual Barcode Search & Preset Chips */}
+      <section className="bg-white p-3.5 rounded-2xl border border-[#c1c8c2] shadow-2xs flex flex-col gap-2.5">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (manualBarcodeInput.trim()) {
+              handleScannedBarcode(manualBarcodeInput);
+              setManualBarcodeInput('');
+            }
+          }}
+          className="flex items-center gap-2"
+        >
+          <div className="relative flex-1">
+            <Barcode className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
+            <input
+              type="text"
+              value={manualBarcodeInput}
+              onChange={(e) => setManualBarcodeInput(e.target.value)}
+              placeholder="Enter or paste barcode / SKU..."
+              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-3 py-2 text-xs text-[#1a1c1a] outline-none focus:border-[#012d1d] font-mono"
+            />
+          </div>
+          <button
+            type="submit"
+            className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 shrink-0 cursor-pointer shadow-2xs"
+          >
+            <Search className="w-3.5 h-3.5" />
+            <span>Scan Code</span>
+          </button>
+        </form>
+
+        {/* Quick Test Barcode Presets */}
+        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px]">
+          <span className="text-[#717973] font-bold uppercase tracking-wider shrink-0 text-[10px]">
+            Test Barcodes:
+          </span>
+          {[
+            { code: '41198', label: 'Golden Pothos' },
+            { code: '41688', label: 'Kickin Aster' },
+            { code: '10008', label: 'Black-Eyed Susan' },
+            { code: '1000', label: 'Item #1000' }
+          ].map((preset) => (
+            <button
+              key={preset.code}
+              type="button"
+              onClick={() => handleScannedBarcode(preset.code)}
+              className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] font-mono font-semibold px-2.5 py-1 rounded-lg border border-[#c1c8c2] shrink-0 cursor-pointer transition-all active:scale-95 flex items-center gap-1"
+            >
+              <QrCode className="w-3 h-3 text-[#0e6c4a]" />
+              <span>{preset.code}</span>
+              <span className="text-[#717973] font-sans font-normal">({preset.label})</span>
+            </button>
+          ))}
+        </div>
+      </section>
+
+      {/* Live Scanned Feedback Banner */}
+      {scannedFeedback && (
+        <div
+          className={`p-3 rounded-xl text-xs font-bold flex items-center justify-between gap-2 shadow-md animate-fade-in border ${
+            scannedFeedback.type === 'success'
+              ? 'bg-[#a0f4c8] text-[#002113] border-[#0e6c4a]'
+              : 'bg-[#ffdad6] text-[#ba1a1a] border-[#ba1a1a]'
+          }`}
+        >
+          <div className="flex items-center gap-2">
+            {scannedFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-[#0e6c4a] shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-[#ba1a1a] shrink-0" />
+            )}
+            <span>{scannedFeedback.message}</span>
+          </div>
+          <div className="flex items-center gap-1 shrink-0">
+            <Volume2 className="w-3.5 h-3.5 opacity-70" />
+            <button
+              type="button"
+              onClick={() => setScannedFeedback(null)}
+              className="p-1 hover:bg-black/10 rounded-full cursor-pointer"
+            >
+              <X className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Barcode Scanner Viewfinder Area */}
       <section className="relative rounded-2xl overflow-hidden shadow-sm border border-[#c1c8c2] bg-[#1a1c1a] aspect-16/10 flex items-center justify-center">
@@ -690,6 +949,78 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           <span>Complete Order</span>
         </button>
       </section>
+
+      {/* Unrecognized Barcode Assignment Modal */}
+      {unrecognizedCode && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4">
+            <div className="flex justify-between items-start">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-[#ffdad6] text-[#ba1a1a] rounded-xl">
+                  <Barcode className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-base text-[#1a1c1a]">Unrecognized Barcode</h3>
+                  <p className="text-xs font-mono text-[#0e6c4a] font-bold">Scanned Code: {unrecognizedCode}</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setUnrecognizedCode(null)}
+                className="p-1 text-[#717973] hover:text-[#1a1c1a] rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <p className="text-xs text-[#414844]">
+              This barcode isn't assigned to a plant in your catalog yet. Select a plant below to pair this barcode and add it to the order:
+            </p>
+
+            <div className="max-h-60 overflow-y-auto flex flex-col gap-2 border border-[#c1c8c2] rounded-xl p-2 bg-[#f3f4f0]">
+              {inventory.slice(0, 10).map((plant) => (
+                <button
+                  key={plant.id}
+                  type="button"
+                  onClick={() => {
+                    plant.barcode = unrecognizedCode;
+                    setCartItems(prev => {
+                      const existing = prev.find(i => i.plant.id === plant.id);
+                      if (existing) {
+                        return prev.map(i => i.plant.id === plant.id ? { ...i, quantity: i.quantity + 1 } : i);
+                      } else {
+                        return [...prev, { plant, quantity: 1 }];
+                      }
+                    });
+                    setScannedFeedback({
+                      message: `Assigned code "${unrecognizedCode}" to ${plant.name} and added to cart!`,
+                      type: 'success'
+                    });
+                    setUnrecognizedCode(null);
+                  }}
+                  className="p-2.5 bg-white hover:bg-[#a0f4c8]/30 rounded-lg border border-[#c1c8c2] text-left flex items-center justify-between transition-colors group cursor-pointer"
+                >
+                  <div>
+                    <p className="text-xs font-bold text-[#012d1d] group-hover:text-[#0e6c4a]">{plant.name}</p>
+                    <p className="text-[10px] text-[#717973]">{plant.size || '3 GAL'} • ${plant.price.toFixed(2)}</p>
+                  </div>
+                  <span className="text-xs font-bold text-[#0e6c4a] bg-[#a0f4c8] px-2 py-0.5 rounded">Select & Add</span>
+                </button>
+              ))}
+            </div>
+
+            <div className="flex justify-end gap-2 pt-1 border-t border-[#c1c8c2]">
+              <button
+                type="button"
+                onClick={() => setUnrecognizedCode(null)}
+                className="px-4 py-2 bg-[#e2e3df] hover:bg-[#c1c8c2] text-[#1a1c1a] text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

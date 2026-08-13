@@ -33,6 +33,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy'>('all');
+  const [minQtyOneOnly, setMinQtyOneOnly] = useState<boolean>(true);
   const [expandedPricesItemId, setExpandedPricesItemId] = useState<string | null>(null);
 
   const criticalCount = inventory.filter(i => i.status === 'critical').length;
@@ -40,6 +41,10 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const healthyCount = inventory.filter(i => i.status === 'healthy').length;
 
   const filteredInventory = inventory.filter(item => {
+    if (minQtyOneOnly && item.stock < 1) {
+      return false;
+    }
+
     const term = searchTerm.toLowerCase();
     const matchesSearch = 
       item.name.toLowerCase().includes(term) ||
@@ -169,7 +174,21 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             />
           </div>
 
-          <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0">
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+            {/* Qty >= 1 Toggle Chip */}
+            <button
+              onClick={() => setMinQtyOneOnly(!minQtyOneOnly)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+                minQtyOneOnly
+                  ? 'bg-[#0e6c4a] text-white border-[#0e6c4a] shadow-xs'
+                  : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+              }`}
+              title={minQtyOneOnly ? 'Currently showing items with quantity 1 or greater. Click to toggle off and show all items including 0 quantity.' : 'Click to toggle on and show only items with quantity 1 or greater.'}
+            >
+              <span className={`w-2 h-2 rounded-full ${minQtyOneOnly ? 'bg-[#a0f4c8]' : 'bg-[#717973]'}`} />
+              <span>Qty ≥ 1 Only</span>
+            </button>
+
             <button
               onClick={() => setStatusFilter('all')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
@@ -209,7 +228,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             <div className="p-8 text-center bg-[#f3f4f0] rounded-xl text-[#717973] border border-dashed border-[#c1c8c2]">
               <p className="text-xs font-medium">No plant stock matches your search filter.</p>
               <button
-                onClick={() => { setSearchTerm(''); setStatusFilter('all'); }}
+                onClick={() => { setSearchTerm(''); setStatusFilter('all'); setMinQtyOneOnly(false); }}
                 className="mt-2 text-xs font-bold text-[#0e6c4a] hover:underline"
               >
                 Reset Filters

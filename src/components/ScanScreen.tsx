@@ -32,14 +32,21 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }));
   };
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
+  const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
+  const [activeDeviceIndex, setActiveDeviceIndex] = useState<number>(0);
+  const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [cameraError, setCameraError] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
-  // Attach camera stream to video element when camera becomes active or stream changes
+  // Attach camera stream to video element whenever stream or active state changes
   useEffect(() => {
     if (cameraActive && cameraStream && videoRef.current) {
-      videoRef.current.srcObject = cameraStream;
-      videoRef.current.play().catch(err => {
+      const v = videoRef.current;
+      if (v.srcObject !== cameraStream) {
+        v.srcObject = cameraStream;
+      }
+      v.play().catch(err => {
         console.warn('Video play error:', err);
       });
     }
@@ -106,7 +113,79 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
   };
 
-  // Enable actual webcam feed if requested or permitted
+  // Start camera stream with specific device or mode
+  const startCameraStream = async (deviceId?: string, mode: 'environment' | 'user' = facingMode) => {
+    if (cameraStream) {
+      cameraStream.getTracks().forEach(track => track.stop());
+      setCameraStream(null);
+    }
+
+    try {
+      let constraints: MediaStreamConstraints = { video: true };
+      if (deviceId) {
+        constraints = { video: { deviceId: { exact: deviceId } } };
+      } else {
+        constraints = {
+          video: {
+            facingMode: { ideal: mode }
+          }
+        };
+      }
+
+      let stream: MediaStream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (err1) {
+        // Fallback to basic video request if constraints fail
+        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+      }
+
+      setCameraStream(stream);
+      setCameraActive(true);
+      setCameraError(null);
+
+      // Enumerate available video inputs
+      if (navigator.mediaDevices && navigator.mediaDevices.enumerateDevices) {
+        try {
+          const devices = await navigator.mediaDevices.enumerateDevices();
+          const videoInputs = devices.filter(d => d.kind === 'videoinput');
+          setVideoDevices(videoInputs);
+          if (deviceId) {
+            const idx = videoInputs.findIndex(d => d.deviceId === deviceId);
+            if (idx >= 0) setActiveDeviceIndex(idx);
+          }
+        } catch (e) {
+          // ignore enumeration errors
+        }
+      }
+    } catch (err: any) {
+      console.error('Camera access error:', err);
+      setCameraActive(false);
+      setCameraError('Camera access denied or unavailable. Click to simulate barcode scan.');
+    }
+  };
+
+  // Switch to next available camera device or toggle facing mode
+  const switchCameraDevice = async () => {
+    if (videoDevices.length > 1) {
+      const nextIndex = (activeDeviceIndex + 1) % videoDevices.length;
+      setActiveDeviceIndex(nextIndex);
+      const nextDevice = videoDevices[nextIndex];
+      if (nextDevice && nextDevice.deviceId) {
+        await startCameraStream(nextDevice.deviceId);
+      } else {
+        const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+        setFacingMode(nextMode);
+        await startCameraStream(undefined, nextMode);
+      }
+    } else {
+      const nextMode = facingMode === 'environment' ? 'user' : 'environment';
+      setFacingMode(nextMode);
+      await startCameraStream(undefined, nextMode);
+    }
+  };
+
+  // Toggle Camera Feed On/Off
   const toggleCameraFeed = async () => {
     if (cameraActive) {
       if (cameraStream) {
@@ -118,24 +197,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       }
       setCameraActive(false);
     } else {
-      try {
-        let stream: MediaStream;
-        try {
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } }
-          });
-        } catch (e) {
-          // Fallback to basic video request if environment camera constraint failed
-          stream = await navigator.mediaDevices.getUserMedia({ video: true });
-        }
-
-        setCameraStream(stream);
-        setCameraActive(true);
-      } catch (err) {
-        console.error('Camera access error:', err);
-        setCameraActive(false);
-        simulateScanItem();
-      }
+      await startCameraStream(undefined, facingMode);
     }
   };
 
@@ -372,13 +434,25 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       </section>
 
       {/* Barcode Scanner Viewfinder Area */}
-      <section className="relative rounded-2xl overflow-hidden shadow-sm border border-[#c1c8c2] bg-[#2e312f] aspect-16/10 flex items-center justify-center">
+      <section className="relative rounded-2xl overflow-hidden shadow-sm border border-[#c1c8c2] bg-[#1a1c1a] aspect-16/10 flex items-center justify-center">
         {cameraActive ? (
           <video
-            ref={videoRef}
+            ref={(el) => {
+              videoRef.current = el;
+              if (el && cameraStream && el.srcObject !== cameraStream) {
+                el.srcObject = cameraStream;
+                el.play().catch(err => console.warn('Video play error:', err));
+              }
+            }}
             autoPlay
             playsInline
             muted
+            onLoadedMetadata={(e) => {
+              e.currentTarget.play().catch(() => {});
+            }}
+            onCanPlay={(e) => {
+              e.currentTarget.play().catch(() => {});
+            }}
             className="w-full h-full object-cover"
           />
         ) : (
@@ -391,50 +465,73 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         )}
 
         {/* Scanner Framing Overlay */}
-        <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-between p-4 pointer-events-none">
+        <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-between p-3.5 pointer-events-none z-10">
           {/* Top Bar */}
-          <div className="w-full flex justify-between items-center text-white/80 text-xs">
-            <span className="flex items-center gap-1 font-mono bg-black/40 px-2 py-0.5 rounded">
-              <QrCode className="w-3.5 h-3.5 text-[#a0f4c8]" /> SCANNER ACTIVE
+          <div className="w-full flex justify-between items-center text-white/90 text-xs">
+            <span className="flex items-center gap-1 font-mono bg-black/60 backdrop-blur-xs px-2 py-1 rounded-md border border-white/10">
+              <QrCode className="w-3.5 h-3.5 text-[#a0f4c8]" />
+              {cameraActive ? 'CAMERA LIVE' : 'DEMO SCANNER'}
             </span>
-            <button
-              onClick={toggleCameraFeed}
-              className="pointer-events-auto bg-black/50 hover:bg-black/70 px-2.5 py-1 rounded text-white text-xs flex items-center gap-1"
-            >
-              <Camera className="w-3.5 h-3.5" /> {cameraActive ? 'Stop Camera' : 'Start Camera'}
-            </button>
+
+            <div className="flex items-center gap-1.5 pointer-events-auto">
+              {cameraActive && (
+                <button
+                  type="button"
+                  onClick={switchCameraDevice}
+                  className="bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/20 px-2.5 py-1 rounded-md text-white text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  title="Switch camera device / flip camera"
+                >
+                  <ArrowRightLeft className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                  <span>Switch Cam</span>
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={toggleCameraFeed}
+                className="bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/20 px-2.5 py-1 rounded-md text-white text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+              >
+                <Camera className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                <span>{cameraActive ? 'Stop' : 'Start Camera'}</span>
+              </button>
+            </div>
           </div>
 
           {/* Viewfinder Target Reticle */}
           <div className="relative w-48 h-36 border-2 border-transparent">
             {/* Corner Bracket SVGs */}
-            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-[#0e6c4a]" />
-            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-[#0e6c4a]" />
-            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-[#0e6c4a]" />
-            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-[#0e6c4a]" />
+            <div className="absolute top-0 left-0 w-6 h-6 border-t-4 border-l-4 border-[#a0f4c8]" />
+            <div className="absolute top-0 right-0 w-6 h-6 border-t-4 border-r-4 border-[#a0f4c8]" />
+            <div className="absolute bottom-0 left-0 w-6 h-6 border-b-4 border-l-4 border-[#a0f4c8]" />
+            <div className="absolute bottom-0 right-0 w-6 h-6 border-b-4 border-r-4 border-[#a0f4c8]" />
 
             {/* Laser Line Animation */}
             {isScanning && (
-              <div className="absolute left-0 right-0 h-0.5 bg-[#a0f4c8] shadow-[0_0_8px_#a0f4c8] animate-pulse top-1/2" />
+              <div className="absolute left-0 right-0 h-0.5 bg-[#a0f4c8] shadow-[0_0_12px_#a0f4c8] animate-pulse top-1/2" />
             )}
           </div>
 
-          {/* Align Barcode Instruction Pill */}
-          <div className="pointer-events-auto">
+          {/* Bottom Actions & Diagnostics */}
+          <div className="flex flex-col items-center gap-1.5 pointer-events-auto w-full">
+            {cameraError && (
+              <div className="bg-[#ba1a1a]/90 text-white text-[11px] font-medium px-3 py-1 rounded-md backdrop-blur-xs text-center max-w-xs animate-fade-in">
+                {cameraError}
+              </div>
+            )}
             <button
+              type="button"
               onClick={simulateScanItem}
               disabled={isScanning}
-              className="bg-white/90 hover:bg-white text-[#1a1c1a] font-medium text-xs px-4 py-2 rounded-full shadow-md flex items-center gap-2 backdrop-blur-xs transition-transform active:scale-95"
+              className="bg-white/95 hover:bg-white text-[#1a1c1a] font-bold text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2 backdrop-blur-xs transition-transform active:scale-95 cursor-pointer"
             >
               {isScanning ? (
                 <>
                   <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#0e6c4a]" />
-                  Scanning barcode...
+                  <span>Scanning Plant Barcode...</span>
                 </>
               ) : (
                 <>
                   <Sparkles className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                  Align barcode within frame
+                  <span>Tap to Scan Barcode</span>
                 </>
               )}
             </button>

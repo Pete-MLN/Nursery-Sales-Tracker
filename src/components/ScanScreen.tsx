@@ -70,8 +70,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
   };
 
+  const unrecognizedCandidateRef = useRef<{ code: string; count: number }>({ code: '', count: 0 });
+
   // Process detected barcode string
-  const handleScannedBarcode = (rawCode: string) => {
+  const handleScannedBarcode = (rawCode: string, isManualInput: boolean = false) => {
     const cleanCode = rawCode.trim();
     if (!cleanCode) return;
 
@@ -80,6 +82,25 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       return;
     }
 
+    const matchedPlant = findPlantByBarcode(cleanCode, inventory);
+
+    // For unrecognized codes from live video stream, require 2 consecutive frame detections to prevent single-frame glitches on iOS
+    if (!matchedPlant && !isManualInput) {
+      if (unrecognizedCandidateRef.current.code === cleanCode) {
+        unrecognizedCandidateRef.current.count += 1;
+      } else {
+        unrecognizedCandidateRef.current = { code: cleanCode, count: 1 };
+        return; // Wait for second frame verification
+      }
+
+      if (unrecognizedCandidateRef.current.count < 2) {
+        return; // Wait for second frame verification
+      }
+    }
+
+    // Reset candidate ref once accepted
+    unrecognizedCandidateRef.current = { code: '', count: 0 };
+
     lastScanTimeRef.current = now;
     setLastScannedCode(cleanCode);
 
@@ -87,8 +108,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
       try { navigator.vibrate(100); } catch (e) {}
     }
-
-    const matchedPlant = findPlantByBarcode(cleanCode, inventory);
 
     if (matchedPlant) {
       setCartItems(prev => {
@@ -163,7 +182,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
         let detectedRawCode: string | null = null;
 
-        // 1. Native BarcodeDetector (instant on Chrome / Android)
+        // 1. Native BarcodeDetector (if available on device)
         if (nativeDetector) {
           try {
             const barcodes = await nativeDetector.detect(video);
@@ -175,24 +194,34 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           }
         }
 
-        // 2. Fallback ZXing canvas decode
+        // 2. Fallback ZXing decode focused on central Region of Interest (ROI)
         if (!detectedRawCode && ctx) {
           try {
-            canvas.width = Math.min(video.videoWidth, 800);
-            canvas.height = Math.min(video.videoHeight, 600);
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const vw = video.videoWidth;
+            const vh = video.videoHeight;
+
+            // Crop to central 75% width, 60% height around viewfinder reticle
+            const cropW = Math.floor(vw * 0.75);
+            const cropH = Math.floor(vh * 0.60);
+            const cropX = Math.floor((vw - cropW) / 2);
+            const cropY = Math.floor((vh - cropH) / 2);
+
+            canvas.width = Math.min(cropW, 800);
+            canvas.height = Math.min(cropH, 600);
+
+            ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
 
             const result = reader.decodeFromCanvas(canvas);
             if (result && result.getText()) {
               detectedRawCode = result.getText();
             }
           } catch (err) {
-            // Expected when frame has no barcode
+            // Expected when frame has no barcode in ROI
           }
         }
 
         if (detectedRawCode && !isCancelled) {
-          handleScannedBarcode(detectedRawCode);
+          handleScannedBarcode(detectedRawCode, false);
         }
       }
     };
@@ -380,7 +409,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const unadded = inventory.filter(p => !cartItems.some(c => c.plant.id === p.id));
       const nextPlant = unadded.length > 0 ? unadded[0] : inventory[Math.floor(Math.random() * inventory.length)];
       if (nextPlant) {
-        handleScannedBarcode(nextPlant.barcode || nextPlant.itemNo || nextPlant.id);
+        handleScannedBarcode(nextPlant.barcode || nextPlant.itemNo || nextPlant.id, true);
       }
       setIsScanning(false);
     }, 500);
@@ -600,7 +629,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           onSubmit={(e) => {
             e.preventDefault();
             if (manualBarcodeInput.trim()) {
-              handleScannedBarcode(manualBarcodeInput);
+              handleScannedBarcode(manualBarcodeInput, true);
               setManualBarcodeInput('');
             }
           }}
@@ -640,7 +669,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <button
               key={preset.code}
               type="button"
-              onClick={() => handleScannedBarcode(preset.code)}
+              onClick={() => handleScannedBarcode(preset.code, true)}
               className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] font-mono font-semibold px-2.5 py-1 rounded-lg border border-[#c1c8c2] shrink-0 cursor-pointer transition-all active:scale-95 flex items-center gap-1"
             >
               <QrCode className="w-3 h-3 text-[#0e6c4a]" />

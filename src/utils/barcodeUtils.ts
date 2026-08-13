@@ -20,12 +20,9 @@ export function normalizeBarcode(code: string | undefined | null): string {
 }
 
 /**
- * Finds a plant item in the inventory matching a scanned barcode.
- * Priority order:
- * 1. Direct raw string equality match (item.barcode, item.itemNo, item.id)
- * 2. Normalized string equality match (stripping leading zeros, whitespace, symbols)
- * 3. Prefix/suffix/checksum digit match (for 12/13-digit UPC-A/EAN-13 padding variations)
- * NO fuzzy string matching on numeric barcodes to prevent misidentifying items.
+ * Finds a plant item in the inventory matching a scanned barcode with 100% precision.
+ * NO loose prefix/suffix matching is permitted so that '10006' or '41796' will NEVER
+ * falsely match '1000' or '41'.
  */
 export function findPlantByBarcode(rawCode: string, inventory: PlantItem[]): PlantItem | undefined {
   const cleanRaw = rawCode.trim();
@@ -34,7 +31,7 @@ export function findPlantByBarcode(rawCode: string, inventory: PlantItem[]): Pla
   const normRaw = normalizeBarcode(cleanRaw);
   const cleanLower = cleanRaw.toLowerCase();
 
-  // 1. Direct raw string equality match
+  // 1. Exact raw string match
   let matched = inventory.find(item => 
     (item.barcode && item.barcode.trim().toLowerCase() === cleanLower) ||
     (item.itemNo && item.itemNo.trim().toLowerCase() === cleanLower) ||
@@ -42,7 +39,7 @@ export function findPlantByBarcode(rawCode: string, inventory: PlantItem[]): Pla
   );
   if (matched) return matched;
 
-  // 2. Normalized equality match (handles '041796' vs '41796' or '0041796')
+  // 2. Exact normalized match (e.g., '041796' -> '41796', '0010006' -> '10006')
   if (normRaw) {
     matched = inventory.find(item => {
       const normB = normalizeBarcode(item.barcode);
@@ -57,33 +54,43 @@ export function findPlantByBarcode(rawCode: string, inventory: PlantItem[]): Pla
     });
     if (matched) return matched;
 
-    // 3. Checksum or UPC-A 12-digit / EAN-13 13-digit prefix/suffix match (for codes >= 3 digits)
-    if (normRaw.length >= 3) {
-      matched = inventory.find(item => {
+    // 3. Exact 1-digit checksum variation (e.g. scanned '417968' where '8' is check digit and item is '41796')
+    // We sort items by LONGEST normalized barcode/itemNo first to avoid matching short keys
+    const sortedInventory = [...inventory].sort((a, b) => {
+      const lenA = Math.max(normalizeBarcode(a.barcode).length, normalizeBarcode(a.itemNo).length);
+      const lenB = Math.max(normalizeBarcode(b.barcode).length, normalizeBarcode(b.itemNo).length);
+      return lenB - lenA;
+    });
+
+    matched = sortedInventory.find(item => {
+      const normB = normalizeBarcode(item.barcode);
+      const normI = normalizeBarcode(item.itemNo);
+
+      if (normB && normB.length >= 4) {
+        if (normRaw.length === normB.length + 1 && normRaw.startsWith(normB)) return true;
+      }
+      if (normI && normI.length >= 4) {
+        if (normRaw.length === normI.length + 1 && normRaw.startsWith(normI)) return true;
+      }
+      return false;
+    });
+    if (matched) return matched;
+
+    // 4. Embedded 12/13 digit UPC-A / EAN-13 matching (e.g. scanned 12-digit '000000417965' containing '41796')
+    if (normRaw.length >= 10 && /^\d+$/.test(normRaw)) {
+      matched = sortedInventory.find(item => {
         const normB = normalizeBarcode(item.barcode);
         const normI = normalizeBarcode(item.itemNo);
 
-        if (normB && normB.length >= 3) {
-          if (normRaw.endsWith(normB) || normB.endsWith(normRaw) || normRaw.startsWith(normB) || normB.startsWith(normRaw)) {
-            return true;
-          }
-          // Stripped checksum digit at end (e.g., '417968' vs '41796')
-          if (normRaw.slice(0, -1) === normB || normB.slice(0, -1) === normRaw) {
-            return true;
-          }
-        }
-        if (normI && normI.length >= 3) {
-          if (normRaw.endsWith(normI) || normI.endsWith(normRaw) || normRaw.startsWith(normI) || normI.startsWith(normRaw)) {
-            return true;
-          }
-        }
+        if (normB && normB.length >= 4 && normRaw.includes(normB)) return true;
+        if (normI && normI.length >= 4 && normRaw.includes(normI)) return true;
         return false;
       });
       if (matched) return matched;
     }
   }
 
-  // 4. Fallback ONLY for explicitly non-numeric text search queries (e.g. "Rose", "Spiraea")
+  // 5. Fallback for non-numeric search query (e.g., text search like "Rose" or "Thuja")
   const isPurelyNumeric = /^\d+$/.test(cleanRaw.replace(/[^0-9]/g, ''));
   if (!isPurelyNumeric && cleanLower.length >= 3) {
     matched = inventory.find(item =>

@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2 } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode } from '../utils/barcodeUtils';
 
@@ -27,12 +27,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [gpsLoggedMap, setGpsLoggedMap] = useState<Record<string, string>>({});
   const [itemFulfillmentMap, setItemFulfillmentMap] = useState<Record<string, 'Take Now' | 'Pick-up/Delivery'>>({});
 
-  const toggleItemFulfillment = (plantId: string) => {
-    setItemFulfillmentMap(prev => ({
-      ...prev,
-      [plantId]: prev[plantId] === 'Pick-up/Delivery' ? 'Take Now' : 'Pick-up/Delivery'
-    }));
-  };
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [activeDeviceIndex, setActiveDeviceIndex] = useState<number>(0);
@@ -43,10 +37,58 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [manualBarcodeInput, setManualBarcodeInput] = useState<string>('');
   const [unrecognizedCode, setUnrecognizedCode] = useState<string | null>(null);
 
+  // Bulk Quick Selector State
+  const [bulkTab, setBulkTab] = useState<'ALL' | 'MULCH' | 'STONE' | 'TOP SOIL'>('ALL');
+
+  // Plant Name Search Modal & Autocomplete State
+  const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
+  const [catalogSearchQuery, setCatalogSearchQuery] = useState<string>('');
+  const [catalogCategory, setCatalogCategory] = useState<string>('All');
+  const [showPlantSuggestions, setShowPlantSuggestions] = useState<boolean>(false);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
+  const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const lastScanTimeRef = useRef<number>(0);
   const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  const toggleItemFulfillment = (plantId: string) => {
+    setItemFulfillmentMap(prev => ({
+      ...prev,
+      [plantId]: prev[plantId] === 'Pick-up/Delivery' ? 'Take Now' : 'Pick-up/Delivery'
+    }));
+  };
+
+  // Helper to add a plant directly to the cart with customizable increment (e.g. 0.5 or 1 yard/ton)
+  const addPlantToCart = (plant: PlantItem, amount: number = 1) => {
+    setCartItems(prev => {
+      const existing = prev.find(i => i.plant.id === plant.id);
+      if (existing) {
+        return prev.map(i => i.plant.id === plant.id ? { ...i, quantity: parseFloat((i.quantity + amount).toFixed(2)) } : i);
+      } else {
+        return [...prev, { plant, quantity: amount }];
+      }
+    });
+
+    playBeepSound();
+    if (typeof navigator !== 'undefined' && navigator.vibrate) {
+      try { navigator.vibrate(100); } catch (e) {}
+    }
+
+    const isBulk = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
+      (plant.category || '').toUpperCase().includes(cat)
+    );
+    const unitLabel = plant.size && plant.size.length < 10 ? plant.size : ((plant.category || '').toUpperCase().includes('STONE') ? 'Ton' : 'Yard');
+
+    setScannedFeedback({
+      message: `Added +${amount} ${isBulk ? unitLabel + '(s) of ' : ''}${plant.name} ($${(plant.price * amount).toFixed(2)}) to order!`,
+      type: 'success'
+    });
+
+    setTimeout(() => {
+      setScannedFeedback(null);
+    }, 3500);
+  };
 
   // Web Audio BEEP feedback synthesizer
   const playBeepSound = () => {
@@ -110,25 +152,32 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
 
     if (matchedPlant) {
-      setCartItems(prev => {
-        const existing = prev.find(i => i.plant.id === matchedPlant!.id);
-        if (existing) {
-          return prev.map(i => i.plant.id === matchedPlant!.id ? { ...i, quantity: i.quantity + 1 } : i);
-        } else {
-          return [...prev, { plant: matchedPlant!, quantity: 1 }];
-        }
-      });
-
-      setScannedFeedback({
-        message: `Scanned code "${cleanCode}": Added ${matchedPlant.name} ($${matchedPlant.price.toFixed(2)}) to cart!`,
-        type: 'success'
-      });
+      addPlantToCart(matchedPlant);
     } else {
-      setUnrecognizedCode(cleanCode);
-      setScannedFeedback({
-        message: `Scanned code "${cleanCode}" - Item not found in catalog. Select plant to assign.`,
-        type: 'warning'
-      });
+      // Check for fuzzy name / category matches when user enters text manually or barcode is unreadable
+      const nameMatches = inventory.filter(p =>
+        p.name.toLowerCase().includes(cleanCode.toLowerCase()) ||
+        (p.botanicalName && p.botanicalName.toLowerCase().includes(cleanCode.toLowerCase())) ||
+        (p.commonName && p.commonName.toLowerCase().includes(cleanCode.toLowerCase())) ||
+        (p.category && p.category.toLowerCase().includes(cleanCode.toLowerCase()))
+      );
+
+      if (nameMatches.length === 1) {
+        addPlantToCart(nameMatches[0]);
+      } else if (nameMatches.length > 1) {
+        setCatalogSearchQuery(cleanCode);
+        setIsCatalogModalOpen(true);
+        setScannedFeedback({
+          message: `Found ${nameMatches.length} plants matching "${cleanCode}". Select your plant below:`,
+          type: 'success'
+        });
+      } else {
+        setUnrecognizedCode(cleanCode);
+        setScannedFeedback({
+          message: `Scanned code "${cleanCode}" - Item not found in catalog. Select plant to assign.`,
+          type: 'warning'
+        });
+      }
     }
 
     setTimeout(() => {
@@ -261,11 +310,14 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     };
   }, [cameraStream]);
 
-  // Close dropdown on click outside
+  // Close dropdowns on click outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (searchContainerRef.current && !searchContainerRef.current.contains(event.target as Node)) {
+        setShowPlantSuggestions(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -419,11 +471,16 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     setCartItems(prev => 
       prev.map(item => {
         if (item.plant.id === plantId) {
-          const newQty = Math.max(1, item.quantity + delta);
+          const isBulk = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
+            (item.plant.category || '').toUpperCase().includes(cat)
+          );
+          const step = isBulk ? (delta > 0 ? 0.5 : -0.5) : (delta > 0 ? 1 : -1);
+          const newQty = parseFloat((item.quantity + step).toFixed(2));
+          if (newQty <= 0) return null as any;
           return { ...item, quantity: newQty };
         }
         return item;
-      })
+      }).filter(Boolean)
     );
   };
 
@@ -451,6 +508,19 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       (c.phone && c.phone.includes(q)) ||
       c.type.toLowerCase().includes(q)
     );
+  });
+
+  const bulkItems = inventory.filter(p => {
+    const cat = (p.category || '').toUpperCase();
+    const name = (p.name || '').toUpperCase();
+    const isMulch = cat.includes('MULCH') || name.includes('MULCH');
+    const isStone = cat.includes('STONE') || cat.includes('GRAVEL') || name.includes('STONE') || name.includes('GRAVEL');
+    const isSoil = cat.includes('SOIL') || cat.includes('DIRT') || name.includes('SOIL') || name.includes('TOP SOIL') || name.includes('COMPOST');
+    
+    if (bulkTab === 'MULCH') return isMulch;
+    if (bulkTab === 'STONE') return isStone;
+    if (bulkTab === 'TOP SOIL') return isSoil;
+    return isMulch || isStone || isSoil;
   });
 
   return (
@@ -591,35 +661,100 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           </button>
         </div>
 
-        {/* Quick Customer Chips */}
-        <div className="flex items-center gap-2 overflow-x-auto py-1 text-xs">
-          <span className="text-[#414844] font-semibold tracking-wider text-[11px] uppercase shrink-0">
-            Quick Select:
-          </span>
-          {customers.map((cust) => {
-            const isSelected = selectedCustomer === cust.name;
-            return (
-              <button
-                key={cust.id}
-                type="button"
-                onClick={() => {
-                  setSelectedCustomer(cust.name);
-                  setCustomerSearch(cust.name);
-                  if (cust.type === 'WHOLESALE' || cust.type === 'RETAIL') {
-                    setCustomerType(cust.type);
-                  }
-                  setIsDropdownOpen(false);
-                }}
-                className={`px-3 py-1 rounded-full text-xs transition-all shrink-0 cursor-pointer ${
-                  isSelected
-                    ? 'bg-[#012d1d] text-[#a0f4c8] font-bold shadow-2xs'
-                    : 'bg-[#e2e3df] text-[#1a1c1a] hover:bg-[#d9dad7]'
-                }`}
-              >
-                {cust.name}
-              </button>
-            );
-          })}
+        {/* Bulk Products Quick Selector Section */}
+        <div className="bg-[#f3f4f0] p-3 rounded-2xl border border-[#c1c8c2] flex flex-col gap-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-xs font-bold text-[#012d1d]">
+              <div className="p-1.5 bg-[#012d1d] text-[#a0f4c8] rounded-lg">
+                <Truck className="w-3.5 h-3.5" />
+              </div>
+              <span>Bulk Quick Select (MULCH • STONE • TOP SOIL):</span>
+            </div>
+
+            {/* Category Filter Pills */}
+            <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
+              {(['ALL', 'MULCH', 'STONE', 'TOP SOIL'] as const).map((tab) => (
+                <button
+                  key={tab}
+                  type="button"
+                  onClick={() => setBulkTab(tab)}
+                  className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                    bulkTab === tab
+                      ? 'bg-[#012d1d] text-[#a0f4c8] shadow-2xs'
+                      : 'bg-white/80 text-[#414844] hover:bg-white border border-[#c1c8c2]'
+                  }`}
+                >
+                  {tab === 'ALL' ? 'All Bulk' : tab}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Bulk Products Cards Grid */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 max-h-60 overflow-y-auto pr-0.5">
+            {bulkItems.length === 0 ? (
+              <p className="text-xs text-[#717973] py-3 col-span-2 text-center bg-white rounded-xl border border-dashed border-[#c1c8c2]">
+                No items found under category {bulkTab}.
+              </p>
+            ) : (
+              bulkItems.map((plant) => {
+                const inCart = cartItems.find(i => i.plant.id === plant.id);
+                const isStone = (plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE');
+                const unitLabel = plant.size && plant.size.length < 8 ? plant.size : (isStone ? 'Ton' : 'Yard');
+
+                return (
+                  <div
+                    key={plant.id}
+                    className="bg-white p-2.5 rounded-xl border border-[#c1c8c2] flex flex-col justify-between gap-2 shadow-2xs hover:border-[#0e6c4a] transition-all"
+                  >
+                    <div className="flex items-start justify-between gap-2 min-w-0">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="text-[9px] font-extrabold uppercase px-1.5 py-0.2 rounded bg-[#012d1d] text-[#a0f4c8]">
+                            {plant.category || 'BULK'}
+                          </span>
+                          {inCart && (
+                            <span className="text-[10px] font-bold text-[#0e6c4a] bg-[#a0f4c8] px-1.5 py-0.2 rounded">
+                              {inCart.quantity} {unitLabel}(s) in order
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="font-bold text-xs text-[#1a1c1a] truncate mt-1" title={plant.name}>
+                          {plant.name}
+                        </h4>
+                      </div>
+                      <span className="text-xs font-extrabold text-[#012d1d] shrink-0">
+                        ${plant.price.toFixed(2)} / {unitLabel}
+                      </span>
+                    </div>
+
+                    {/* 0.5 and 1.0 Increment Action Buttons */}
+                    <div className="flex items-center gap-1.5 pt-1 border-t border-[#f3f4f0]">
+                      <button
+                        type="button"
+                        onClick={() => addPlantToCart(plant, 0.5)}
+                        className="flex-1 bg-[#a0f4c8]/30 hover:bg-[#a0f4c8] text-[#002113] border border-[#0e6c4a]/30 text-[11px] font-extrabold py-1.5 px-2 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95"
+                        title={`Add 0.5 ${unitLabel} of ${plant.name}`}
+                      >
+                        <Plus className="w-3 h-3 text-[#0e6c4a]" />
+                        <span>+0.5 {unitLabel}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => addPlantToCart(plant, 1.0)}
+                        className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-[11px] font-extrabold py-1.5 px-2 rounded-lg transition-colors flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                        title={`Add 1.0 ${unitLabel} of ${plant.name}`}
+                      >
+                        <Plus className="w-3 h-3" />
+                        <span>+1.0 {unitLabel}</span>
+                      </button>
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
         </div>
       </section>
 
@@ -631,27 +766,114 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             if (manualBarcodeInput.trim()) {
               handleScannedBarcode(manualBarcodeInput, true);
               setManualBarcodeInput('');
+              setShowPlantSuggestions(false);
             }
           }}
-          className="flex items-center gap-2"
+          className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
         >
-          <div className="relative flex-1">
-            <Barcode className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
+          <div className="relative flex-1" ref={searchContainerRef}>
+            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
             <input
               type="text"
               value={manualBarcodeInput}
-              onChange={(e) => setManualBarcodeInput(e.target.value)}
-              placeholder="Enter or paste barcode / SKU..."
-              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-10 pr-3 py-3 text-base text-[#1a1c1a] outline-none focus:border-[#012d1d] font-mono font-medium"
+              onChange={(e) => {
+                setManualBarcodeInput(e.target.value);
+                setShowPlantSuggestions(true);
+              }}
+              onFocus={() => setShowPlantSuggestions(true)}
+              placeholder="Search plant name, SKU, or barcode..."
+              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-10 pr-3 py-3 text-base text-[#1a1c1a] outline-none focus:border-[#012d1d] font-sans font-medium"
             />
+
+            {/* Live Autocomplete Suggestions Popover */}
+            {showPlantSuggestions && manualBarcodeInput.trim().length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#c1c8c2] rounded-xl shadow-xl z-40 max-h-72 overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
+                {(() => {
+                  const q = manualBarcodeInput.trim().toLowerCase();
+                  const matches = inventory.filter(p =>
+                    p.name.toLowerCase().includes(q) ||
+                    (p.botanicalName && p.botanicalName.toLowerCase().includes(q)) ||
+                    (p.commonName && p.commonName.toLowerCase().includes(q)) ||
+                    (p.category && p.category.toLowerCase().includes(q)) ||
+                    (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+                    (p.itemNo && p.itemNo.toLowerCase().includes(q))
+                  ).slice(0, 6);
+
+                  if (matches.length === 0) {
+                    return (
+                      <div className="p-3.5 text-center text-xs text-[#717973]">
+                        No exact plant name match for "{manualBarcodeInput}". Press Enter to run catalog search.
+                      </div>
+                    );
+                  }
+
+                  return matches.map((plant) => (
+                    <button
+                      key={plant.id}
+                      type="button"
+                      onClick={() => {
+                        addPlantToCart(plant);
+                        setManualBarcodeInput('');
+                        setShowPlantSuggestions(false);
+                      }}
+                      className="w-full p-2.5 hover:bg-[#a0f4c8]/20 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer group"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <img
+                          src={plant.image || DEFAULT_PLANT_IMAGE}
+                          alt={plant.name}
+                          className="w-9 h-9 rounded-md object-cover bg-[#f3f4f0] shrink-0"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                        />
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold text-[#012d1d] truncate group-hover:text-[#0e6c4a]">
+                            {plant.name}
+                          </p>
+                          <p className="text-[10px] text-[#717973] truncate italic">
+                            {plant.botanicalName || plant.commonName || plant.size || 'Container'}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        <span className="text-xs font-bold text-[#012d1d]">
+                          ${plant.price.toFixed(2)}
+                        </span>
+                        <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 group-hover:bg-[#0e6c4a]">
+                          <Plus className="w-3 h-3" />
+                          <span>Add</span>
+                        </span>
+                      </div>
+                    </button>
+                  ));
+                })()}
+              </div>
+            )}
           </div>
-          <button
-            type="submit"
-            className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-bold px-4 py-3 rounded-xl transition-all flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
-          >
-            <Search className="w-4 h-4" />
-            <span>Scan Code</span>
-          </button>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="submit"
+              className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-bold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+            >
+              <Search className="w-4 h-4" />
+              <span>Add / Scan</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => {
+                setCatalogSearchQuery(manualBarcodeInput);
+                setIsCatalogModalOpen(true);
+              }}
+              className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] text-sm font-bold px-3.5 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+              title="Search plant catalog by name when barcode is missing"
+            >
+              <BookOpen className="w-4 h-4 text-[#0e6c4a]" />
+              <span className="hidden xs:inline">Browse Catalog</span>
+            </button>
+          </div>
         </form>
 
         {/* Quick Test Barcode Presets */}
@@ -1034,6 +1256,179 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 className="px-4 py-2 bg-[#e2e3df] hover:bg-[#c1c8c2] text-[#1a1c1a] text-xs font-bold rounded-xl cursor-pointer"
               >
                 Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* Full Plant Catalog Search & Selection Modal */}
+      {isCatalogModalOpen && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[85vh] p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden">
+            <div className="flex justify-between items-center pb-2 border-b border-[#e2e3df]">
+              <div className="flex items-center gap-2">
+                <div className="p-2.5 bg-[#a0f4c8] text-[#012d1d] rounded-xl">
+                  <BookOpen className="w-5 h-5 text-[#0e6c4a]" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-lg text-[#012d1d]">Plant Catalog Search</h3>
+                  <p className="text-xs text-[#414844]">Search plant name, botanical name, or category when barcode is missing</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCatalogModalOpen(false)}
+                className="p-1 text-[#717973] hover:text-[#1a1c1a] hover:bg-[#f3f4f0] rounded-lg cursor-pointer transition-colors"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Search Input & Category Filters */}
+            <div className="flex flex-col gap-2.5">
+              <div className="relative">
+                <Search className="w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#717973]" />
+                <input
+                  type="text"
+                  value={catalogSearchQuery}
+                  onChange={(e) => setCatalogSearchQuery(e.target.value)}
+                  placeholder="Filter by name, botanical name, size, category..."
+                  className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-10 pr-9 py-2.5 text-sm text-[#1a1c1a] outline-none focus:border-[#012d1d]"
+                  autoFocus
+                />
+                {catalogSearchQuery && (
+                  <button
+                    type="button"
+                    onClick={() => setCatalogSearchQuery('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-[#717973] hover:text-[#1a1c1a]"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                )}
+              </div>
+
+              {/* Category Pills */}
+              <div className="flex gap-1.5 overflow-x-auto pb-1 text-xs">
+                {['All', 'Trees & Shrubs', 'Perennials', 'Annuals', 'Houseplants'].map((cat) => (
+                  <button
+                    key={cat}
+                    type="button"
+                    onClick={() => setCatalogCategory(cat)}
+                    className={`px-3 py-1 rounded-full font-semibold shrink-0 cursor-pointer transition-colors ${
+                      catalogCategory === cat
+                        ? 'bg-[#012d1d] text-[#a0f4c8]'
+                        : 'bg-[#f3f4f0] text-[#414844] hover:bg-[#e2e3df]'
+                    }`}
+                  >
+                    {cat}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Results Grid / List */}
+            <div className="flex-1 overflow-y-auto pr-1 flex flex-col gap-2 min-h-48 max-h-[50vh]">
+              {(() => {
+                const matches = inventory.filter(p => {
+                  const matchesCategory = catalogCategory === 'All' ? true :
+                    catalogCategory === 'Trees & Shrubs' ? (p.category?.includes('TREE') || p.category?.includes('SHRUB') || p.name.includes('Arborvitae') || p.name.includes('Fig') || p.name.includes('Prince')) :
+                    catalogCategory === 'Perennials' ? (p.category?.includes('PERENNIAL') || p.name.includes('Susan') || p.name.includes('Aster')) :
+                    catalogCategory === 'Annuals' ? (p.category?.includes('ANNUAL')) :
+                    catalogCategory === 'Houseplants' ? (p.name.includes('Pothos') || p.name.includes('Succulent') || p.name.includes('Fig')) :
+                    true;
+
+                  if (!matchesCategory) return false;
+
+                  if (!catalogSearchQuery.trim()) return true;
+                  const q = catalogSearchQuery.trim().toLowerCase();
+                  return (
+                    p.name.toLowerCase().includes(q) ||
+                    (p.botanicalName && p.botanicalName.toLowerCase().includes(q)) ||
+                    (p.commonName && p.commonName.toLowerCase().includes(q)) ||
+                    (p.category && p.category.toLowerCase().includes(q)) ||
+                    (p.barcode && p.barcode.toLowerCase().includes(q)) ||
+                    (p.itemNo && p.itemNo.toLowerCase().includes(q))
+                  );
+                });
+
+                if (matches.length === 0) {
+                  return (
+                    <div className="py-12 text-center text-[#717973] flex flex-col items-center gap-2">
+                      <Leaf className="w-8 h-8 text-[#c1c8c2]" />
+                      <p className="text-sm font-medium">No plants match "{catalogSearchQuery}"</p>
+                      <button
+                        type="button"
+                        onClick={() => { setCatalogSearchQuery(''); setCatalogCategory('All'); }}
+                        className="text-xs text-[#0e6c4a] font-bold hover:underline"
+                      >
+                        Reset Search Filters
+                      </button>
+                    </div>
+                  );
+                }
+
+                return matches.map((plant) => {
+                  const inCartCount = cartItems.find(i => i.plant.id === plant.id)?.quantity || 0;
+
+                  return (
+                    <div
+                      key={plant.id}
+                      className="p-3 bg-white hover:bg-[#f3f4f0]/60 rounded-xl border border-[#c1c8c2] flex items-center justify-between gap-3 transition-colors"
+                    >
+                      <div className="flex items-center gap-3 min-w-0">
+                        <img
+                          src={plant.image || DEFAULT_PLANT_IMAGE}
+                          alt={plant.name}
+                          className="w-12 h-12 rounded-lg object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                        />
+                        <div className="min-w-0">
+                          <h4 className="font-bold text-sm text-[#1a1c1a] truncate">{plant.name}</h4>
+                          <p className="text-xs text-[#717973] truncate italic">
+                            {plant.botanicalName || plant.commonName || 'Standard Container'}
+                          </p>
+                          <div className="flex items-center gap-2 mt-1">
+                            <span className="text-[10px] font-bold bg-[#e7e9e5] text-[#414844] px-1.5 py-0.5 rounded">
+                              {plant.size || '3 GAL'}
+                            </span>
+                            <span className="text-[10px] text-[#717973]">
+                              Stock: <strong className="text-[#012d1d]">{plant.stock}</strong>
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <span className="font-extrabold text-sm text-[#012d1d]">
+                          ${plant.price.toFixed(2)}
+                        </span>
+
+                        <button
+                          type="button"
+                          onClick={() => addPlantToCart(plant)}
+                          className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                        >
+                          <Plus className="w-3.5 h-3.5" />
+                          <span>{inCartCount > 0 ? `Add (${inCartCount})` : 'Add to Order'}</span>
+                        </button>
+                      </div>
+                    </div>
+                  );
+                });
+              })()}
+            </div>
+
+            <div className="flex justify-between items-center pt-2 border-t border-[#e2e3df]">
+              <span className="text-xs text-[#717973]">
+                {cartItems.reduce((sum, i) => sum + i.quantity, 0)} items in order
+              </span>
+              <button
+                type="button"
+                onClick={() => setIsCatalogModalOpen(false)}
+                className="px-4 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-white text-xs font-bold rounded-xl cursor-pointer"
+              >
+                Done Adding Items
               </button>
             </div>
           </div>

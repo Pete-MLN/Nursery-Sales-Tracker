@@ -12,6 +12,8 @@ import { DataManagementScreen } from './components/DataManagementScreen';
 import { OrdersScreen } from './components/OrdersScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { LoginScreen } from './components/LoginScreen';
+import { auth } from './lib/firebase';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
 import {
   seedInitialFirestoreData,
   subscribeToPlants,
@@ -33,11 +35,38 @@ import { sanitizeCustomerName } from './utils/customerNameCleaner';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
-  const [user, setUser] = useState<User>({
-    name: 'Alex',
-    email: 'alex@maplelanenursery.com',
-    role: 'Operations Specialist',
-    isLoggedIn: true
+  const [user, setUser] = useState<User>(() => {
+    // Check localStorage for saved session
+    const savedLocal = localStorage.getItem('nursery_user_session');
+    if (savedLocal) {
+      try {
+        const parsed = JSON.parse(savedLocal);
+        if (parsed && typeof parsed === 'object' && parsed.isLoggedIn) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed parsing local user session:', e);
+      }
+    }
+    // Check sessionStorage
+    const savedSession = sessionStorage.getItem('nursery_user_session');
+    if (savedSession) {
+      try {
+        const parsed = JSON.parse(savedSession);
+        if (parsed && typeof parsed === 'object' && parsed.isLoggedIn) {
+          return parsed;
+        }
+      } catch (e) {
+        console.error('Failed parsing session user session:', e);
+      }
+    }
+    // Default active demo user session
+    return {
+      name: 'Pete',
+      email: 'pete@maplelanenursery.com',
+      role: 'General Manager',
+      isLoggedIn: true
+    };
   });
 
   const [inventory, setInventory] = useState<PlantItem[]>(INITIAL_PLANTS);
@@ -66,6 +95,24 @@ export default function App() {
     setStockAlertSettings(newSettings);
     localStorage.setItem('nursery_stock_alert_settings', JSON.stringify(newSettings));
   };
+
+  // Sync Firebase Auth state if available
+  useEffect(() => {
+    const unsubscribeAuth = onAuthStateChanged(auth, (fbUser) => {
+      if (fbUser) {
+        const authUser: User = {
+          name: fbUser.displayName || fbUser.email?.split('@')[0] || 'Nursery Staff',
+          email: fbUser.email || 'staff@maplelanenursery.com',
+          role: 'Nursery Manager',
+          isLoggedIn: true
+        };
+        setUser(authUser);
+        localStorage.setItem('nursery_user_session', JSON.stringify(authUser));
+      }
+    });
+
+    return () => unsubscribeAuth();
+  }, []);
 
   // Initialize and subscribe to real-time Firestore updates for multi-device syncing
   useEffect(() => {
@@ -203,13 +250,29 @@ export default function App() {
     saveUploadToFirestore(newUpload);
   };
 
-  const handleLogin = (newUser: User) => {
+  const handleLogin = (newUser: User, keepSignedIn: boolean = true) => {
     setUser(newUser);
+    if (keepSignedIn) {
+      localStorage.setItem('nursery_user_session', JSON.stringify(newUser));
+      sessionStorage.removeItem('nursery_user_session');
+    } else {
+      sessionStorage.setItem('nursery_user_session', JSON.stringify(newUser));
+      localStorage.removeItem('nursery_user_session');
+    }
     setCurrentScreen('home');
   };
 
   const handleLogout = () => {
-    setUser(prev => ({ ...prev, isLoggedIn: false }));
+    const loggedOutUser: User = {
+      name: '',
+      email: '',
+      role: '',
+      isLoggedIn: false
+    };
+    setUser(loggedOutUser);
+    localStorage.removeItem('nursery_user_session');
+    sessionStorage.removeItem('nursery_user_session');
+    signOut(auth).catch(() => {});
     setCurrentScreen('login');
   };
 

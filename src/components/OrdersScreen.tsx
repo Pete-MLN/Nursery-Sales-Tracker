@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScreenType, Order } from '../types';
-import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus } from 'lucide-react';
+import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock } from 'lucide-react';
 
 interface OrdersScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -15,14 +15,17 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   onSelectOrder,
   onCreateNewOrderClick
 }) => {
-  const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Ready' | 'Completed'>('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Ready' | 'Partial Pickup' | 'Completed'>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const filteredOrders = orders.filter(o => {
+    const isPartial = o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0);
+    
     const matchesTab = 
       activeTab === 'All' ? true :
       activeTab === 'Pending' ? o.status === 'Pending' :
-      activeTab === 'Ready' ? o.status === 'Ready for Pickup' :
+      activeTab === 'Ready' ? (o.status === 'Ready for Pickup' || (o.status === 'Partial Pickup' && !isPartial)) :
+      activeTab === 'Partial Pickup' ? isPartial :
       o.status === 'Completed';
 
     const matchesSearch = 
@@ -35,10 +38,13 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   const getFulfillmentIcon = (type: string) => {
     switch (type) {
       case 'Delivery': return <Truck className="w-4 h-4 text-[#0e6c4a]" />;
-      case 'Pickup': return <Calendar className="w-4 h-4 text-[#0e6c4a]" />;
+      case 'Pickup':
+      case 'Pickup Later': return <Calendar className="w-4 h-4 text-[#0e6c4a]" />;
       case 'Take Now': default: return <ShoppingBag className="w-4 h-4 text-[#0e6c4a]" />;
     }
   };
+
+  const partialOrdersCount = orders.filter(o => o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0)).length;
 
   return (
     <div className="flex-1 px-4 py-6 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-5">
@@ -49,7 +55,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         </div>
         <button
           onClick={onCreateNewOrderClick}
-          className="bg-[#461702] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-[#622c13] transition-colors shadow-xs"
+          className="bg-[#461702] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-[#622c13] transition-colors shadow-xs cursor-pointer"
         >
           <Plus className="w-4 h-4" />
           <span>New Order</span>
@@ -70,17 +76,17 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
       {/* Tabs */}
       <div className="flex border-b border-[#c1c8c2] gap-2 overflow-x-auto text-xs font-bold">
-        {(['All', 'Pending', 'Ready', 'Completed'] as const).map((tab) => (
+        {(['All', 'Pending', 'Ready', 'Partial Pickup', 'Completed'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 ${
+            className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer ${
               activeTab === tab
                 ? 'border-[#012d1d] text-[#012d1d]'
                 : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
             }`}
           >
-            {tab} {tab === 'All' ? `(${orders.length})` : ''}
+            {tab} {tab === 'All' ? `(${orders.length})` : tab === 'Partial Pickup' && partialOrdersCount > 0 ? `(${partialOrdersCount})` : ''}
           </button>
         ))}
       </div>
@@ -93,70 +99,122 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
             <p className="text-sm font-medium">No orders found matching criteria.</p>
           </div>
         ) : (
-          filteredOrders.map((order) => (
-            <div
-              key={order.id}
-              className="bg-white rounded-xl p-4 border border-[#c1c8c2] hover:border-[#012d1d] shadow-2xs transition-all flex flex-col gap-3"
-            >
-              <div className="flex justify-between items-start">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <span className="font-extrabold text-base text-[#012d1d]">
-                      {order.id}
-                    </span>
-                    <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                      order.status === 'Ready for Pickup' 
-                        ? 'bg-[#a0f4c8] text-[#19724f]'
-                        : order.status === 'Pending'
-                        ? 'bg-[#facc15]/30 text-[#461702]'
-                        : 'bg-[#e2e3df] text-[#414844]'
-                    }`}>
-                      {order.status}
+          filteredOrders.map((order) => {
+            const isPartial = order.status === 'Partial Pickup' || !!order.hasPartialPickup || ((order.remainingItemsCount || 0) > 0 && (order.pickedUpItemsCount || 0) > 0);
+            const remainingCount = order.remainingItemsCount ?? (isPartial ? (order.itemsCount - (order.pickedUpItemsCount || 0)) : 0);
+
+            return (
+              <div
+                key={order.id}
+                onClick={() => {
+                  onSelectOrder(order);
+                  onNavigate('finalization');
+                }}
+                className={`bg-white rounded-2xl p-4 sm:p-5 border shadow-2xs hover:shadow-md transition-all flex flex-col gap-3 cursor-pointer group ${
+                  isPartial 
+                    ? 'border-amber-300 hover:border-amber-500 bg-amber-50/20' 
+                    : 'border-[#c1c8c2] hover:border-[#012d1d]'
+                }`}
+              >
+                <div className="flex justify-between items-start gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-extrabold text-base sm:text-lg text-[#012d1d] group-hover:underline">
+                        {order.customerName ? `${order.customerName} - ${order.id}` : order.id}
+                      </span>
+                      {isPartial ? (
+                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                          <AlertCircle className="w-3 h-3 text-amber-700" />
+                          <span>Partial Pickup ({remainingCount > 0 ? `${remainingCount} remaining` : 'Split Load'})</span>
+                        </span>
+                      ) : (
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                          order.status === 'Ready for Pickup' 
+                            ? 'bg-[#a0f4c8] text-[#19724f]'
+                            : order.status === 'Pending'
+                            ? 'bg-[#facc15]/30 text-[#461702]'
+                            : order.status === 'Completed'
+                            ? 'bg-[#e2e3df] text-[#414844]'
+                            : 'bg-[#f3f4f0] text-[#717973]'
+                        }`}>
+                          {order.status}
+                        </span>
+                      )}
+                    </div>
+                    <span className="block text-xs text-[#717973] mt-0.5">
+                      Created: {order.date || 'Today'} • Scheduled: {order.scheduledTime || 'Scheduled'}
                     </span>
                   </div>
-                  <span className="block text-sm font-semibold text-[#1a1c1a] mt-0.5">
-                    {order.customerName}
-                  </span>
+
+                  <div className="text-right shrink-0">
+                    <span className="font-extrabold text-lg sm:text-xl text-[#012d1d] block">
+                      ${order.total.toFixed(2)}
+                    </span>
+                    <span className="text-[11px] font-semibold text-[#717973]">
+                      {order.itemsCount} items
+                    </span>
+                  </div>
                 </div>
 
-                <span className="font-extrabold text-lg text-[#012d1d]">
-                  ${order.total.toFixed(2)}
-                </span>
+                {/* Holding Location & Pickup Status Notice */}
+                <div className="bg-[#f3f4f0] px-3 py-2 rounded-xl flex items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-1.5 min-w-0 text-[#012d1d]">
+                    <MapPin className="w-3.5 h-3.5 text-[#012d1d] shrink-0" />
+                    <span className="font-bold truncate">
+                      {order.holdingLocation || 'Holding Location Not Assigned'}
+                    </span>
+                  </div>
+                  {isPartial && remainingCount > 0 ? (
+                    <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                      <Clock className="w-3 h-3 text-amber-700" />
+                      <span>{remainingCount} plants held for pickup</span>
+                    </span>
+                  ) : (
+                    <span className="text-[10px] font-extrabold text-[#717973] uppercase tracking-wider shrink-0">
+                      Zone
+                    </span>
+                  )}
+                </div>
+
+                {/* Card Footer Actions */}
+                <div className="flex justify-between items-center text-xs text-[#414844] pt-2 border-t border-[#f3f4f0]">
+                  <div className="flex items-center gap-1.5">
+                    {getFulfillmentIcon(order.type)}
+                    <span className="font-semibold">{order.type}</span>
+                  </div>
+
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectOrder(order);
+                        onNavigate('holding_location');
+                      }}
+                      className="p-1.5 px-2.5 rounded-lg bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
+                      title="Change holding area"
+                    >
+                      <MapPin className="w-3.5 h-3.5" />
+                      <span>Change Zone</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectOrder(order);
+                        onNavigate('finalization');
+                      }}
+                      className="p-1.5 px-3 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white flex items-center gap-1 text-xs font-extrabold shadow-2xs transition-all cursor-pointer"
+                    >
+                      <span>View & Edit</span>
+                      <ChevronRight className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
               </div>
-
-              <div className="flex justify-between items-center text-xs text-[#414844] pt-2 border-t border-[#f3f4f0]">
-                <div className="flex items-center gap-1.5">
-                  {getFulfillmentIcon(order.type)}
-                  <span>{order.type} • {order.itemsCount} items</span>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <button
-                    onClick={() => {
-                      onSelectOrder(order);
-                      onNavigate('holding_location');
-                    }}
-                    className="p-1.5 rounded-lg bg-[#f3f4f0] text-[#012d1d] hover:bg-[#a0f4c8] flex items-center gap-1 text-[11px] font-bold"
-                    title="Assign Placement"
-                  >
-                    <MapPin className="w-3.5 h-3.5" />
-                    Routing
-                  </button>
-
-                  <button
-                    onClick={() => {
-                      onSelectOrder(order);
-                      onNavigate('finalization');
-                    }}
-                    className="p-1.5 rounded-lg bg-[#461702] text-white hover:bg-[#622c13] flex items-center gap-1 text-[11px] font-bold"
-                  >
-                    <span>Finalize</span>
-                    <ChevronRight className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-            </div>
-          ))
+            );
+          })
         )}
       </div>
     </div>

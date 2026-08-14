@@ -7,6 +7,7 @@ export type ScreenType =
   | 'holding_location' 
   | 'data_management' 
   | 'settings' 
+  | 'instructions'
   | 'login';
 
 export interface PlantItem {
@@ -39,6 +40,7 @@ export interface PlantItem {
 export interface OrderCartItem {
   plant: PlantItem;
   quantity: number;
+  pickedUpQuantity?: number; // Number of units customer has taken (0 to quantity)
   gpsLocation?: {
     latitude: number;
     longitude: number;
@@ -53,10 +55,16 @@ export interface Order {
   total: number;
   type: 'Pickup' | 'Delivery' | 'Take Now' | 'Pick-up/Delivery';
   scheduledTime?: string;
-  status: 'Pending' | 'Ready for Pickup' | 'Completed' | 'In Transit';
+  status: 'Pending' | 'Ready for Pickup' | 'Completed' | 'In Transit' | 'Cancelled' | 'Partial Pickup';
   date: string;
   items?: OrderCartItem[];
   holdingLocation?: string;
+  notes?: string;
+  hasPartialPickup?: boolean; // True if customer took only part of order
+  remainingItemsCount?: number; // Number of items still awaiting pickup
+  pickedUpItemsCount?: number; // Number of items already taken
+  remainingPickupDate?: string; // Estimated date for customer to pick up remainder
+  partialPickupNotes?: string; // Specific pickup remarks
 }
 
 export interface Customer {
@@ -101,5 +109,13 @@ export interface StockAlertSettings {
   criticalThreshold: number;
   warningThreshold: number;
   alertsEnabled: boolean;
+}
+
+export interface HoldingArea {
+  id: string;
+  title: string;
+  subtitle: string;
+  icon: string;
+  isCustom?: boolean;
 }
 

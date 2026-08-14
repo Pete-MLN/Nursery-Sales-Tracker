@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings } from './types';
-import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, INITIAL_EMPLOYEES } from './data/mockData';
+import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings, HoldingArea } from './types';
+import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, INITIAL_EMPLOYEES, HOLDING_AREAS } from './data/mockData';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './components/HomeScreen';
@@ -11,6 +11,7 @@ import { OrderFinalizationScreen } from './components/OrderFinalizationScreen';
 import { DataManagementScreen } from './components/DataManagementScreen';
 import { OrdersScreen } from './components/OrdersScreen';
 import { SettingsScreen } from './components/SettingsScreen';
+import { InstructionsScreen } from './components/InstructionsScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -21,6 +22,7 @@ import {
   subscribeToEmployees,
   subscribeToOrders,
   subscribeToUploads,
+  subscribeToHoldingLocations,
   savePlantToFirestore,
   batchSavePlantsToFirestore,
   saveCustomerToFirestore,
@@ -29,7 +31,11 @@ import {
   saveEmployeeToFirestore,
   deleteEmployeeFromFirestore,
   saveOrderToFirestore,
-  saveUploadToFirestore
+  deleteOrderFromFirestore,
+  saveUploadToFirestore,
+  saveHoldingLocationToFirestore,
+  batchSaveHoldingLocationsToFirestore,
+  deleteHoldingLocationFromFirestore
 } from './services/firebaseService';
 import { sanitizeCustomerName } from './utils/customerNameCleaner';
 
@@ -74,6 +80,18 @@ export default function App() {
   const [uploads, setUploads] = useState<RecentUpload[]>(INITIAL_UPLOADS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+  const [holdingAreas, setHoldingAreas] = useState<HoldingArea[]>(() => {
+    const saved = localStorage.getItem('nursery_holding_areas');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {
+        // Fallback to default
+      }
+    }
+    return HOLDING_AREAS;
+  });
   const [activeOrder, setActiveOrder] = useState<Order | null>(INITIAL_ORDERS[2]); // ORD-90210-A
   const [screenHistory, setScreenHistory] = useState<ScreenType[]>(['home']);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
@@ -142,6 +160,12 @@ export default function App() {
     const unsubUploads = subscribeToUploads((data) => {
       if (data && data.length > 0) setUploads(data);
     });
+    const unsubHoldingLocations = subscribeToHoldingLocations((data) => {
+      if (data && data.length > 0) {
+        setHoldingAreas(data);
+        localStorage.setItem('nursery_holding_areas', JSON.stringify(data));
+      }
+    });
 
     return () => {
       unsubPlants();
@@ -149,8 +173,42 @@ export default function App() {
       unsubEmployees();
       unsubOrders();
       unsubUploads();
+      unsubHoldingLocations();
     };
   }, []);
+
+  const handleUpdateHoldingArea = (updatedArea: HoldingArea) => {
+    setHoldingAreas(prev => {
+      const next = prev.map(a => a.id === updatedArea.id ? updatedArea : a);
+      localStorage.setItem('nursery_holding_areas', JSON.stringify(next));
+      return next;
+    });
+    saveHoldingLocationToFirestore(updatedArea);
+  };
+
+  const handleAddHoldingArea = (newArea: HoldingArea) => {
+    setHoldingAreas(prev => {
+      const next = [...prev, newArea];
+      localStorage.setItem('nursery_holding_areas', JSON.stringify(next));
+      return next;
+    });
+    saveHoldingLocationToFirestore(newArea);
+  };
+
+  const handleDeleteHoldingArea = (id: string) => {
+    setHoldingAreas(prev => {
+      const next = prev.filter(a => a.id !== id);
+      localStorage.setItem('nursery_holding_areas', JSON.stringify(next));
+      return next;
+    });
+    deleteHoldingLocationFromFirestore(id);
+  };
+
+  const handleResetHoldingAreas = () => {
+    setHoldingAreas(HOLDING_AREAS);
+    localStorage.setItem('nursery_holding_areas', JSON.stringify(HOLDING_AREAS));
+    batchSaveHoldingLocationsToFirestore(HOLDING_AREAS);
+  };
 
   const handleAddEmployee = (empData: Omit<Employee, 'id'>) => {
     const newEmp: Employee = {
@@ -233,6 +291,24 @@ export default function App() {
       setOrders(prev => prev.map(o => o.id === activeOrder.id ? updatedOrder : o));
       saveOrderToFirestore(updatedOrder);
     }
+  };
+
+  // Full order update (items, quantities, customer, location, status)
+  const handleUpdateOrder = (updatedOrder: Order) => {
+    setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+    if (activeOrder && activeOrder.id === updatedOrder.id) {
+      setActiveOrder(updatedOrder);
+    }
+    saveOrderToFirestore(updatedOrder);
+  };
+
+  // Cancel / delete order from list and Firestore
+  const handleDeleteOrder = (orderId: string) => {
+    setOrders(prev => prev.filter(o => o.id !== orderId));
+    if (activeOrder && activeOrder.id === orderId) {
+      setActiveOrder(null);
+    }
+    deleteOrderFromFirestore(orderId);
   };
 
   // Handle uploading dataset in Data Management
@@ -338,6 +414,9 @@ export default function App() {
             inventory={inventory}
             customers={customers}
             onCompleteOrder={handleCompleteScanOrder}
+            activeOrder={activeOrder}
+            onUpdateActiveOrder={handleUpdateOrder}
+            onStartNewOrder={() => setActiveOrder(null)}
           />
         )}
 
@@ -355,6 +434,11 @@ export default function App() {
             onNavigate={navigateTo}
             activeOrder={activeOrder}
             onConfirmLocation={handleConfirmLocation}
+            holdingAreas={holdingAreas}
+            onUpdateHoldingArea={handleUpdateHoldingArea}
+            onAddHoldingArea={handleAddHoldingArea}
+            onDeleteHoldingArea={handleDeleteHoldingArea}
+            onResetHoldingAreas={handleResetHoldingAreas}
           />
         )}
 
@@ -362,6 +446,11 @@ export default function App() {
           <OrderFinalizationScreen
             onNavigate={navigateTo}
             order={activeOrder}
+            inventory={inventory}
+            customers={customers}
+            holdingAreas={holdingAreas}
+            onUpdateOrder={handleUpdateOrder}
+            onDeleteOrder={handleDeleteOrder}
           />
         )}
 
@@ -399,6 +488,12 @@ export default function App() {
             onNavigate={navigateTo}
             stockAlertSettings={stockAlertSettings}
             onUpdateStockAlertSettings={handleUpdateStockAlertSettings}
+          />
+        )}
+
+        {currentScreen === 'instructions' && (
+          <InstructionsScreen
+            onNavigate={navigateTo}
           />
         )}
       </main>

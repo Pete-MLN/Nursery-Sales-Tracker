@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScreenType, User, StockAlertSettings } from '../types';
-import { User as UserIcon, LogOut, FileSpreadsheet, MapPin, Database, Bell, Shield, Moon, Sun, Check, Smartphone, QrCode, Copy, ExternalLink, Wifi, AlertTriangle, Plus, Minus, Sliders, CheckCircle2 } from 'lucide-react';
+import { User as UserIcon, LogOut, FileSpreadsheet, MapPin, Database, Bell, Shield, Moon, Sun, Check, Smartphone, QrCode, Copy, ExternalLink, Wifi, AlertTriangle, Plus, Minus, Sliders, CheckCircle2, BookOpen } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface SettingsScreenProps {
@@ -198,12 +198,34 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       {/* Quick Navigation Cards */}
       <div className="flex flex-col gap-2">
         <span className="text-xs font-bold text-[#414844] uppercase tracking-wider px-1">
-          Nursery System Tools
+          Nursery System Tools & Documentation
         </span>
 
         <button
+          onClick={() => onNavigate('instructions')}
+          className="w-full bg-[#f3f4f0] p-3.5 rounded-xl border border-[#012d1d] hover:bg-[#e7f8ef] flex items-center justify-between transition-colors text-left group cursor-pointer shadow-2xs"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center">
+              <BookOpen className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="block font-extrabold text-sm text-[#012d1d] group-hover:underline">
+                Staff User Guide & Instructions Manual
+              </span>
+              <span className="block text-xs text-[#414844]">
+                New orders, unlisted customers, editing loads, & staff hold emails
+              </span>
+            </div>
+          </div>
+          <span className="text-xs font-extrabold text-[#002113] bg-[#a0f4c8] px-2.5 py-1 rounded-full">
+            Open Guide
+          </span>
+        </button>
+
+        <button
           onClick={() => onNavigate('data_management')}
-          className="w-full bg-white p-3.5 rounded-xl border border-[#c1c8c2] hover:border-[#012d1d] flex items-center justify-between transition-colors text-left"
+          className="w-full bg-white p-3.5 rounded-xl border border-[#c1c8c2] hover:border-[#012d1d] flex items-center justify-between transition-colors text-left cursor-pointer"
         >
           <div className="flex items-center gap-3">
             <FileSpreadsheet className="w-5 h-5 text-[#0e6c4a]" />

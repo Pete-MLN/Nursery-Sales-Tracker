@@ -9,13 +9,14 @@ import {
   writeBatch 
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { PlantItem, Customer, Employee, Order, RecentUpload } from '../types';
+import { PlantItem, Customer, Employee, Order, RecentUpload, HoldingArea } from '../types';
 import { 
   INITIAL_PLANTS, 
   INITIAL_CUSTOMERS, 
   INITIAL_EMPLOYEES, 
   INITIAL_ORDERS, 
-  INITIAL_UPLOADS 
+  INITIAL_UPLOADS,
+  HOLDING_AREAS
 } from '../data/mockData';
 
 const PLANTS_COL = 'plants';
@@ -23,6 +24,7 @@ const CUSTOMERS_COL = 'customers';
 const EMPLOYEES_COL = 'employees';
 const ORDERS_COL = 'orders';
 const UPLOADS_COL = 'uploads';
+const HOLDING_LOCATIONS_COL = 'holding_locations';
 
 /**
  * Helper to recursively strip undefined properties from an object prior to Firestore operations
@@ -103,6 +105,17 @@ export async function seedInitialFirestoreData() {
       await batch.commit();
       console.log('Firestore: Uploads initialized');
     }
+
+    const holdingSnap = await getDocs(collection(db, HOLDING_LOCATIONS_COL));
+    if (holdingSnap.empty) {
+      const batch = writeBatch(db);
+      HOLDING_AREAS.forEach((area) => {
+        const ref = doc(db, HOLDING_LOCATIONS_COL, area.id);
+        batch.set(ref, cleanForFirestore(area));
+      });
+      await batch.commit();
+      console.log('Firestore: Holding Locations initialized');
+    }
   } catch (err) {
     console.error('Error seeding Firestore data:', err);
   }
@@ -158,6 +171,16 @@ export function subscribeToUploads(callback: (uploads: RecentUpload[]) => void) 
     });
     callback(items);
   }, (err) => console.error('Uploads snapshot error:', err));
+}
+
+export function subscribeToHoldingLocations(callback: (areas: HoldingArea[]) => void) {
+  return onSnapshot(collection(db, HOLDING_LOCATIONS_COL), (snapshot) => {
+    const items: HoldingArea[] = [];
+    snapshot.forEach((doc) => {
+      items.push(doc.data() as HoldingArea);
+    });
+    callback(items);
+  }, (err) => console.error('Holding locations snapshot error:', err));
 }
 
 /* --- CRUD Helpers --- */
@@ -221,6 +244,31 @@ export async function saveOrderToFirestore(order: Order) {
   await setDoc(doc(db, ORDERS_COL, order.id), cleanForFirestore(order), { merge: true });
 }
 
+export async function deleteOrderFromFirestore(id: string) {
+  await deleteDoc(doc(db, ORDERS_COL, id));
+}
+
 export async function saveUploadToFirestore(upload: RecentUpload) {
   await setDoc(doc(db, UPLOADS_COL, upload.id), cleanForFirestore(upload), { merge: true });
+}
+
+export async function saveHoldingLocationToFirestore(area: HoldingArea) {
+  await setDoc(doc(db, HOLDING_LOCATIONS_COL, area.id), cleanForFirestore(area), { merge: true });
+}
+
+export async function batchSaveHoldingLocationsToFirestore(areas: HoldingArea[]) {
+  try {
+    const batch = writeBatch(db);
+    areas.forEach((area) => {
+      const ref = doc(db, HOLDING_LOCATIONS_COL, area.id);
+      batch.set(ref, cleanForFirestore(area), { merge: true });
+    });
+    await batch.commit();
+  } catch (err) {
+    console.error('Error batch saving holding locations to Firestore:', err);
+  }
+}
+
+export async function deleteHoldingLocationFromFirestore(id: string) {
+  await deleteDoc(doc(db, HOLDING_LOCATIONS_COL, id));
 }

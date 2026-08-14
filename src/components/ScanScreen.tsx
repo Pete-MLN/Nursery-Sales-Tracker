@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { ScreenType, PlantItem, OrderCartItem, Customer } from '../types';
+import { ScreenType, PlantItem, OrderCartItem, Customer, Order } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode } from '../utils/barcodeUtils';
 
@@ -10,22 +10,47 @@ interface ScanScreenProps {
   inventory: PlantItem[];
   customers: Customer[];
   onCompleteOrder: (cartItems: OrderCartItem[], customerName: string) => void;
+  activeOrder?: Order | null;
+  onUpdateActiveOrder?: (updatedOrder: Order) => void;
+  onStartNewOrder?: () => void;
 }
 
 export const ScanScreen: React.FC<ScanScreenProps> = ({
   onNavigate,
   inventory,
   customers,
-  onCompleteOrder
+  onCompleteOrder,
+  activeOrder,
+  onUpdateActiveOrder,
+  onStartNewOrder
 }) => {
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
-  const [customerSearch, setCustomerSearch] = useState<string>('');
+  const [cartItems, setCartItems] = useState<OrderCartItem[]>(() => {
+    if (activeOrder && activeOrder.items && activeOrder.items.length > 0) {
+      return activeOrder.items;
+    }
+    return [];
+  });
+  const [selectedCustomer, setSelectedCustomer] = useState<string>(activeOrder?.customerName || '');
+  const [customerSearch, setCustomerSearch] = useState<string>(activeOrder?.customerName || '');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [customerType, setCustomerType] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [cameraActive, setCameraActive] = useState<boolean>(false);
   const [gpsLoggedMap, setGpsLoggedMap] = useState<Record<string, string>>({});
   const [itemFulfillmentMap, setItemFulfillmentMap] = useState<Record<string, 'Take Now' | 'Pick-up/Delivery'>>({});
+
+  // Sync state when activeOrder changes
+  useEffect(() => {
+    if (activeOrder) {
+      if (activeOrder.items) {
+        setCartItems(activeOrder.items);
+      }
+      if (activeOrder.customerName) {
+        setSelectedCustomer(activeOrder.customerName);
+        setCustomerSearch(activeOrder.customerName);
+      }
+    }
+  }, [activeOrder?.id]);
 
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -325,19 +350,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Initial order items matching screenshot 3:
-  // Golden Pothos ($22.50), Fiddle Leaf Fig ($65.00), Succulent Arrangement ($45.00)
-  const [cartItems, setCartItems] = useState<OrderCartItem[]>([
-    {
-      plant: inventory.find(p => p.id === 'p1') || inventory[0],
-      quantity: 1,
-    },
-    {
-      plant: inventory.find(p => p.id === 'p2') || inventory[1],
-      quantity: 1,
-    }
-  ]);
-
   // Handle GPS location logging
   const handleLogGPS = (plantId: string) => {
     if (navigator.geolocation) {
@@ -495,7 +507,44 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   const handleComplete = () => {
     if (cartItems.length === 0) return;
-    onCompleteOrder(cartItems, selectedCustomer.trim() || 'Retail Walk-in');
+    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
+    
+    if (activeOrder && onUpdateActiveOrder) {
+      const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+      const totalAmt = calculateTotal();
+      const updated: Order = {
+        ...activeOrder,
+        customerName: finalCustomer,
+        items: cartItems,
+        itemsCount: totalCount,
+        total: totalAmt
+      };
+      onUpdateActiveOrder(updated);
+      onNavigate('finalization');
+    } else {
+      onCompleteOrder(cartItems, finalCustomer);
+      onNavigate('holding_location');
+    }
+  };
+
+  const handleCompleteAndGoToHolding = () => {
+    if (cartItems.length === 0) return;
+    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
+    
+    if (activeOrder && onUpdateActiveOrder) {
+      const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+      const totalAmt = calculateTotal();
+      const updated: Order = {
+        ...activeOrder,
+        customerName: finalCustomer,
+        items: cartItems,
+        itemsCount: totalCount,
+        total: totalAmt
+      };
+      onUpdateActiveOrder(updated);
+    } else {
+      onCompleteOrder(cartItems, finalCustomer);
+    }
     onNavigate('holding_location');
   };
 
@@ -526,6 +575,55 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   return (
     <div className="flex-1 px-4 py-4 w-full max-w-2xl mx-auto pb-44 animate-fade-in flex flex-col gap-4">
+      {/* Active Order Editing Banner */}
+      {activeOrder && (
+        <div className="bg-[#e7f8ef] border border-[#a0f4c8] p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center shrink-0 shadow-2xs">
+              <Barcode className="w-5 h-5" />
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a] bg-[#a0f4c8]/60 px-2 py-0.5 rounded">
+                  Order {activeOrder.id}
+                </span>
+                <span className="text-xs text-[#012d1d] font-bold">
+                  Live Scan & Edit Mode
+                </span>
+              </div>
+              <p className="text-sm font-extrabold text-[#012d1d] truncate mt-0.5">
+                {activeOrder.customerName || 'Customer'} • {cartItems.reduce((acc, item) => acc + item.quantity, 0)} items
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => onNavigate('finalization')}
+              className="text-xs font-extrabold text-[#012d1d] hover:bg-white px-2.5 py-1.5 rounded-xl border border-[#a0f4c8] bg-white/70 transition-all cursor-pointer shadow-2xs"
+            >
+              Order Details
+            </button>
+            {onStartNewOrder && (
+              <button
+                type="button"
+                onClick={() => {
+                  onStartNewOrder();
+                  setCartItems([]);
+                  setSelectedCustomer('');
+                  setCustomerSearch('');
+                }}
+                className="text-xs font-bold text-[#717973] hover:text-[#ba1a1a] hover:bg-white px-2 py-1.5 rounded-lg transition-colors cursor-pointer"
+                title="Start a blank order"
+              >
+                New Order
+              </button>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Customer Search Bar */}
       <section className="flex flex-col gap-2">
         <div className="flex items-center gap-2">
@@ -1187,22 +1285,51 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       </section>
 
       {/* Order Total & Action Footer */}
-      <section className="mt-4 pt-4 border-t border-[#c1c8c2] pb-6 mb-12">
-        <div className="flex justify-between items-center mb-4">
-          <span className="font-bold text-xl text-[#012d1d]">Total</span>
+      <section className="mt-4 pt-4 border-t border-[#c1c8c2] pb-6 mb-12 flex flex-col gap-3">
+        <div className="flex justify-between items-center">
+          <div>
+            <span className="font-bold text-xl text-[#012d1d] block">Total</span>
+            <span className="text-xs text-[#717973] font-semibold">
+              {cartItems.reduce((acc, item) => acc + item.quantity, 0)} items in order
+            </span>
+          </div>
           <span className="font-bold text-2xl text-[#012d1d]">
             ${calculateTotal().toFixed(2)}
           </span>
         </div>
 
-        <button
-          onClick={handleComplete}
-          disabled={cartItems.length === 0}
-          className="w-full bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer"
-        >
-          <CheckCircle className="w-5 h-5" />
-          <span>Complete Order</span>
-        </button>
+        {activeOrder ? (
+          <div className="flex flex-col sm:flex-row gap-2.5">
+            <button
+              type="button"
+              onClick={handleComplete}
+              disabled={cartItems.length === 0}
+              className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base"
+            >
+              <CheckCircle className="w-5 h-5" />
+              <span>Save & Return to Order {activeOrder.id}</span>
+            </button>
+            <button
+              type="button"
+              onClick={handleCompleteAndGoToHolding}
+              disabled={cartItems.length === 0}
+              className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm shrink-0"
+              title="Save changes and proceed to staging map"
+            >
+              <MapPin className="w-4 h-4" />
+              <span>Holding Map</span>
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={handleComplete}
+            disabled={cartItems.length === 0}
+            className="w-full bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer"
+          >
+            <CheckCircle className="w-5 h-5" />
+            <span>Complete Order</span>
+          </button>
+        )}
       </section>
 
       {/* Unrecognized Barcode Assignment Modal */}

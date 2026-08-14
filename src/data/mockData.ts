@@ -1,4 +1,4 @@
-import { PlantItem, Order, Customer, RecentUpload, Employee } from '../types';
+import { PlantItem, Order, Customer, RecentUpload, Employee, HoldingArea } from '../types';
 import defaultPlantImg from '../assets/images/default_maple_leaf_1786202948974.jpg';
 
 export const DEFAULT_PLANT_IMAGE = defaultPlantImg;
@@ -415,7 +415,7 @@ export const INITIAL_UPLOADS: RecentUpload[] = [
   }
 ];
 
-export const HOLDING_AREAS = [
+export const HOLDING_AREAS: HoldingArea[] = [
   {
     id: 'area_a',
     title: 'Holding Area A',

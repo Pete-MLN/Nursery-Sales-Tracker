@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScreenType, User } from '../types';
-import { ArrowLeft, User as UserIcon, MoreVertical, Sprout, Wifi, QrCode, X, Copy, Check, Smartphone, ExternalLink } from 'lucide-react';
+import { ArrowLeft, User as UserIcon, MoreVertical, Sprout, Wifi, QrCode, X, Copy, Check, Smartphone, ExternalLink, BookOpen } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface HeaderProps {
@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const showBackButton = currentScreen === 'holding_location' || currentScreen === 'data_management' || currentScreen === 'finalization' || !!onBack;
+  const showBackButton = currentScreen === 'holding_location' || currentScreen === 'data_management' || currentScreen === 'finalization' || currentScreen === 'instructions' || !!onBack;
 
   const getTitle = () => {
     if (titleOverride) return titleOverride;
@@ -56,6 +56,8 @@ export const Header: React.FC<HeaderProps> = ({
         return 'All Orders';
       case 'settings':
         return 'System Settings';
+      case 'instructions':
+        return 'Staff Operations Guide';
       default:
         return 'Nursery Manager';
     }
@@ -99,11 +101,25 @@ export const Header: React.FC<HeaderProps> = ({
           </h1>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5 sm:gap-2">
+          {/* Staff Guide Quick Button */}
+          <button
+            onClick={() => onNavigate('instructions')}
+            className={`flex items-center gap-1 text-xs font-semibold px-2.5 py-1.5 rounded-lg border transition-all cursor-pointer ${
+              currentScreen === 'instructions'
+                ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
+                : 'bg-white hover:bg-[#e2e3df] text-[#012d1d] border-[#c1c8c2]'
+            }`}
+            title="Open Staff Operations & User Guide"
+          >
+            <BookOpen className="w-4 h-4 text-[#0e6c4a]" />
+            <span className="hidden sm:inline">User Guide</span>
+          </button>
+
           {/* QR Code Quick Button */}
           <button
             onClick={() => setShowQrModal(true)}
-            className="flex items-center gap-1.5 bg-[#19724f] text-white hover:bg-[#005236] text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-2xs transition-all active:scale-95"
+            className="flex items-center gap-1.5 bg-[#19724f] text-white hover:bg-[#005236] text-xs font-semibold px-2.5 py-1.5 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer"
             title="Scan QR Code to open on phones"
           >
             <QrCode className="w-4 h-4" />

@@ -1,7 +1,7 @@
 import React from 'react';
 import { ScreenType, Order, PlantItem } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
-import { PlusCircle, ChevronRight, Smartphone } from 'lucide-react';
+import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode } from 'lucide-react';
 
 interface HomeScreenProps {
   userName: string;
@@ -33,7 +33,10 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
         {/* Big Terracotta New Order Button */}
         <button
-          onClick={() => onNavigate('scan')}
+          onClick={() => {
+            if (onSelectOrder) onSelectOrder(null as any);
+            onNavigate('scan');
+          }}
           className="w-full bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] text-white flex flex-col items-center justify-center p-6 rounded-xl shadow-md transition-all h-32 cursor-pointer group"
         >
           <div className="w-10 h-10 rounded-full bg-white/10 flex items-center justify-center mb-2 group-hover:scale-110 transition-transform">
@@ -75,15 +78,23 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                     onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                   />
                   <div className="flex-grow min-w-0">
-                    <div className="flex justify-between items-baseline">
-                      <span className="font-semibold text-base text-[#012d1d] group-hover:underline">
-                        {order.id}
+                    <div className="flex justify-between items-baseline gap-2">
+                      <span className="font-semibold text-base text-[#012d1d] group-hover:underline truncate">
+                        {order.customerName ? `${order.customerName} - ${order.id}` : order.id}
                       </span>
-                      <span className="text-xs text-[#414844] font-medium">{order.itemsCount} items</span>
+                      <span className="text-xs text-[#414844] font-medium shrink-0">{order.itemsCount} items</span>
                     </div>
-                    <span className="text-xs text-[#414844] block mt-0.5">
-                      {order.type}: {order.scheduledTime || 'Scheduled'}
-                    </span>
+                    <div className="flex items-center gap-2 mt-1 text-xs text-[#414844] flex-wrap">
+                      <span>{order.type}: {order.scheduledTime || 'Scheduled'}</span>
+                      {order.holdingLocation && (
+                        <>
+                          <span className="text-[#c1c8c2]">•</span>
+                          <span className="text-[#012d1d] font-bold truncate max-w-[140px]">
+                            {order.holdingLocation}
+                          </span>
+                        </>
+                      )}
+                    </div>
                   </div>
                   <ChevronRight className="w-5 h-5 text-[#717973] group-hover:text-[#012d1d] transition-colors" />
                 </div>
@@ -97,6 +108,33 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           >
             View All Orders
           </button>
+        </div>
+
+        {/* Staff User Guide Card */}
+        <div 
+          onClick={() => onNavigate('instructions')}
+          className="bg-gradient-to-r from-[#012d1d] to-[#0e6c4a] text-white rounded-2xl p-4.5 border border-[#19724f]/40 shadow-sm flex items-center justify-between gap-4 cursor-pointer hover:shadow-md transition-all group"
+        >
+          <div className="flex items-center gap-3.5">
+            <div className="w-11 h-11 rounded-xl bg-[#a0f4c8]/20 text-[#a0f4c8] flex items-center justify-center shrink-0 border border-[#a0f4c8]/30">
+              <BookOpen className="w-6 h-6" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-extrabold uppercase tracking-widest text-[#a0f4c8] bg-[#a0f4c8]/20 px-2 py-0.2 rounded-full">
+                  Staff Handbook
+                </span>
+                <span className="text-xs text-white/70">Step-by-Step Instructions</span>
+              </div>
+              <h3 className="font-extrabold text-base text-white mt-0.5 group-hover:underline">
+                User Guide & Operations Manual
+              </h3>
+              <p className="text-xs text-white/80 mt-0.5">
+                Entering new customers, editing orders, partial pickups, & emailing staff.
+              </p>
+            </div>
+          </div>
+          <ChevronRight className="w-6 h-6 text-[#a0f4c8] shrink-0 group-hover:translate-x-1 transition-transform" />
         </div>
       </section>
     </div>

@@ -18,8 +18,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   customers,
   onCompleteOrder
 }) => {
-  const [selectedCustomer, setSelectedCustomer] = useState<string>('Sarah J.');
-  const [customerSearch, setCustomerSearch] = useState<string>('Sarah J.');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>('');
+  const [customerSearch, setCustomerSearch] = useState<string>('');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [customerType, setCustomerType] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
   const [isScanning, setIsScanning] = useState<boolean>(false);
@@ -39,7 +39,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   // Bulk Quick Selector State
   const [bulkTab, setBulkTab] = useState<'ALL' | 'MULCH' | 'STONE' | 'TOP SOIL'>('ALL');
-  const [isBulkSectionOpen, setIsBulkSectionOpen] = useState<boolean>(true);
+  const [isBulkSectionOpen, setIsBulkSectionOpen] = useState<boolean>(false);
 
   // Plant Name Search Modal & Autocomplete State
   const [isCatalogModalOpen, setIsCatalogModalOpen] = useState<boolean>(false);
@@ -495,7 +495,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   const handleComplete = () => {
     if (cartItems.length === 0) return;
-    onCompleteOrder(cartItems, selectedCustomer);
+    onCompleteOrder(cartItems, selectedCustomer.trim() || 'Retail Walk-in');
     onNavigate('holding_location');
   };
 
@@ -542,8 +542,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   setSelectedCustomer(e.target.value);
                   setIsDropdownOpen(true);
                 }}
-                placeholder="Search customer name or company..."
-                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-16 py-2 text-sm font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white transition-all shadow-2xs"
+                placeholder="Customer Name (e.g., Retail Walk-in, John Smith)..."
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-16 py-2.5 text-base font-semibold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white transition-all shadow-2xs placeholder:text-sm placeholder:font-normal"
               />
               <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 {customerSearch && (
@@ -554,34 +554,34 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       setSelectedCustomer('');
                       setIsDropdownOpen(true);
                     }}
-                    className="p-1 text-[#717973] hover:text-[#1a1c1a] rounded cursor-pointer"
+                    className="p-1.5 text-[#717973] hover:text-[#1a1c1a] rounded cursor-pointer"
                     title="Clear search"
                   >
-                    <X className="w-3.5 h-3.5" />
+                    <X className="w-4 h-4" />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(prev => !prev)}
-                  className="p-1 text-[#717973] hover:text-[#012d1d] rounded cursor-pointer"
+                  className="p-1.5 text-[#717973] hover:text-[#012d1d] rounded cursor-pointer"
                   title="Toggle customer list"
                 >
-                  {isDropdownOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  {isDropdownOpen ? <ChevronUp className="w-4.5 h-4.5" /> : <ChevronDown className="w-4.5 h-4.5" />}
                 </button>
               </div>
             </div>
 
             {/* Searchable Dropdown Popup Menu */}
             {isDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-[#c1c8c2] rounded-xl shadow-lg overflow-hidden max-h-60 overflow-y-auto animate-fade-in">
-                <div className="p-1.5 flex flex-col gap-0.5">
-                  <div className="px-3 py-1.5 text-[10px] font-bold text-[#717973] uppercase tracking-wider bg-[#f9faf6] rounded-md flex justify-between items-center">
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-[#c1c8c2] rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto animate-fade-in">
+                <div className="p-2 flex flex-col gap-1">
+                  <div className="px-3 py-1.5 text-xs font-bold text-[#717973] uppercase tracking-wider bg-[#f9faf6] rounded-md flex justify-between items-center">
                     <span>Customer Accounts ({matchingCustomers.length})</span>
-                    <span className="text-[9px] font-normal text-[#717973]">Type name or company to filter</span>
+                    <span className="text-[11px] font-normal text-[#717973]">Type to filter</span>
                   </div>
 
                   {matchingCustomers.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-[#717973]">
+                    <div className="p-3 text-center text-sm text-[#717973]">
                       <span>No matching customers found.</span>
                       {customerSearch && (
                         <button
@@ -590,9 +590,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             setSelectedCustomer(customerSearch);
                             setIsDropdownOpen(false);
                           }}
-                          className="mt-2 w-full bg-[#a0f4c8]/30 hover:bg-[#a0f4c8] text-[#002113] font-bold py-2 px-3 rounded-lg text-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="mt-2 w-full bg-[#a0f4c8]/30 hover:bg-[#a0f4c8] text-[#002113] font-bold py-2.5 px-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
                         >
-                          <User className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                          <User className="w-4 h-4 text-[#0e6c4a]" />
                           <span>Use "{customerSearch}" as customer</span>
                         </button>
                       )}
@@ -612,29 +612,29 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             }
                             setIsDropdownOpen(false);
                           }}
-                          className={`w-full text-left px-3 py-2 rounded-lg text-xs font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                          className={`w-full text-left px-3.5 py-2.5 rounded-lg text-sm sm:text-base font-medium flex items-center justify-between transition-colors cursor-pointer ${
                             isSelected
                               ? 'bg-[#012d1d] text-white font-bold'
                               : 'hover:bg-[#f3f4f0] text-[#1a1c1a]'
                           }`}
                         >
-                          <div className="flex items-center gap-2 min-w-0">
-                            <User className={`w-3.5 h-3.5 shrink-0 ${isSelected ? 'text-[#a0f4c8]' : 'text-[#0e6c4a]'}`} />
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <User className={`w-4 h-4 shrink-0 ${isSelected ? 'text-[#a0f4c8]' : 'text-[#0e6c4a]'}`} />
                             <div className="flex flex-col min-w-0">
-                              <span className={`font-bold text-xs truncate ${isSelected ? 'text-white' : 'text-[#1a1c1a]'}`}>
+                              <span className={`font-bold text-sm sm:text-base truncate ${isSelected ? 'text-white' : 'text-[#1a1c1a]'}`}>
                                 {cust.name}
                               </span>
                               {cust.company && cust.company !== cust.name && (
-                                <span className={`text-[10px] truncate ${isSelected ? 'text-[#a0f4c8]/80' : 'text-[#717973]'}`}>
+                                <span className={`text-xs truncate ${isSelected ? 'text-[#a0f4c8]/80' : 'text-[#717973]'}`}>
                                   {cust.company}
                                 </span>
                               )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                          <div className="flex items-center gap-2 shrink-0 ml-2">
                             <span
-                              className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${
+                              className={`text-xs font-bold px-2 py-0.5 rounded ${
                                 isSelected
                                   ? 'bg-[#a0f4c8] text-[#002113]'
                                   : 'bg-[#e2e3df] text-[#414844]'
@@ -642,7 +642,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             >
                               {cust.type}
                             </span>
-                            {isSelected && <Check className="w-3.5 h-3.5 text-[#a0f4c8]" />}
+                            {isSelected && <Check className="w-4 h-4 text-[#a0f4c8]" />}
                           </div>
                         </button>
                       );
@@ -655,7 +655,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
           <button
             onClick={() => setCustomerType(prev => prev === 'RETAIL' ? 'WHOLESALE' : 'RETAIL')}
-            className="border border-[#012d1d] px-3 py-2 rounded-xl text-xs font-bold text-[#012d1d] hover:bg-[#e7e9e5] transition-colors shrink-0 cursor-pointer shadow-2xs"
+            className="border border-[#012d1d] px-3.5 py-2.5 rounded-xl text-sm font-extrabold text-[#012d1d] hover:bg-[#e7e9e5] transition-colors shrink-0 cursor-pointer shadow-2xs"
             title="Toggle customer rate classification"
           >
             {customerType}
@@ -669,28 +669,28 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <button
               type="button"
               onClick={() => setIsBulkSectionOpen(!isBulkSectionOpen)}
-              className="flex items-center gap-2 text-xs sm:text-sm font-extrabold text-[#012d1d] cursor-pointer hover:text-[#0e6c4a] transition-colors group"
+              className="flex items-center gap-2.5 text-base sm:text-lg font-extrabold text-[#012d1d] cursor-pointer hover:text-[#0e6c4a] transition-colors group"
             >
-              <div className="p-1.5 bg-[#012d1d] text-[#a0f4c8] rounded-lg group-hover:bg-[#0e6c4a]">
-                <Truck className="w-4 h-4" />
+              <div className="p-2 bg-[#012d1d] text-[#a0f4c8] rounded-xl group-hover:bg-[#0e6c4a]">
+                <Truck className="w-5 h-5" />
               </div>
               <span>Bulk Quick Select (MULCH • STONE • TOP SOIL)</span>
               {isBulkSectionOpen ? (
-                <ChevronUp className="w-4 h-4 text-[#717973] group-hover:text-[#012d1d]" />
+                <ChevronUp className="w-5 h-5 text-[#717973] group-hover:text-[#012d1d]" />
               ) : (
-                <ChevronDown className="w-4 h-4 text-[#717973] group-hover:text-[#012d1d]" />
+                <ChevronDown className="w-5 h-5 text-[#717973] group-hover:text-[#012d1d]" />
               )}
             </button>
 
             {/* Category Filter Pills (Visible when open) */}
             {isBulkSectionOpen && (
-              <div className="flex items-center gap-1 overflow-x-auto text-[11px]">
+              <div className="flex items-center gap-1.5 overflow-x-auto text-xs sm:text-sm">
                 {(['ALL', 'MULCH', 'STONE', 'TOP SOIL'] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
                     onClick={() => setBulkTab(tab)}
-                    className={`px-2.5 py-1 rounded-lg font-bold cursor-pointer transition-all ${
+                    className={`px-3 py-1.5 rounded-lg font-bold cursor-pointer transition-all ${
                       bulkTab === tab
                         ? 'bg-[#012d1d] text-[#a0f4c8] shadow-2xs'
                         : 'bg-white/80 text-[#414844] hover:bg-white border border-[#c1c8c2]'
@@ -831,32 +831,32 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                         setManualBarcodeInput('');
                         setShowPlantSuggestions(false);
                       }}
-                      className="w-full p-2.5 hover:bg-[#a0f4c8]/20 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer group"
+                      className="w-full p-3 hover:bg-[#a0f4c8]/20 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer group"
                     >
-                      <div className="flex items-center gap-2.5 min-w-0">
+                      <div className="flex items-center gap-3 min-w-0">
                         <img
                           src={plant.image || DEFAULT_PLANT_IMAGE}
                           alt={plant.name}
-                          className="w-9 h-9 rounded-md object-cover bg-[#f3f4f0] shrink-0"
+                          className="w-11 h-11 rounded-lg object-cover bg-[#f3f4f0] shrink-0"
                           referrerPolicy="no-referrer"
                           onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                         />
                         <div className="min-w-0">
-                          <p className="text-xs font-bold text-[#012d1d] truncate group-hover:text-[#0e6c4a]">
+                          <p className="text-base font-extrabold text-[#012d1d] truncate group-hover:text-[#0e6c4a]">
                             {plant.name}
                           </p>
-                          <p className="text-[10px] text-[#717973] truncate italic">
+                          <p className="text-xs sm:text-sm font-medium text-[#414844] truncate italic mt-0.5">
                             {plant.botanicalName || plant.commonName || plant.size || 'Container'}
                           </p>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-2 shrink-0">
-                        <span className="text-xs font-bold text-[#012d1d]">
+                      <div className="flex items-center gap-2.5 shrink-0">
+                        <span className="text-base font-extrabold text-[#012d1d]">
                           ${plant.price.toFixed(2)}
                         </span>
-                        <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-bold px-2 py-1 rounded-md flex items-center gap-1 group-hover:bg-[#0e6c4a]">
-                          <Plus className="w-3 h-3" />
+                        <span className="bg-[#012d1d] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1 group-hover:bg-[#0e6c4a]">
+                          <Plus className="w-4 h-4" />
                           <span>Add</span>
                         </span>
                       </div>
@@ -1399,15 +1399,15 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                           onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                         />
                         <div className="min-w-0">
-                          <h4 className="font-bold text-sm text-[#1a1c1a] truncate">{plant.name}</h4>
-                          <p className="text-xs text-[#717973] truncate italic">
+                          <h4 className="font-extrabold text-base text-[#1a1c1a] truncate">{plant.name}</h4>
+                          <p className="text-xs sm:text-sm text-[#414844] truncate italic mt-0.5">
                             {plant.botanicalName || plant.commonName || 'Standard Container'}
                           </p>
                           <div className="flex items-center gap-2 mt-1">
-                            <span className="text-[10px] font-bold bg-[#e7e9e5] text-[#414844] px-1.5 py-0.5 rounded">
+                            <span className="text-xs font-bold bg-[#e7e9e5] text-[#414844] px-2 py-0.5 rounded">
                               {plant.size || '3 GAL'}
                             </span>
-                            <span className="text-[10px] text-[#717973]">
+                            <span className="text-xs text-[#717973]">
                               Stock: <strong className="text-[#012d1d]">{plant.stock}</strong>
                             </span>
                           </div>
@@ -1415,16 +1415,16 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       </div>
 
                       <div className="flex items-center gap-3 shrink-0">
-                        <span className="font-extrabold text-sm text-[#012d1d]">
+                        <span className="font-extrabold text-base text-[#012d1d]">
                           ${plant.price.toFixed(2)}
                         </span>
 
                         <button
                           type="button"
                           onClick={() => addPlantToCart(plant)}
-                          className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-bold px-3 py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                          className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
                         >
-                          <Plus className="w-3.5 h-3.5" />
+                          <Plus className="w-4 h-4" />
                           <span>{inCartCount > 0 ? `Add (${inCartCount})` : 'Add to Order'}</span>
                         </button>
                       </div>

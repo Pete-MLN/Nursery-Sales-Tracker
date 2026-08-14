@@ -32,7 +32,9 @@ import {
   Camera,
   RefreshCw,
   Sliders,
-  CheckCircle
+  CheckCircle,
+  Building,
+  MessageSquare
 } from 'lucide-react';
 
 interface InstructionsScreenProps {
@@ -706,6 +708,50 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
             >
               Go to Orders
             </button>
+          </div>
+
+          {/* Native Phone Apps Integration Guide */}
+          <div className="bg-[#f3f4f0] rounded-2xl p-4 sm:p-5 border border-[#c1c8c2] flex flex-col gap-3">
+            <div className="flex items-center gap-2">
+              <Smartphone className="w-4 h-4 text-[#012d1d]" />
+              <h3 className="font-extrabold text-sm text-[#012d1d] uppercase tracking-wider">
+                Dispatch Buttons (Default Phone Apps)
+              </h3>
+            </div>
+            <p className="text-xs text-[#414844]">
+              When working from an iPhone, Android, or tablet, the 3 dispatch buttons at the bottom of the order screen open directly into your device's built-in communication apps:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 text-xs">
+              <div className="bg-white p-3.5 rounded-xl border border-[#c1c8c2] flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-[#012d1d]">
+                  <Mail className="w-4 h-4 text-[#0e6c4a]" />
+                  <span>Email Receipt</span>
+                </div>
+                <p className="text-[#414844] text-[11px]">
+                  Opens your phone's default mail app (Apple Mail, Gmail, Outlook) with the complete customer receipt, itemized pricing, and thank you message.
+                </p>
+              </div>
+
+              <div className="bg-white p-3.5 rounded-xl border border-[#c1c8c2] flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-[#461702]">
+                  <Building className="w-4 h-4 text-[#461702]" />
+                  <span>Email Office</span>
+                </div>
+                <p className="text-[#414844] text-[11px]">
+                  Dispatches internal order log and staging bay assignment directly to <code>office@maplelanenursery.com</code> for accounting records.
+                </p>
+              </div>
+
+              <div className="bg-white p-3.5 rounded-xl border border-[#c1c8c2] flex flex-col gap-1.5">
+                <div className="flex items-center gap-1.5 font-bold text-[#012d1d]">
+                  <MessageSquare className="w-4 h-4 text-[#012d1d]" />
+                  <span>Text Crew (SMS)</span>
+                </div>
+                <p className="text-[#414844] text-[11px]">
+                  Opens your device's Messages / SMS app with order staging details pre-filled so you can quickly text the yard crew or loading dock lead.
+                </p>
+              </div>
+            </div>
           </div>
         </section>
       )}

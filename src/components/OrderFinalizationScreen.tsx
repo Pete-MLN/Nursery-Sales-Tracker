@@ -111,6 +111,15 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [isHoldSlipModalOpen, setIsHoldSlipModalOpen] = useState<boolean>(false);
   const [isEmailStaffModalOpen, setIsEmailStaffModalOpen] = useState<boolean>(false);
   const [staffEmailAddress, setStaffEmailAddress] = useState<string>('yard@maplelanenursery.com');
+
+  // Customer & Office Communication Modals
+  const [isEmailReceiptModalOpen, setIsEmailReceiptModalOpen] = useState<boolean>(false);
+  const [customerEmailAddress, setCustomerEmailAddress] = useState<string>('');
+  const [isEmailOfficeModalOpen, setIsEmailOfficeModalOpen] = useState<boolean>(false);
+  const [officeEmailAddress, setOfficeEmailAddress] = useState<string>('office@maplelanenursery.com');
+  const [isTextCrewModalOpen, setIsTextCrewModalOpen] = useState<boolean>(false);
+  const [crewPhoneNumber, setCrewPhoneNumber] = useState<string>('');
+
   const [plantSearchQuery, setPlantSearchQuery] = useState<string>('');
   const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('All');
   const [customLocationText, setCustomLocationText] = useState<string>('');
@@ -120,6 +129,16 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   // Synchronize internal form when currentOrder changes
   useEffect(() => {
     setCustomerName(currentOrder.customerName || '');
+    const matchedCustomer = customers.find(
+      c => c.name.toLowerCase() === (currentOrder.customerName || '').toLowerCase() || 
+           (c.company && c.company.toLowerCase() === (currentOrder.customerName || '').toLowerCase())
+    );
+    if (matchedCustomer?.email) {
+      setCustomerEmailAddress(matchedCustomer.email);
+    }
+    if (matchedCustomer?.phone) {
+      setCrewPhoneNumber(matchedCustomer.phone);
+    }
     setFulfillment(currentOrder.type || 'Take Now');
     setScheduledDate(currentOrder.scheduledTime || '');
     setOrderStatus(currentOrder.status || 'Pending');
@@ -134,7 +153,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     setRemainingPickupDate(currentOrder.remainingPickupDate || '');
     setPartialPickupNotes(currentOrder.partialPickupNotes || '');
     setHasUnsavedChanges(false);
-  }, [currentOrder.id]);
+  }, [currentOrder.id, customers]);
 
   // Computed Totals
   const calculatedTotal = items.reduce((sum, item) => sum + (item.plant.price * item.quantity), 0);
@@ -394,6 +413,125 @@ Timestamp: ${new Date().toLocaleString()}`;
     window.location.href = mailtoUrl;
     showToast(`Email opened for staff (${staffEmailAddress})`);
     setIsEmailStaffModalOpen(true);
+  };
+
+  // Get formatted email receipt for customer
+  const getReceiptEmailContent = () => {
+    const subject = `Maple Lane Nursery - Receipt & Order Confirmation #${currentOrder.id}`;
+    const body = 
+`MAPLE LANE NURSERY - CUSTOMER ORDER RECEIPT
+==================================================
+Order Number: ${currentOrder.id}
+Date: ${currentOrder.date || new Date().toLocaleDateString()}
+Customer: ${customerName}
+Fulfillment Type: ${fulfillment}
+Status: ${orderStatus}
+Holding / Staging Location: ${holdingLocation || 'Holding Area B'}
+
+ORDER ITEMS:
+--------------------------------------------------
+${items.map(item => `( ${item.quantity}x )  -  SKU #${item.plant.itemNo || item.plant.barcode || 'N/A'}  -  ${item.plant.name} ($${item.plant.price.toFixed(2)} ea)  -  $${(item.quantity * item.plant.price).toFixed(2)}`).join('\n')}
+
+SUMMARY:
+--------------------------------------------------
+Total Items / Plants: ${calculatedItemsCount}
+Subtotal: $${calculatedTotal.toFixed(2)}
+Sales Tax: $0.00
+--------------------------------------------------
+FINAL TOTAL: $${calculatedTotal.toFixed(2)}
+
+${orderNotes ? `SPECIAL INSTRUCTIONS / NOTES:\n--------------------------------------------------\n${orderNotes}\n\n` : ''}Thank you for choosing Maple Lane Nursery!
+For questions, contact us at (555) 345-6789 or office@maplelanenursery.com.`;
+
+    return { subject, body };
+  };
+
+  // Trigger Email Receipt using default phone/desktop mail app
+  const handleEmailReceipt = (targetEmail?: string) => {
+    const emailToUse = targetEmail !== undefined ? targetEmail : (customerEmailAddress || '');
+    const { subject, body } = getReceiptEmailContent();
+    const mailtoUrl = `mailto:${encodeURIComponent(emailToUse)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open default mail app
+    window.location.href = mailtoUrl;
+    showToast(emailToUse ? `Email opened for ${emailToUse}` : `Receipt email opened in mail app`);
+    setIsEmailReceiptModalOpen(true);
+  };
+
+  // Get formatted email log for main office desk
+  const getOfficeEmailContent = () => {
+    const subject = `[OFFICE ORDER LOG] Order #${currentOrder.id} - ${customerName} ($${calculatedTotal.toFixed(2)})`;
+    const body = 
+`MAPLE LANE NURSERY - OFFICE ORDER DISPATCH LOG
+==================================================
+Order Number: ${currentOrder.id}
+Customer Name: ${customerName}
+Fulfillment Method: ${fulfillment}
+Scheduled Date/Time: ${scheduledDate || 'Today'}
+Current Status: ${orderStatus}
+Holding / Staging Location: ${holdingLocation || 'Holding Area B'}
+
+ITEMIZED BREAKDOWN:
+--------------------------------------------------
+${items.map(item => `• ( ${item.quantity}x ) SKU #${item.plant.itemNo || item.plant.barcode || 'N/A'} - ${item.plant.name} @ $${item.plant.price.toFixed(2)} ea = $${(item.quantity * item.plant.price).toFixed(2)}`).join('\n')}
+
+FINANCIAL BREAKDOWN:
+--------------------------------------------------
+Total Quantity: ${calculatedItemsCount}
+Order Total: $${calculatedTotal.toFixed(2)}
+
+${isPartialPickupActive ? `PARTIAL PICKUP STATUS:
+• Plants Already Taken: ${totalPickedUpQty}
+• Plants Remaining in Staging: ${totalRemainingQty}
+• Next Expected Pickup: ${remainingPickupDate || 'Pending'}
+` : ''}
+NOTES / INSTRUCTIONS:
+--------------------------------------------------
+${orderNotes || partialPickupNotes || 'None'}
+
+Logged by: Nursery Floor Staff
+Timestamp: ${new Date().toLocaleString()}`;
+
+    return { subject, body };
+  };
+
+  // Trigger Email Office using default phone/desktop mail app
+  const handleEmailOffice = (targetEmail?: string) => {
+    const emailToUse = targetEmail !== undefined ? targetEmail : (officeEmailAddress || 'office@maplelanenursery.com');
+    const { subject, body } = getOfficeEmailContent();
+    const mailtoUrl = `mailto:${encodeURIComponent(emailToUse)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    
+    // Open default mail app
+    window.location.href = mailtoUrl;
+    showToast(`Office dispatch email opened (${emailToUse})`);
+    setIsEmailOfficeModalOpen(true);
+  };
+
+  // Get formatted SMS dispatch for staging yard crew
+  const getCrewSmsContent = () => {
+    const body = 
+`[MAPLE LANE CREW] Order #${currentOrder.id} for ${customerName}
+Bay: ${holdingLocation || 'Holding Area B'}
+Qty: ${calculatedItemsCount} plants ($${calculatedTotal.toFixed(2)})
+Status: ${orderStatus}
+${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemainingQty} remaining in yard.\n` : ''}${orderNotes ? `Notes: ${orderNotes}` : ''}`;
+
+    return body;
+  };
+
+  // Trigger Text Crew using default phone SMS/Messaging app
+  const handleTextCrew = (targetPhone?: string) => {
+    const text = getCrewSmsContent();
+    const phoneToUse = targetPhone !== undefined ? targetPhone : (crewPhoneNumber || '');
+    // SMS URL scheme supported across iOS Safari & Android Chrome
+    const smsUrl = phoneToUse.trim()
+      ? `sms:${encodeURIComponent(phoneToUse.trim())}?&body=${encodeURIComponent(text)}`
+      : `sms:?&body=${encodeURIComponent(text)}`;
+    
+    // Open default SMS app
+    window.location.href = smsUrl;
+    showToast(phoneToUse ? `Opening SMS app for ${phoneToUse}...` : 'Opening SMS app for staging crew...');
+    setIsTextCrewModalOpen(true);
   };
 
   // Filter plants for add item dialog
@@ -1182,15 +1320,21 @@ Timestamp: ${new Date().toLocaleString()}`;
 
       {/* Notification and Communication Actions */}
       <div className="bg-white p-5 rounded-2xl border border-[#c1c8c2] shadow-xs flex flex-col gap-3">
-        <h3 className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider">
-          Dispatch & Customer Communication
-        </h3>
+        <div className="flex justify-between items-center">
+          <h3 className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider">
+            Dispatch & Customer Communication
+          </h3>
+          <span className="text-[11px] font-semibold text-[#717973]">
+            Opens default phone apps
+          </span>
+        </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           <button
             type="button"
-            onClick={() => showToast(`Receipt emailed to ${customerName}`)}
-            className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+            onClick={() => handleEmailReceipt()}
+            className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98"
+            title="Open default email app to send receipt to customer"
           >
             <Mail className="w-4 h-4" />
             <span>Email Receipt</span>
@@ -1198,8 +1342,9 @@ Timestamp: ${new Date().toLocaleString()}`;
 
           <button
             type="button"
-            onClick={() => showToast('Order details dispatched to main office desk')}
-            className="w-full bg-[#461702] hover:bg-[#622c13] text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+            onClick={() => handleEmailOffice()}
+            className="w-full bg-[#461702] hover:bg-[#622c13] text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98"
+            title="Open default email app to dispatch order record to office"
           >
             <Building className="w-4 h-4" />
             <span>Email Office</span>
@@ -1207,8 +1352,9 @@ Timestamp: ${new Date().toLocaleString()}`;
 
           <button
             type="button"
-            onClick={() => showToast('SMS dispatch message sent to staging crew')}
-            className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] font-bold py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs cursor-pointer"
+            onClick={() => handleTextCrew()}
+            className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] font-bold py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98"
+            title="Open default SMS / text messaging app to notify yard crew"
           >
             <MessageSquare className="w-4 h-4" />
             <span>Text Crew</span>
@@ -1686,6 +1832,325 @@ Timestamp: ${new Date().toLocaleString()}`;
                   className="px-4 py-2 bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] rounded-xl text-xs font-bold cursor-pointer"
                 >
                   Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Customer Receipt Modal */}
+      {isEmailReceiptModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div 
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-[#012d1d] text-[#a0f4c8] rounded-xl">
+                  <Mail className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#1a1c1a]">Email Customer Receipt</h3>
+                  <p className="text-xs text-[#717973]">Sends order summary & itemized pricing via default mail app.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEmailReceiptModalOpen(false)}
+                className="p-1.5 text-[#717973] hover:text-[#1a1c1a] hover:bg-[#f3f4f0] rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Recipient Input */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
+                Customer Email Address
+              </label>
+              <input
+                type="email"
+                value={customerEmailAddress}
+                onChange={(e) => setCustomerEmailAddress(e.target.value)}
+                placeholder="customer@example.com (or leave blank to choose in mail app)"
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
+              />
+            </div>
+
+            {/* Receipt Preview */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
+                Receipt Preview
+              </span>
+              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed">
+                {getReceiptEmailContent().body}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-2 border-t border-[#e2e3df]">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(getReceiptEmailContent().body);
+                  showToast('Receipt text copied to clipboard!');
+                }}
+                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Receipt</span>
+              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const { subject, body } = getReceiptEmailContent();
+                    const mailtoUrl = `mailto:${encodeURIComponent(customerEmailAddress)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                    window.location.href = mailtoUrl;
+                    showToast(customerEmailAddress ? `Sending receipt to ${customerEmailAddress}...` : 'Opening mail app...');
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Open in Mail App</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEmailReceiptModalOpen(false)}
+                  className="px-4 py-2 bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Email Office Modal */}
+      {isEmailOfficeModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div 
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-[#461702] text-white rounded-xl">
+                  <Building className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#1a1c1a]">Email Order to Office</h3>
+                  <p className="text-xs text-[#717973]">Sends order details & staging log to office/accounting.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsEmailOfficeModalOpen(false)}
+                className="p-1.5 text-[#717973] hover:text-[#1a1c1a] hover:bg-[#f3f4f0] rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Recipient Input & Preset Office Chips */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
+                Office Recipient Email
+              </label>
+              <input
+                type="email"
+                value={officeEmailAddress}
+                onChange={(e) => setOfficeEmailAddress(e.target.value)}
+                placeholder="office@maplelanenursery.com"
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
+              />
+              
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[11px] font-semibold text-[#717973]">Office Inboxes:</span>
+                {[
+                  'office@maplelanenursery.com',
+                  'accounting@maplelanenursery.com',
+                  'pete@maplelanenursery.com'
+                ].map((email) => (
+                  <button
+                    key={email}
+                    type="button"
+                    onClick={() => setOfficeEmailAddress(email)}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                      officeEmailAddress === email
+                        ? 'bg-[#461702] text-white border-[#461702]'
+                        : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
+                    }`}
+                  >
+                    {email.split('@')[0]}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Office Log Preview */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
+                Office Dispatch Record Preview
+              </span>
+              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed">
+                {getOfficeEmailContent().body}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-2 border-t border-[#e2e3df]">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(getOfficeEmailContent().body);
+                  showToast('Office dispatch log copied to clipboard!');
+                }}
+                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy Body</span>
+              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const { subject, body } = getOfficeEmailContent();
+                    const mailtoUrl = `mailto:${encodeURIComponent(officeEmailAddress)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+                    window.location.href = mailtoUrl;
+                    showToast(`Sending office record to ${officeEmailAddress}...`);
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 bg-[#461702] hover:bg-[#622c13] text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <Mail className="w-3.5 h-3.5" />
+                  <span>Open in Mail App</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsEmailOfficeModalOpen(false)}
+                  className="px-4 py-2 bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Done
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Text Crew SMS Modal */}
+      {isTextCrewModalOpen && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div 
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-[#012d1d] text-[#a0f4c8] rounded-xl">
+                  <MessageSquare className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-extrabold text-[#1a1c1a]">Text Staging Crew (SMS)</h3>
+                  <p className="text-xs text-[#717973]">Opens default text messaging / SMS app with order staging details.</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setIsTextCrewModalOpen(false)}
+                className="p-1.5 text-[#717973] hover:text-[#1a1c1a] hover:bg-[#f3f4f0] rounded-lg transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Phone Number Input & Presets */}
+            <div className="flex flex-col gap-2">
+              <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
+                Crew Phone Number (Optional)
+              </label>
+              <input
+                type="tel"
+                value={crewPhoneNumber}
+                onChange={(e) => setCrewPhoneNumber(e.target.value)}
+                placeholder="e.g. 555-234-5678 (or leave blank to pick contact in SMS app)"
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
+              />
+              
+              <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
+                <span className="text-[11px] font-semibold text-[#717973]">Quick Teams:</span>
+                {[
+                  { label: 'Yard Lead', num: '555-019-2831' },
+                  { label: 'Loading Dock', num: '555-019-2832' },
+                  { label: 'Delivery Driver', num: '555-019-2833' }
+                ].map((item) => (
+                  <button
+                    key={item.label}
+                    type="button"
+                    onClick={() => setCrewPhoneNumber(item.num)}
+                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                      crewPhoneNumber === item.num
+                        ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
+                        : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
+                    }`}
+                  >
+                    {item.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* SMS Message Preview */}
+            <div className="flex flex-col gap-1">
+              <span className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
+                SMS Text Preview
+              </span>
+              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+                {getCrewSmsContent()}
+              </div>
+            </div>
+
+            {/* Modal Actions */}
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-2 pt-2 border-t border-[#e2e3df]">
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(getCrewSmsContent());
+                  showToast('SMS message text copied to clipboard!');
+                }}
+                className="w-full sm:w-auto px-3.5 py-2 rounded-xl bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5"
+              >
+                <Copy className="w-3.5 h-3.5" />
+                <span>Copy SMS</span>
+              </button>
+
+              <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                <button
+                  type="button"
+                  onClick={() => {
+                    const text = getCrewSmsContent();
+                    const smsUrl = crewPhoneNumber.trim()
+                      ? `sms:${encodeURIComponent(crewPhoneNumber.trim())}?&body=${encodeURIComponent(text)}`
+                      : `sms:?&body=${encodeURIComponent(text)}`;
+                    window.location.href = smsUrl;
+                    showToast(crewPhoneNumber ? `Opening SMS for ${crewPhoneNumber}...` : 'Opening Messages app...');
+                  }}
+                  className="w-full sm:w-auto px-4 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                  <span>Open in Messages (SMS)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setIsTextCrewModalOpen(false)}
+                  className="px-4 py-2 bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] rounded-xl text-xs font-bold cursor-pointer"
+                >
+                  Done
                 </button>
               </div>
             </div>

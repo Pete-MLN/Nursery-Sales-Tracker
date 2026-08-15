@@ -58,9 +58,31 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scannedFeedback, setScannedFeedback] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
+  const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
   const [manualBarcodeInput, setManualBarcodeInput] = useState<string>('');
   const [unrecognizedCode, setUnrecognizedCode] = useState<string | null>(null);
+
+  // Helper to show scan feedback banner with 3x extended duration (10.5s default)
+  const triggerScannedFeedback = (message: string, type: 'success' | 'warning' = 'success', durationMs: number = 10500) => {
+    if (feedbackTimerRef.current) {
+      clearTimeout(feedbackTimerRef.current);
+    }
+    setScannedFeedback({ message, type });
+    feedbackTimerRef.current = setTimeout(() => {
+      setScannedFeedback(null);
+      feedbackTimerRef.current = null;
+    }, durationMs);
+  };
+
+  // Clean up timer on component unmount
+  useEffect(() => {
+    return () => {
+      if (feedbackTimerRef.current) {
+        clearTimeout(feedbackTimerRef.current);
+      }
+    };
+  }, []);
 
   // Bulk Quick Selector State
   const [bulkTab, setBulkTab] = useState<'ALL' | 'MULCH' | 'STONE' | 'TOP SOIL'>('ALL');
@@ -106,14 +128,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     );
     const unitLabel = plant.size && plant.size.length < 10 ? plant.size : ((plant.category || '').toUpperCase().includes('STONE') ? 'Ton' : 'Yard');
 
-    setScannedFeedback({
-      message: `Added +${amount} ${isBulk ? unitLabel + '(s) of ' : ''}${plant.name} ($${(plant.price * amount).toFixed(2)}) to order!`,
-      type: 'success'
-    });
-
-    setTimeout(() => {
-      setScannedFeedback(null);
-    }, 3500);
+    triggerScannedFeedback(
+      `Added +${amount} ${isBulk ? unitLabel + '(s) of ' : ''}${plant.name} ($${(plant.price * amount).toFixed(2)}) to order!`,
+      'success',
+      10500
+    );
   };
 
   // Web Audio BEEP feedback synthesizer
@@ -193,22 +212,20 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       } else if (nameMatches.length > 1) {
         setCatalogSearchQuery(cleanCode);
         setIsCatalogModalOpen(true);
-        setScannedFeedback({
-          message: `Found ${nameMatches.length} plants matching "${cleanCode}". Select your plant below:`,
-          type: 'success'
-        });
+        triggerScannedFeedback(
+          `Found ${nameMatches.length} plants matching "${cleanCode}". Select your plant below:`,
+          'success',
+          10500
+        );
       } else {
         setUnrecognizedCode(cleanCode);
-        setScannedFeedback({
-          message: `Scanned code "${cleanCode}" - Item not found in catalog. Select plant to assign.`,
-          type: 'warning'
-        });
+        triggerScannedFeedback(
+          `Scanned code "${cleanCode}" - Item not found in catalog. Select plant to assign.`,
+          'warning',
+          10500
+        );
       }
     }
-
-    setTimeout(() => {
-      setScannedFeedback(null);
-    }, 4500);
   };
 
   // Continuous Camera Frame Barcode Scanner Loop
@@ -1036,8 +1053,15 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <Volume2 className="w-3.5 h-3.5 opacity-70" />
             <button
               type="button"
-              onClick={() => setScannedFeedback(null)}
+              onClick={() => {
+                if (feedbackTimerRef.current) {
+                  clearTimeout(feedbackTimerRef.current);
+                  feedbackTimerRef.current = null;
+                }
+                setScannedFeedback(null);
+              }}
               className="p-1 hover:bg-black/10 rounded-full cursor-pointer"
+              title="Dismiss notification"
             >
               <X className="w-3.5 h-3.5" />
             </button>
@@ -1374,10 +1398,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                         return [...prev, { plant, quantity: 1 }];
                       }
                     });
-                    setScannedFeedback({
-                      message: `Assigned code "${unrecognizedCode}" to ${plant.name} and added to cart!`,
-                      type: 'success'
-                    });
+                    triggerScannedFeedback(
+                      `Assigned code "${unrecognizedCode}" to ${plant.name} and added to cart!`,
+                      'success',
+                      10500
+                    );
                     setUnrecognizedCode(null);
                   }}
                   className="p-2.5 bg-white hover:bg-[#a0f4c8]/30 rounded-lg border border-[#c1c8c2] text-left flex items-center justify-between transition-colors group cursor-pointer"

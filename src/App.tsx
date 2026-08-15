@@ -448,6 +448,7 @@ export default function App() {
             order={activeOrder}
             inventory={inventory}
             customers={customers}
+            employees={employees}
             holdingAreas={holdingAreas}
             onUpdateOrder={handleUpdateOrder}
             onDeleteOrder={handleDeleteOrder}

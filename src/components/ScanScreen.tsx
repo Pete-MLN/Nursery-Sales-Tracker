@@ -1358,8 +1358,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
       {/* Unrecognized Barcode Assignment Modal */}
       {unrecognizedCode && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-4 sm:pt-8 z-50 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16">
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-[#ffdad6] text-[#ba1a1a] rounded-xl">
@@ -1430,8 +1430,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       )}
       {/* Full Plant Catalog Search & Selection Modal */}
       {isCatalogModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-50 animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[85vh] p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-4 sm:pt-8 z-50 overflow-y-auto animate-fade-in">
+          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[85vh] p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16 overflow-hidden">
             <div className="flex justify-between items-center pb-2 border-b border-[#e2e3df]">
               <div className="flex items-center gap-2">
                 <div className="p-2.5 bg-[#a0f4c8] text-[#012d1d] rounded-xl">

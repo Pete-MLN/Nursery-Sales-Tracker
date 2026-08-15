@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from 'react';
-import { ScreenType, Order, PlantItem, Customer, HoldingArea, OrderCartItem } from '../types';
-import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
+import React, { useState, useEffect, useMemo } from 'react';
+import { ScreenType, Order, PlantItem, Customer, HoldingArea, OrderCartItem, Employee } from '../types';
+import { DEFAULT_PLANT_IMAGE, INITIAL_EMPLOYEES } from '../data/mockData';
 import { 
   CheckCircle, 
   ShoppingBag, 
@@ -35,7 +35,12 @@ import {
   ClipboardCheck,
   Layers,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Users,
+  User,
+  Smartphone,
+  Star,
+  Check
 } from 'lucide-react';
 
 interface OrderFinalizationScreenProps {
@@ -43,6 +48,7 @@ interface OrderFinalizationScreenProps {
   order?: Order | null;
   inventory?: PlantItem[];
   customers?: Customer[];
+  employees?: Employee[];
   holdingAreas?: HoldingArea[];
   onUpdateOrder?: (updatedOrder: Order) => void;
   onDeleteOrder?: (orderId: string) => void;
@@ -54,6 +60,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   order,
   inventory = [],
   customers = [],
+  employees = INITIAL_EMPLOYEES,
   holdingAreas = [],
   onUpdateOrder,
   onDeleteOrder,
@@ -115,10 +122,20 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   // Customer & Office Communication Modals
   const [isEmailReceiptModalOpen, setIsEmailReceiptModalOpen] = useState<boolean>(false);
   const [customerEmailAddress, setCustomerEmailAddress] = useState<string>('');
+  const [customerEmailSearch, setCustomerEmailSearch] = useState<string>('');
+  
+  // Office Email State with default persistence
   const [isEmailOfficeModalOpen, setIsEmailOfficeModalOpen] = useState<boolean>(false);
-  const [officeEmailAddress, setOfficeEmailAddress] = useState<string>('office@maplelanenursery.com');
+  const [officeEmailAddress, setOfficeEmailAddress] = useState<string>(() => {
+    return localStorage.getItem('nursery_default_office_email') || 'office@maplelanenursery.com';
+  });
+  const [selectedOfficeEmployeeId, setSelectedOfficeEmployeeId] = useState<string>('');
+  const [isDefaultOfficeSaved, setIsDefaultOfficeSaved] = useState<boolean>(false);
+
+  // Text Crew / SMS State
   const [isTextCrewModalOpen, setIsTextCrewModalOpen] = useState<boolean>(false);
   const [crewPhoneNumber, setCrewPhoneNumber] = useState<string>('');
+  const [selectedCrewEmployeeId, setSelectedCrewEmployeeId] = useState<string>('');
 
   const [plantSearchQuery, setPlantSearchQuery] = useState<string>('');
   const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('All');
@@ -126,19 +143,55 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
 
+  // Robust customer matching helper
+  const findMatchingCustomer = (name: string, customerList: Customer[]): Customer | undefined => {
+    if (!name || !name.trim()) return undefined;
+    const query = name.trim().toLowerCase();
+    
+    // 1. Exact name match
+    const exact = customerList.find(c => c.name.trim().toLowerCase() === query);
+    if (exact) return exact;
+
+    // 2. Company match
+    const comp = customerList.find(c => c.company && c.company.trim().toLowerCase() === query);
+    if (comp) return comp;
+
+    // 3. Account No match
+    const acc = customerList.find(c => c.accountNo && c.accountNo.trim().toLowerCase() === query);
+    if (acc) return acc;
+
+    // 4. Partial / contains match
+    const partial = customerList.find(c => {
+      const cName = c.name.toLowerCase();
+      return (
+        cName.includes(query) || 
+        query.includes(cName) ||
+        (c.company && (c.company.toLowerCase().includes(query) || query.includes(c.company.toLowerCase())))
+      );
+    });
+    if (partial) return partial;
+
+    return undefined;
+  };
+
+  // Find actively matched customer profile
+  const matchedCustomer = useMemo(() => {
+    return findMatchingCustomer(customerName || currentOrder.customerName || '', customers);
+  }, [customerName, currentOrder.customerName, customers]);
+
   // Synchronize internal form when currentOrder changes
   useEffect(() => {
-    setCustomerName(currentOrder.customerName || '');
-    const matchedCustomer = customers.find(
-      c => c.name.toLowerCase() === (currentOrder.customerName || '').toLowerCase() || 
-           (c.company && c.company.toLowerCase() === (currentOrder.customerName || '').toLowerCase())
-    );
-    if (matchedCustomer?.email) {
-      setCustomerEmailAddress(matchedCustomer.email);
+    const rawName = currentOrder.customerName || '';
+    setCustomerName(rawName);
+    
+    const matched = findMatchingCustomer(rawName, customers);
+    if (matched?.email) {
+      setCustomerEmailAddress(matched.email);
     }
-    if (matchedCustomer?.phone) {
-      setCrewPhoneNumber(matchedCustomer.phone);
+    if (matched?.phone) {
+      setCrewPhoneNumber(matched.phone);
     }
+    
     setFulfillment(currentOrder.type || 'Take Now');
     setScheduledDate(currentOrder.scheduledTime || '');
     setOrderStatus(currentOrder.status || 'Pending');
@@ -446,6 +499,21 @@ For questions, contact us at (555) 345-6789 or office@maplelanenursery.com.`;
     return { subject, body };
   };
 
+  // Helper to save chosen office recipient as the default
+  const handleSaveDefaultOfficeEmail = (emailToSave: string) => {
+    if (!emailToSave || !emailToSave.trim()) return;
+    localStorage.setItem('nursery_default_office_email', emailToSave.trim());
+    setIsDefaultOfficeSaved(true);
+    showToast(`Saved "${emailToSave.trim()}" as default Office email!`);
+    setTimeout(() => setIsDefaultOfficeSaved(false), 3500);
+  };
+
+  // Helper to clean phone numbers for SMS dialing links
+  const cleanPhoneForDialer = (phoneStr: string) => {
+    if (!phoneStr) return '';
+    return phoneStr.replace(/[^\d+]/g, '');
+  };
+
   // Trigger Email Receipt using default phone/desktop mail app
   const handleEmailReceipt = (targetEmail?: string) => {
     const emailToUse = targetEmail !== undefined ? targetEmail : (customerEmailAddress || '');
@@ -522,15 +590,16 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
   // Trigger Text Crew using default phone SMS/Messaging app
   const handleTextCrew = (targetPhone?: string) => {
     const text = getCrewSmsContent();
-    const phoneToUse = targetPhone !== undefined ? targetPhone : (crewPhoneNumber || '');
+    const rawPhone = targetPhone !== undefined ? targetPhone : (crewPhoneNumber || '');
+    const cleanPhone = cleanPhoneForDialer(rawPhone);
     // SMS URL scheme supported across iOS Safari & Android Chrome
-    const smsUrl = phoneToUse.trim()
-      ? `sms:${encodeURIComponent(phoneToUse.trim())}?&body=${encodeURIComponent(text)}`
+    const smsUrl = cleanPhone
+      ? `sms:${encodeURIComponent(cleanPhone)}?&body=${encodeURIComponent(text)}`
       : `sms:?&body=${encodeURIComponent(text)}`;
     
     // Open default SMS app
     window.location.href = smsUrl;
-    showToast(phoneToUse ? `Opening SMS app for ${phoneToUse}...` : 'Opening SMS app for staging crew...');
+    showToast(rawPhone ? `Opening SMS app for ${rawPhone}...` : 'Opening SMS app for staging crew...');
     setIsTextCrewModalOpen(true);
   };
 
@@ -1409,9 +1478,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Add Plant Search Modal */}
       {isAddingPlantModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[85vh] overflow-hidden"
+            className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16 overflow-hidden"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -1527,9 +1596,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Change Holding Location Modal */}
       {isChangingLocationModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[85vh] overflow-y-auto"
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
@@ -1628,9 +1697,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Staff Modal */}
       {isEmailStaffModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -1652,6 +1721,34 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               </button>
             </div>
 
+            {/* Select Employee Dropdown */}
+            <div className="flex flex-col gap-1.5">
+              <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5" />
+                <span>Select Staff / Employee Recipient</span>
+              </label>
+              <select
+                value={staffEmailAddress}
+                onChange={(e) => setStaffEmailAddress(e.target.value)}
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+              >
+                <optgroup label="Staging & Yard Inboxes">
+                  <option value="yard@maplelanenursery.com">Yard Team (yard@maplelanenursery.com)</option>
+                  <option value="crew@maplelanenursery.com">Loading Crew (crew@maplelanenursery.com)</option>
+                  <option value="fulfillment@maplelanenursery.com">Fulfillment (fulfillment@maplelanenursery.com)</option>
+                </optgroup>
+                {employees.length > 0 && (
+                  <optgroup label="Nursery Staff Members">
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.email}>
+                        {emp.name} ({emp.role || emp.department || 'Staff'}) - {emp.email}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+
             {/* Recipient Input & Preset Staff Chips */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
@@ -1662,27 +1759,23 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 value={staffEmailAddress}
                 onChange={(e) => setStaffEmailAddress(e.target.value)}
                 placeholder="yard@maplelanenursery.com"
-                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
               />
               
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-[11px] font-semibold text-[#717973]">Quick Select:</span>
-                {[
-                  'yard@maplelanenursery.com',
-                  'crew@maplelanenursery.com',
-                  'fulfillment@maplelanenursery.com'
-                ].map((email) => (
+                {employees.slice(0, 4).map((emp) => (
                   <button
-                    key={email}
+                    key={emp.id}
                     type="button"
-                    onClick={() => setStaffEmailAddress(email)}
+                    onClick={() => setStaffEmailAddress(emp.email)}
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                      staffEmailAddress === email
+                      staffEmailAddress === emp.email
                         ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
                         : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
                     }`}
                   >
-                    {email.split('@')[0]}
+                    {emp.name.split(' ')[0]} ({emp.role ? emp.role.split(' ')[0] : 'Staff'})
                   </button>
                 ))}
               </div>
@@ -1693,7 +1786,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               <span className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
                 Hold Ticket Preview
               </span>
-              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed">
+              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
                 {getStaffEmailContent().body}
               </div>
             </div>
@@ -1742,9 +1835,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Printable Remaining Hold Slip Modal */}
       {isHoldSlipModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
@@ -1841,11 +1934,12 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Customer Receipt Modal */}
       {isEmailReceiptModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Modal Header */}
             <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-[#012d1d] text-[#a0f4c8] rounded-xl">
@@ -1864,11 +1958,65 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               </button>
             </div>
 
+            {/* Customer Link Status & Selector */}
+            <div className="flex flex-col gap-2 bg-[#f9faf6] p-3 rounded-xl border border-[#e2e3df]">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                  <User className="w-3.5 h-3.5 text-[#012d1d]" />
+                  <span>Customer Profile in App</span>
+                </label>
+                {matchedCustomer && (
+                  <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                    <Check className="w-3 h-3" />
+                    <span>Auto-Linked: {matchedCustomer.name}</span>
+                  </span>
+                )}
+              </div>
+
+              {/* Select Customer from App List */}
+              <select
+                value={matchedCustomer?.id || ''}
+                onChange={(e) => {
+                  const selectedId = e.target.value;
+                  const found = customers.find(c => c.id === selectedId);
+                  if (found) {
+                    setCustomerName(found.name);
+                    if (found.email) {
+                      setCustomerEmailAddress(found.email);
+                      showToast(`Pulled email for ${found.name}: ${found.email}`);
+                    } else {
+                      showToast(`Selected ${found.name} (No email on file)`);
+                    }
+                    if (found.phone) {
+                      setCrewPhoneNumber(found.phone);
+                    }
+                  }
+                }}
+                className="w-full bg-white border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+              >
+                <option value="">
+                  {matchedCustomer ? `Linked: ${matchedCustomer.name} (${matchedCustomer.email || 'No email'})` : '-- Select Customer from App List --'}
+                </option>
+                {customers.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} {c.company ? `(${c.company})` : ''} - {c.email || 'No email'}
+                  </option>
+                ))}
+              </select>
+            </div>
+
             {/* Recipient Input */}
             <div className="flex flex-col gap-1.5">
-              <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
-                Customer Email Address
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
+                  Customer Email Address
+                </label>
+                {customerEmailAddress && (
+                  <span className="text-[11px] text-emerald-700 font-semibold">
+                    Will auto-populate in Phone Mail App
+                  </span>
+                )}
+              </div>
               <input
                 type="email"
                 value={customerEmailAddress}
@@ -1883,7 +2031,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               <span className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
                 Receipt Preview
               </span>
-              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed">
+              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
                 {getReceiptEmailContent().body}
               </div>
             </div>
@@ -1932,9 +2080,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Office Modal */}
       {isEmailOfficeModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
@@ -1944,7 +2092,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 </div>
                 <div>
                   <h3 className="text-lg font-extrabold text-[#1a1c1a]">Email Order to Office</h3>
-                  <p className="text-xs text-[#717973]">Sends order details & staging log to office/accounting.</p>
+                  <p className="text-xs text-[#717973]">Sends order details & staging log to office or selected employee.</p>
                 </div>
               </div>
               <button
@@ -1955,37 +2103,106 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               </button>
             </div>
 
-            {/* Recipient Input & Preset Office Chips */}
+            {/* Select Employee / Office Dropdown */}
+            <div className="flex flex-col gap-1.5 bg-[#f9faf6] p-3 rounded-xl border border-[#e2e3df]">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-[#461702]" />
+                  <span>Choose Recipient from Employee List</span>
+                </label>
+                <span className="text-[10px] font-semibold text-[#717973]">
+                  Auto-populates email
+                </span>
+              </div>
+              <select
+                value={officeEmailAddress}
+                onChange={(e) => {
+                  setOfficeEmailAddress(e.target.value);
+                  const matchedEmp = employees.find(emp => emp.email === e.target.value);
+                  if (matchedEmp) {
+                    setSelectedOfficeEmployeeId(matchedEmp.id);
+                    showToast(`Selected employee: ${matchedEmp.name} (${matchedEmp.email})`);
+                  } else {
+                    setSelectedOfficeEmployeeId('');
+                  }
+                }}
+                className="w-full bg-white border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#461702]"
+              >
+                <optgroup label="Main Office & Inboxes">
+                  <option value="office@maplelanenursery.com">Main Office Desk (office@maplelanenursery.com)</option>
+                  <option value="accounting@maplelanenursery.com">Accounting & Invoicing (accounting@maplelanenursery.com)</option>
+                  <option value="pete@maplelanenursery.com">Pete - General Manager (pete@maplelanenursery.com)</option>
+                </optgroup>
+                {employees.length > 0 && (
+                  <optgroup label="Nursery Staff & Crew Members">
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.email}>
+                        {emp.name} ({emp.role || emp.department || 'Staff'}) - {emp.email}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+              </select>
+            </div>
+
+            {/* Recipient Input & Default Config Button */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
-                Office Recipient Email
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
+                  Target Recipient Email
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleSaveDefaultOfficeEmail(officeEmailAddress)}
+                  className={`text-[11px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer flex items-center gap-1 ${
+                    isDefaultOfficeSaved
+                      ? 'bg-emerald-100 text-emerald-800 border-emerald-300'
+                      : 'bg-amber-50 hover:bg-amber-100 text-amber-900 border-amber-300'
+                  }`}
+                  title="Save this recipient email as default for future orders"
+                >
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-600" />
+                  <span>{isDefaultOfficeSaved ? 'Saved as Default!' : 'Set as Default Office Email'}</span>
+                </button>
+              </div>
+
               <input
                 type="email"
                 value={officeEmailAddress}
                 onChange={(e) => setOfficeEmailAddress(e.target.value)}
                 placeholder="office@maplelanenursery.com"
-                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#461702] focus:bg-white"
               />
               
+              {/* Quick Employee Chips */}
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                <span className="text-[11px] font-semibold text-[#717973]">Office Inboxes:</span>
-                {[
-                  'office@maplelanenursery.com',
-                  'accounting@maplelanenursery.com',
-                  'pete@maplelanenursery.com'
-                ].map((email) => (
+                <span className="text-[11px] font-semibold text-[#717973]">Quick Select:</span>
+                <button
+                  type="button"
+                  onClick={() => setOfficeEmailAddress('office@maplelanenursery.com')}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                    officeEmailAddress === 'office@maplelanenursery.com'
+                      ? 'bg-[#461702] text-white border-[#461702]'
+                      : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
+                  }`}
+                >
+                  Main Office
+                </button>
+                {employees.map((emp) => (
                   <button
-                    key={email}
+                    key={emp.id}
                     type="button"
-                    onClick={() => setOfficeEmailAddress(email)}
+                    onClick={() => {
+                      setOfficeEmailAddress(emp.email);
+                      setSelectedOfficeEmployeeId(emp.id);
+                    }}
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                      officeEmailAddress === email
+                      officeEmailAddress === emp.email
                         ? 'bg-[#461702] text-white border-[#461702]'
                         : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
                     }`}
                   >
-                    {email.split('@')[0]}
+                    {emp.name.split(' ')[0]} ({emp.role ? emp.role.split(' ')[0] : 'Staff'})
                   </button>
                 ))}
               </div>
@@ -1996,7 +2213,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               <span className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
                 Office Dispatch Record Preview
               </span>
-              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-56 overflow-y-auto leading-relaxed">
+              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
                 {getOfficeEmailContent().body}
               </div>
             </div>
@@ -2045,11 +2262,12 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Text Crew SMS Modal */}
       {isTextCrewModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 max-h-[90vh] overflow-y-auto"
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
             onClick={(e) => e.stopPropagation()}
           >
+            {/* Modal Header */}
             <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-[#012d1d] text-[#a0f4c8] rounded-xl">
@@ -2068,7 +2286,56 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               </button>
             </div>
 
-            {/* Phone Number Input & Presets */}
+            {/* Select Employee / Staging Team Dropdown */}
+            <div className="flex flex-col gap-1.5 bg-[#f9faf6] p-3 rounded-xl border border-[#e2e3df]">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                  <Users className="w-3.5 h-3.5 text-[#012d1d]" />
+                  <span>Choose Recipient from Employee List</span>
+                </label>
+                <span className="text-[10px] font-semibold text-[#717973]">
+                  Auto-populates phone number
+                </span>
+              </div>
+              <select
+                value={crewPhoneNumber}
+                onChange={(e) => {
+                  const selectedVal = e.target.value;
+                  setCrewPhoneNumber(selectedVal);
+                  const matchedEmp = employees.find(emp => emp.phone === selectedVal);
+                  if (matchedEmp) {
+                    setSelectedCrewEmployeeId(matchedEmp.id);
+                    showToast(`Selected ${matchedEmp.name} (${matchedEmp.phone})`);
+                  } else {
+                    setSelectedCrewEmployeeId('');
+                  }
+                }}
+                className="w-full bg-white border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+              >
+                <option value="">-- Choose Employee / Team --</option>
+                {employees.length > 0 && (
+                  <optgroup label="Nursery Employees & Crew">
+                    {employees.map(emp => (
+                      <option key={emp.id} value={emp.phone}>
+                        {emp.name} ({emp.role || emp.department || 'Staff'}) - {emp.phone}
+                      </option>
+                    ))}
+                  </optgroup>
+                )}
+                <optgroup label="Staging & Yard Teams">
+                  <option value="(555) 019-2831">Yard Lead - (555) 019-2831</option>
+                  <option value="(555) 019-2832">Loading Dock - (555) 019-2832</option>
+                  <option value="(555) 019-2833">Delivery Driver - (555) 019-2833</option>
+                </optgroup>
+                {matchedCustomer?.phone && (
+                  <optgroup label="Customer Contact">
+                    <option value={matchedCustomer.phone}>Customer: {customerName} - {matchedCustomer.phone}</option>
+                  </optgroup>
+                )}
+              </select>
+            </div>
+
+            {/* Phone Number Input & Employee Chips */}
             <div className="flex flex-col gap-2">
               <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
                 Crew Phone Number (Optional)
@@ -2082,23 +2349,22 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               />
               
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
-                <span className="text-[11px] font-semibold text-[#717973]">Quick Teams:</span>
-                {[
-                  { label: 'Yard Lead', num: '555-019-2831' },
-                  { label: 'Loading Dock', num: '555-019-2832' },
-                  { label: 'Delivery Driver', num: '555-019-2833' }
-                ].map((item) => (
+                <span className="text-[11px] font-semibold text-[#717973]">Quick Select:</span>
+                {employees.map((emp) => (
                   <button
-                    key={item.label}
+                    key={emp.id}
                     type="button"
-                    onClick={() => setCrewPhoneNumber(item.num)}
+                    onClick={() => {
+                      setCrewPhoneNumber(emp.phone);
+                      setSelectedCrewEmployeeId(emp.id);
+                    }}
                     className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                      crewPhoneNumber === item.num
+                      crewPhoneNumber === emp.phone
                         ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
                         : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
                     }`}
                   >
-                    {item.label}
+                    {emp.name.split(' ')[0]} ({emp.role ? emp.role.split(' ')[0] : 'Staff'})
                   </button>
                 ))}
               </div>
@@ -2109,7 +2375,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               <span className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
                 SMS Text Preview
               </span>
-              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-48 overflow-y-auto leading-relaxed">
+              <div className="p-3.5 bg-[#fcfdfa] border border-[#c1c8c2] rounded-xl font-mono text-xs text-[#1a1c1a] whitespace-pre-wrap max-h-40 overflow-y-auto leading-relaxed">
                 {getCrewSmsContent()}
               </div>
             </div>
@@ -2133,8 +2399,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                   type="button"
                   onClick={() => {
                     const text = getCrewSmsContent();
-                    const smsUrl = crewPhoneNumber.trim()
-                      ? `sms:${encodeURIComponent(crewPhoneNumber.trim())}?&body=${encodeURIComponent(text)}`
+                    const cleanPhone = cleanPhoneForDialer(crewPhoneNumber);
+                    const smsUrl = cleanPhone
+                      ? `sms:${encodeURIComponent(cleanPhone)}?&body=${encodeURIComponent(text)}`
                       : `sms:?&body=${encodeURIComponent(text)}`;
                     window.location.href = smsUrl;
                     showToast(crewPhoneNumber ? `Opening SMS for ${crewPhoneNumber}...` : 'Opening Messages app...');

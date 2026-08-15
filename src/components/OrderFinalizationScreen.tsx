@@ -664,14 +664,12 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
     setIsTextCrewModalOpen(true);
   };
 
-  // Filter plants for add item dialog
+  // Filter plants for add item dialog with multi-term search including size
   const filteredInventory = inventory.filter(plant => {
-    const matchesSearch = 
-      plant.name.toLowerCase().includes(plantSearchQuery.toLowerCase()) ||
-      (plant.botanicalName && plant.botanicalName.toLowerCase().includes(plantSearchQuery.toLowerCase())) ||
-      (plant.itemNo && plant.itemNo.toLowerCase().includes(plantSearchQuery.toLowerCase())) ||
-      (plant.size && plant.size.toLowerCase().includes(plantSearchQuery.toLowerCase())) ||
-      (plant.barcode && plant.barcode.includes(plantSearchQuery));
+    const searchTerms = plantSearchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const searchable = `${plant.name} ${plant.botanicalName || ''} ${plant.commonName || ''} ${plant.category || ''} ${plant.size || ''} ${plant.itemNo || ''} ${plant.barcode || ''}`.toLowerCase();
+    
+    const matchesSearch = searchTerms.length === 0 || searchTerms.every(term => searchable.includes(term));
     
     const matchesCategory = 
       selectedPlantCategory === 'All' || 

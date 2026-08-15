@@ -256,13 +256,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     lastScanTimeRef.current = now;
     setLastScannedCode(cleanCode);
 
-    // Check for fuzzy name / category matches when user enters text manually
-    const nameMatches = inventory.filter(p =>
-      p.name.toLowerCase().includes(cleanCode.toLowerCase()) ||
-      (p.botanicalName && p.botanicalName.toLowerCase().includes(cleanCode.toLowerCase())) ||
-      (p.commonName && p.commonName.toLowerCase().includes(cleanCode.toLowerCase())) ||
-      (p.category && p.category.toLowerCase().includes(cleanCode.toLowerCase()))
-    );
+    // Check for multi-term match across name, size, SKU, botanical name, category, and barcode
+    const searchTerms = cleanCode.toLowerCase().split(/\s+/).filter(Boolean);
+    const nameMatches = inventory.filter(p => {
+      const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
+      return searchTerms.every(term => searchable.includes(term));
+    });
 
     if (nameMatches.length === 1) {
       addPlantToCart(nameMatches[0]);
@@ -270,7 +269,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       setCatalogSearchQuery(cleanCode);
       setIsCatalogModalOpen(true);
       triggerScannedFeedback(
-        `Found ${nameMatches.length} plants matching "${cleanCode}". Select your plant below:`,
+        `Found ${nameMatches.length} plants matching "${cleanCode}". Select your exact plant & size below:`,
         'success',
         10500
       );
@@ -1103,22 +1102,19 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
             {/* Live Autocomplete Suggestions Popover */}
             {showPlantSuggestions && manualBarcodeInput.trim().length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#c1c8c2] rounded-xl shadow-xl z-40 max-h-72 overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
+              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#c1c8c2] rounded-2xl shadow-2xl z-40 max-h-80 overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
                 {(() => {
                   const q = manualBarcodeInput.trim().toLowerCase();
-                  const matches = inventory.filter(p =>
-                    p.name.toLowerCase().includes(q) ||
-                    (p.botanicalName && p.botanicalName.toLowerCase().includes(q)) ||
-                    (p.commonName && p.commonName.toLowerCase().includes(q)) ||
-                    (p.category && p.category.toLowerCase().includes(q)) ||
-                    (p.barcode && p.barcode.toLowerCase().includes(q)) ||
-                    (p.itemNo && p.itemNo.toLowerCase().includes(q))
-                  ).slice(0, 6);
+                  const searchTerms = q.split(/\s+/).filter(Boolean);
+                  const matches = inventory.filter(p => {
+                    const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
+                    return searchTerms.every(term => searchable.includes(term));
+                  }).slice(0, 8);
 
                   if (matches.length === 0) {
                     return (
-                      <div className="p-3.5 text-center text-xs text-[#717973]">
-                        No exact plant name match for "{manualBarcodeInput}". Press Enter to run catalog search.
+                      <div className="p-4 text-center text-xs text-[#717973]">
+                        No exact plant matches for "{manualBarcodeInput}". Press Enter or Browse Catalog to search all inventory.
                       </div>
                     );
                   }
@@ -1138,17 +1134,32 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                         <img
                           src={plant.image || DEFAULT_PLANT_IMAGE}
                           alt={plant.name}
-                          className="w-11 h-11 rounded-lg object-cover bg-[#f3f4f0] shrink-0"
+                          className="w-12 h-12 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
                           referrerPolicy="no-referrer"
                           onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                         />
                         <div className="min-w-0">
-                          <p className="text-base font-extrabold text-[#012d1d] truncate group-hover:text-[#0e6c4a]">
+                          <p className="text-sm sm:text-base font-extrabold text-[#012d1d] truncate group-hover:text-[#0e6c4a]">
                             {plant.name}
                           </p>
-                          <p className="text-xs sm:text-sm font-medium text-[#414844] truncate italic mt-0.5">
-                            {plant.botanicalName || plant.commonName || plant.size || 'Container'}
-                          </p>
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
+                              #{plant.itemNo || plant.barcode || 'N/A'}
+                            </span>
+                            <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <Package className="w-2.5 h-2.5 text-amber-300" />
+                              SIZE: {plant.size || 'Standard'}
+                            </span>
+                            <span className="text-xs text-[#717973] font-medium ml-1">
+                              Avail: <strong className="text-[#012d1d]">{plant.stock}</strong>
+                            </span>
+                          </div>
+                          {(plant.botanicalName || plant.commonName) && (
+                            <p className="text-xs text-[#414844] truncate italic mt-0.5">
+                              {plant.botanicalName || plant.commonName}
+                            </p>
+                          )}
                         </div>
                       </div>
 
@@ -1156,7 +1167,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                         <span className="text-base font-extrabold text-[#012d1d]">
                           ${plant.price.toFixed(2)}
                         </span>
-                        <span className="bg-[#012d1d] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-lg flex items-center gap-1 group-hover:bg-[#0e6c4a]">
+                        <span className="bg-[#012d1d] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 group-hover:bg-[#0e6c4a] shadow-2xs">
                           <Plus className="w-4 h-4" />
                           <span>Add</span>
                         </span>
@@ -1627,7 +1638,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             </p>
 
             <div className="max-h-60 overflow-y-auto flex flex-col gap-2 border border-[#c1c8c2] rounded-xl p-2 bg-[#f3f4f0]">
-              {inventory.slice(0, 10).map((plant) => (
+              {inventory.slice(0, 15).map((plant) => (
                 <button
                   key={plant.id}
                   type="button"
@@ -1642,19 +1653,29 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       }
                     });
                     triggerScannedFeedback(
-                      `Assigned code "${unrecognizedCode}" to ${plant.name} and added to cart!`,
+                      `Assigned code "${unrecognizedCode}" to ${plant.name} (${plant.size || 'Std'}) and added to cart!`,
                       'success',
                       10500
                     );
                     setUnrecognizedCode(null);
                   }}
-                  className="p-2.5 bg-white hover:bg-[#a0f4c8]/30 rounded-lg border border-[#c1c8c2] text-left flex items-center justify-between transition-colors group cursor-pointer"
+                  className="p-2.5 bg-white hover:bg-[#a0f4c8]/30 rounded-xl border border-[#c1c8c2] text-left flex items-center justify-between gap-2 transition-colors group cursor-pointer"
                 >
-                  <div>
-                    <p className="text-xs font-bold text-[#012d1d] group-hover:text-[#0e6c4a]">{plant.name}</p>
-                    <p className="text-[10px] text-[#717973]">{plant.size || '3 GAL'} • ${plant.price.toFixed(2)}</p>
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-extrabold text-[#012d1d] group-hover:text-[#0e6c4a] truncate">{plant.name}</p>
+                    <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                      <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[10px] font-bold px-1.5 py-0.2 rounded">
+                        #{plant.itemNo || plant.barcode || 'N/A'}
+                      </span>
+                      <span className="bg-[#461702] text-amber-100 text-[10px] font-bold px-1.5 py-0.2 rounded">
+                        SIZE: {plant.size || 'Standard'}
+                      </span>
+                      <span className="text-[11px] font-bold text-[#012d1d] ml-1">
+                        ${plant.price.toFixed(2)}
+                      </span>
+                    </div>
                   </div>
-                  <span className="text-xs font-bold text-[#0e6c4a] bg-[#a0f4c8] px-2 py-0.5 rounded">Select & Add</span>
+                  <span className="text-xs font-bold text-[#0e6c4a] bg-[#a0f4c8] px-2.5 py-1 rounded-lg shrink-0">Select & Add</span>
                 </button>
               ))}
             </div>
@@ -1750,15 +1771,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   if (!matchesCategory) return false;
 
                   if (!catalogSearchQuery.trim()) return true;
-                  const q = catalogSearchQuery.trim().toLowerCase();
-                  return (
-                    p.name.toLowerCase().includes(q) ||
-                    (p.botanicalName && p.botanicalName.toLowerCase().includes(q)) ||
-                    (p.commonName && p.commonName.toLowerCase().includes(q)) ||
-                    (p.category && p.category.toLowerCase().includes(q)) ||
-                    (p.barcode && p.barcode.toLowerCase().includes(q)) ||
-                    (p.itemNo && p.itemNo.toLowerCase().includes(q))
-                  );
+                  const searchTerms = catalogSearchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+                  const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
+                  return searchTerms.every(term => searchable.includes(term));
                 });
 
                 if (matches.length === 0) {

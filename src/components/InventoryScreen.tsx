@@ -56,17 +56,10 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
       return false;
     }
 
-    const term = searchTerm.toLowerCase();
-    const matchesSearch = 
-      item.name.toLowerCase().includes(term) ||
-      (item.botanicalName && item.botanicalName.toLowerCase().includes(term)) ||
-      (item.commonName && item.commonName.toLowerCase().includes(term)) ||
-      (item.itemNo && item.itemNo.toLowerCase().includes(term)) ||
-      (item.size && item.size.toLowerCase().includes(term)) ||
-      (item.category && item.category.toLowerCase().includes(term)) ||
-      (item.holdingLocation && item.holdingLocation.toLowerCase().includes(term)) ||
-      item.barcode.includes(term) ||
-      item.lightRequirement.toLowerCase().includes(term);
+    const searchTerms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    const searchable = `${item.name} ${item.botanicalName || ''} ${item.commonName || ''} ${item.itemNo || ''} ${item.size || ''} ${item.category || ''} ${item.holdingLocation || ''} ${item.barcode || ''} ${item.lightRequirement || ''}`.toLowerCase();
+    
+    const matchesSearch = searchTerms.length === 0 || searchTerms.every(t => searchable.includes(t));
     
     if (statusFilter === 'all') return matchesSearch;
     return matchesSearch && getItemStatus(item) === statusFilter;

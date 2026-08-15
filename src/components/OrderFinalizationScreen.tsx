@@ -40,8 +40,12 @@ import {
   User,
   Smartphone,
   Star,
-  Check
+  Check,
+  Tag,
+  Send
 } from 'lucide-react';
+import { PricingDropdown } from './PricingDropdown';
+import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
 
 interface OrderFinalizationScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -209,8 +213,25 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   }, [currentOrder.id, customers]);
 
   // Computed Totals
-  const calculatedTotal = items.reduce((sum, item) => sum + (item.plant.price * item.quantity), 0);
+  const calculatedTotal = items.reduce((sum, item) => sum + (getItemEffectiveUnitPrice(item) * item.quantity), 0);
   const calculatedItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+
+  // Helper to switch or set price tier for a specific item in the order
+  const handleUpdateItemPriceLevel = (plantId: string, levelKey: PriceLevelKey, newPrice: number) => {
+    setItems(prev => {
+      return prev.map(item => {
+        if (item.plant.id === plantId) {
+          return {
+            ...item,
+            selectedPriceLevel: levelKey,
+            selectedPrice: newPrice
+          };
+        }
+        return item;
+      });
+    });
+    setHasUnsavedChanges(true);
+  };
 
   // Item pickup calculation helpers
   const getItemPickedUpQty = (item: OrderCartItem): number => {
@@ -341,16 +362,28 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
 
   // Add plant to active order from Inventory search modal
   const handleAddPlantToOrder = (plant: PlantItem) => {
+    const defaultLevel: PriceLevelKey = 'retail';
+    const tiers = getPlantPriceTiers(plant);
+    const initialPrice = tiers[0]?.price ?? plant.price;
+
     setItems(prev => {
       const existing = prev.find(i => i.plant.id === plant.id);
       if (existing) {
         return prev.map(i => i.plant.id === plant.id ? { ...i, quantity: i.quantity + 1 } : i);
       } else {
-        return [...prev, { plant, quantity: 1, pickedUpQuantity: 0 }];
+        return [...prev, { 
+          plant, 
+          quantity: 1, 
+          pickedUpQuantity: 0,
+          selectedPriceLevel: defaultLevel,
+          selectedPrice: initialPrice
+        }];
       }
     });
     setHasUnsavedChanges(true);
-    showToast(`Added ${plant.name} to order.`);
+    const itemNum = plant.itemNo || plant.barcode || 'N/A';
+    const size = plant.size || 'Standard';
+    showToast(`Added "${plant.name}" [Item #${itemNum}] [Size: ${size}] to order.`);
   };
 
   // Save changes to database and parent state
@@ -421,7 +454,9 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       `PLANTS STILL TO PICK UP (${totalRemainingQty} plants):`,
       ...remainingItemsList.map(item => {
         const rem = getItemRemainingQty(item);
-        return `[ ] ${rem}x ${item.plant.name} (${item.plant.size || 'Std'}) - SKU #${item.plant.itemNo || item.plant.barcode}`;
+        const itemNum = item.plant.itemNo || item.plant.barcode || 'N/A';
+        const size = item.plant.size || 'Standard';
+        return `[ ] ${rem}x ${item.plant.name} [Size: ${size}] [Item #${itemNum}]`;
       }),
       `----------------------------------------`,
       `Staged by: Pete / Maple Lane Crew`
@@ -445,7 +480,11 @@ Total Remaining Plants: ${totalRemainingQty}
 
 PLANTS AWAITING PICKUP:
 --------------------------------------------------
-${remainingItemsList.map(item => `( ${getItemRemainingQty(item)}x )  -  SKU #${item.plant.itemNo || item.plant.barcode || 'N/A'}  -  ${item.plant.name}`).join('\n')}
+${remainingItemsList.map(item => {
+  const itemNum = item.plant.itemNo || item.plant.barcode || 'N/A';
+  const size = item.plant.size || 'Standard';
+  return `( ${getItemRemainingQty(item)}x )  -  Item #${itemNum}  -  Size: ${size}  -  ${item.plant.name}`;
+}).join('\n')}
 
 STAFF INSTRUCTIONS / NOTES:
 --------------------------------------------------
@@ -483,7 +522,14 @@ Holding / Staging Location: ${holdingLocation || 'Holding Area B'}
 
 ORDER ITEMS:
 --------------------------------------------------
-${items.map(item => `( ${item.quantity}x )  -  SKU #${item.plant.itemNo || item.plant.barcode || 'N/A'}  -  ${item.plant.name} ($${item.plant.price.toFixed(2)} ea)  -  $${(item.quantity * item.plant.price).toFixed(2)}`).join('\n')}
+${items.map(item => {
+  const unitPrice = getItemEffectiveUnitPrice(item);
+  const lineTotal = unitPrice * item.quantity;
+  const tierName = item.selectedPriceLevel ? `[${item.selectedPriceLevel.toUpperCase()}] ` : '';
+  const itemNum = item.plant.itemNo || item.plant.barcode || 'N/A';
+  const size = item.plant.size || 'Standard';
+  return `( ${item.quantity}x )  -  Item #${itemNum}  -  Size: ${size}  -  ${item.plant.name} ${tierName}($${unitPrice.toFixed(2)} ea)  -  $${lineTotal.toFixed(2)}`;
+}).join('\n')}
 
 SUMMARY:
 --------------------------------------------------
@@ -541,7 +587,14 @@ Holding / Staging Location: ${holdingLocation || 'Holding Area B'}
 
 ITEMIZED BREAKDOWN:
 --------------------------------------------------
-${items.map(item => `• ( ${item.quantity}x ) SKU #${item.plant.itemNo || item.plant.barcode || 'N/A'} - ${item.plant.name} @ $${item.plant.price.toFixed(2)} ea = $${(item.quantity * item.plant.price).toFixed(2)}`).join('\n')}
+${items.map(item => {
+  const unitPrice = getItemEffectiveUnitPrice(item);
+  const lineTotal = unitPrice * item.quantity;
+  const tierName = item.selectedPriceLevel ? `[${item.selectedPriceLevel.toUpperCase()}] ` : '';
+  const itemNum = item.plant.itemNo || item.plant.barcode || 'N/A';
+  const size = item.plant.size || 'Standard';
+  return `• ( ${item.quantity}x ) Item #${itemNum} [Size: ${size}] - ${item.plant.name} ${tierName}@ $${unitPrice.toFixed(2)} ea = $${lineTotal.toFixed(2)}`;
+}).join('\n')}
 
 FINANCIAL BREAKDOWN:
 --------------------------------------------------
@@ -582,6 +635,14 @@ Timestamp: ${new Date().toLocaleString()}`;
 Bay: ${holdingLocation || 'Holding Area B'}
 Qty: ${calculatedItemsCount} plants ($${calculatedTotal.toFixed(2)})
 Status: ${orderStatus}
+
+PLANTS TO LOAD:
+${items.map(item => {
+  const itemNum = item.plant.itemNo || item.plant.barcode || 'N/A';
+  const size = item.plant.size || 'Standard';
+  return `• ( ${item.quantity}x ) [Item #${itemNum}] [Size: ${size}] ${item.plant.name}`;
+}).join('\n')}
+
 ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemainingQty} remaining in yard.\n` : ''}${orderNotes ? `Notes: ${orderNotes}` : ''}`;
 
     return body;
@@ -609,6 +670,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
       plant.name.toLowerCase().includes(plantSearchQuery.toLowerCase()) ||
       (plant.botanicalName && plant.botanicalName.toLowerCase().includes(plantSearchQuery.toLowerCase())) ||
       (plant.itemNo && plant.itemNo.toLowerCase().includes(plantSearchQuery.toLowerCase())) ||
+      (plant.size && plant.size.toLowerCase().includes(plantSearchQuery.toLowerCase())) ||
       (plant.barcode && plant.barcode.includes(plantSearchQuery));
     
     const matchesCategory = 
@@ -825,6 +887,71 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
         </div>
       </div>
 
+      {/* TOP COMMUNICATION & DISPATCH ACTION BAR */}
+      <div className="bg-white p-4 rounded-2xl border-2 border-[#012d1d]/30 shadow-sm flex flex-col gap-3">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Send className="w-4 h-4 text-[#012d1d]" />
+            <h3 className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider">
+              Quick Dispatch & Communication
+            </h3>
+          </div>
+          <span className="text-[11px] text-[#717973] font-medium hidden sm:inline">
+            1-Tap SMS & Email with recipient select
+          </span>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+          {/* Email Customer Receipt Button */}
+          <button
+            type="button"
+            onClick={() => handleEmailReceipt()}
+            className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white font-bold py-3 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-[#a0f4c8]/20"
+            title="Send order receipt to customer via mail app"
+          >
+            <Mail className="w-4 h-4 text-[#a0f4c8]" />
+            <div className="flex flex-col items-start text-left leading-tight">
+              <span className="font-extrabold">Email Receipt</span>
+              <span className="text-[10px] text-white/80 font-normal truncate max-w-[130px]">
+                {customerEmailAddress || (matchedCustomer?.email || 'Customer')}
+              </span>
+            </div>
+          </button>
+
+          {/* Email Office Button */}
+          <button
+            type="button"
+            onClick={() => handleEmailOffice()}
+            className="bg-[#461702] hover:bg-[#622c13] text-white font-bold py-3 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-amber-500/20"
+            title="Send order record to office / staff"
+          >
+            <Building className="w-4 h-4 text-amber-200" />
+            <div className="flex flex-col items-start text-left leading-tight">
+              <span className="font-extrabold">Email Office</span>
+              <span className="text-[10px] text-amber-100 font-normal truncate max-w-[130px]">
+                {officeEmailAddress}
+              </span>
+            </div>
+          </button>
+
+          {/* Text Crew / SMS Button */}
+          <button
+            type="button"
+            onClick={() => handleTextCrew()}
+            className="bg-[#0e6c4a] hover:bg-[#012d1d] text-white font-bold py-3 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-[#a0f4c8]/20"
+            title="Send SMS message to yard staff or employee"
+          >
+            <MessageSquare className="w-4 h-4 text-[#a0f4c8]" />
+            <div className="flex flex-col items-start text-left leading-tight">
+              <span className="font-extrabold">Text Crew (SMS)</span>
+              <span className="text-[10px] text-emerald-100 font-normal truncate max-w-[130px]">
+                {crewPhoneNumber || 'Select Employee'}
+              </span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       {/* PARTIAL PICKUP & FULFILLMENT CONTROLLER */}
       <div className="bg-[#fcfdfa] p-5 rounded-2xl border-2 border-[#012d1d]/20 shadow-xs flex flex-col gap-4">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2e3df] pb-3">
@@ -997,23 +1124,23 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                       onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                     />
                     <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
+                      <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="font-extrabold text-sm text-[#012d1d] truncate">
                           {item.plant.name}
                         </span>
-                        {item.plant.size && (
-                          <span className="text-[10px] font-bold bg-[#e2e3df] text-[#414844] px-1.5 py-0.5 rounded">
-                            {item.plant.size}
-                          </span>
-                        )}
-                        {item.plant.itemNo && (
-                          <span className="text-[10px] font-semibold text-[#717973]">
-                            #{item.plant.itemNo}
-                          </span>
-                        )}
+                      </div>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
+                          #{item.plant.itemNo || item.plant.barcode || 'N/A'}
+                        </span>
+                        <span className="bg-[#461702] text-amber-100 text-[11px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">
+                          <Package className="w-2.5 h-2.5 text-amber-300" />
+                          SIZE: {item.plant.size || 'Standard'}
+                        </span>
                       </div>
                       {item.plant.botanicalName && (
-                        <span className="text-xs italic text-[#414844] block truncate">
+                        <span className="text-xs italic text-[#414844] block truncate mt-0.5">
                           {item.plant.botanicalName}
                         </span>
                       )}
@@ -1160,7 +1287,8 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
         ) : (
           <div className="divide-y divide-[#f3f4f0] flex flex-col">
             {items.map((item, index) => {
-              const lineTotal = item.plant.price * item.quantity;
+              const unitPrice = getItemEffectiveUnitPrice(item);
+              const lineTotal = unitPrice * item.quantity;
               const pickedUpQty = getItemPickedUpQty(item);
               const remainingQty = getItemRemainingQty(item);
               const isItemFullyTaken = pickedUpQty === item.quantity;
@@ -1208,23 +1336,40 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           <span className="font-extrabold text-sm sm:text-base text-[#012d1d] truncate">
                             {item.plant.name}
                           </span>
-                          {item.plant.size && (
-                            <span className="text-[10px] font-bold bg-[#e2e3df] text-[#414844] px-1.5 py-0.5 rounded">
-                              {item.plant.size}
-                            </span>
-                          )}
-                          {item.plant.itemNo && (
-                            <span className="text-[10px] font-semibold text-[#717973]">
-                              #{item.plant.itemNo}
-                            </span>
-                          )}
                         </div>
+
+                        {/* High-Visibility Loading Identifiers: Product # and Size */}
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#012d1d] shadow-2xs">
+                            <Tag className="w-3 h-3 text-[#a0f4c8]" />
+                            #{item.plant.itemNo || item.plant.barcode || 'N/A'}
+                          </span>
+                          <span className="bg-[#461702] text-amber-100 text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#461702] shadow-2xs">
+                            <Package className="w-3 h-3 text-amber-300" />
+                            SIZE: {item.plant.size || 'Standard'}
+                          </span>
+                        </div>
+
                         {item.plant.botanicalName && (
-                          <span className="text-xs italic text-[#414844] block truncate">
+                          <span className="text-xs italic text-[#414844] block truncate mt-1">
                             {item.plant.botanicalName}
                           </span>
                         )}
                         
+                        {/* Pricing Tier Dropdown & Unit Price */}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <PricingDropdown
+                            plant={item.plant}
+                            currentPrice={unitPrice}
+                            selectedLevelKey={item.selectedPriceLevel}
+                            onSelectPriceLevel={(levelKey, newPrice) => handleUpdateItemPriceLevel(item.plant.id, levelKey, newPrice)}
+                            size="sm"
+                          />
+                          <span className="text-xs font-bold text-[#012d1d]">
+                            ${unitPrice.toFixed(2)} ea
+                          </span>
+                        </div>
+
                         {/* Pickup State Badge */}
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
                           {isItemFullyTaken ? (
@@ -1243,9 +1388,6 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                               <span>0 Taken • All {item.quantity} to Pick Up</span>
                             </span>
                           )}
-                          <span className="text-xs font-semibold text-[#717973]">
-                            ${item.plant.price.toFixed(2)} each
-                          </span>
                         </div>
                       </div>
                     </div>
@@ -1557,13 +1699,27 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                         <span className="font-bold text-sm text-[#1a1c1a] block truncate">
                           {plant.name}
                         </span>
-                        <div className="flex items-center gap-2 text-xs text-[#717973] flex-wrap">
-                          {plant.size && <span className="font-semibold">{plant.size}</span>}
-                          <span>•</span>
-                          <span>Avail: <strong className="text-[#012d1d]">{plant.stock}</strong></span>
-                          <span>•</span>
-                          <span className="font-bold text-[#012d1d]">${plant.price.toFixed(2)}</span>
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
+                            #{plant.itemNo || plant.barcode || 'N/A'}
+                          </span>
+                          <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <Package className="w-2.5 h-2.5 text-amber-300" />
+                            SIZE: {plant.size || 'Standard'}
+                          </span>
+                          <span className="text-xs text-[#717973] ml-1">
+                            Avail: <strong className="text-[#012d1d]">{plant.stock}</strong>
+                          </span>
+                          <span className="text-xs font-bold text-[#012d1d] ml-1">
+                            ${plant.price.toFixed(2)}
+                          </span>
                         </div>
+                        {plant.botanicalName && (
+                          <span className="text-xs italic text-[#414844] block truncate mt-0.5">
+                            {plant.botanicalName}
+                          </span>
+                        )}
                       </div>
                     </div>
 

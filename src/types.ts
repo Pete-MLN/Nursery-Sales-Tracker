@@ -40,6 +40,8 @@ export interface PlantItem {
 export interface OrderCartItem {
   plant: PlantItem;
   quantity: number;
+  selectedPriceLevel?: 'retail' | 'wholesale' | 'gardenCenter' | 'elite';
+  selectedPrice?: number;
   pickedUpQuantity?: number; // Number of units customer has taken (0 to quantity)
   gpsLocation?: {
     latitude: number;

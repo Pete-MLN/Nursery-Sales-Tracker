@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScreenType, Order } from '../types';
-import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock } from 'lucide-react';
+import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Tag } from 'lucide-react';
 
 interface OrdersScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -175,6 +175,32 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                     </span>
                   )}
                 </div>
+
+                {/* Items Preview with Product Number & Size for Yard Loaders */}
+                {order.items && order.items.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 pt-0.5">
+                    {order.items.slice(0, 4).map((item, idx) => (
+                      <span 
+                        key={`${item.plant.id}-${idx}`}
+                        className="inline-flex items-center gap-1.5 text-[11px] bg-[#f9faf6] border border-[#c1c8c2] px-2 py-1 rounded-lg text-[#1a1c1a]"
+                      >
+                        <span className="font-bold text-[#012d1d]">{item.quantity}x</span>
+                        <span className="truncate max-w-[130px] font-semibold">{item.plant.name}</span>
+                        <span className="font-mono font-bold text-[#a0f4c8] bg-[#012d1d] px-1.5 py-0.2 rounded text-[10px]">
+                          #{item.plant.itemNo || item.plant.barcode || 'N/A'}
+                        </span>
+                        <span className="font-bold text-amber-100 bg-[#461702] px-1.5 py-0.2 rounded text-[10px]">
+                          {item.plant.size || 'Std'}
+                        </span>
+                      </span>
+                    ))}
+                    {order.items.length > 4 && (
+                      <span className="text-[11px] text-[#717973] font-bold self-center px-1">
+                        +{order.items.length - 4} more items
+                      </span>
+                    )}
+                  </div>
+                )}
 
                 {/* Card Footer Actions */}
                 <div className="flex justify-between items-center text-xs text-[#414844] pt-2 border-t border-[#f3f4f0]">

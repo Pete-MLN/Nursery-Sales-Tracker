@@ -1,9 +1,11 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer, Order } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
-import { findPlantByBarcode } from '../utils/barcodeUtils';
+import { findPlantByBarcode, isValidBarcodeString } from '../utils/barcodeUtils';
+import { PricingDropdown } from './PricingDropdown';
+import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
 
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -56,6 +58,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
   const [activeDeviceIndex, setActiveDeviceIndex] = useState<number>(0);
   const [facingMode, setFacingMode] = useState<'environment' | 'user'>('environment');
+  const [isTorchSupported, setIsTorchSupported] = useState<boolean>(false);
+  const [isTorchOn, setIsTorchOn] = useState<boolean>(false);
+  const [zoomLevel, setZoomLevel] = useState<number>(1);
+  const [maxZoom, setMaxZoom] = useState<number>(1);
+  const [minZoom, setMinZoom] = useState<number>(1);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [scannedFeedback, setScannedFeedback] = useState<{ message: string; type: 'success' | 'warning' } | null>(null);
   const feedbackTimerRef = useRef<NodeJS.Timeout | null>(null);
@@ -107,14 +114,27 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }));
   };
 
-  // Helper to add a plant directly to the cart with customizable increment (e.g. 0.5 or 1 yard/ton)
-  const addPlantToCart = (plant: PlantItem, amount: number = 1) => {
+  // Helper to add a plant directly to the cart with customizable increment and price tier
+  const addPlantToCart = (plant: PlantItem, amount: number = 1, priceLevel?: PriceLevelKey) => {
+    const defaultLevel: PriceLevelKey = priceLevel || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
+    const tiers = getPlantPriceTiers(plant);
+    const matchedTier = tiers.find(t => t.key === defaultLevel) || tiers[0];
+    const initialPrice = matchedTier.price;
+
     setCartItems(prev => {
       const existing = prev.find(i => i.plant.id === plant.id);
       if (existing) {
-        return prev.map(i => i.plant.id === plant.id ? { ...i, quantity: parseFloat((i.quantity + amount).toFixed(2)) } : i);
+        return prev.map(i => i.plant.id === plant.id ? { 
+          ...i, 
+          quantity: parseFloat((i.quantity + amount).toFixed(2)) 
+        } : i);
       } else {
-        return [...prev, { plant, quantity: amount }];
+        return [...prev, { 
+          plant, 
+          quantity: amount,
+          selectedPriceLevel: defaultLevel,
+          selectedPrice: initialPrice
+        }];
       }
     });
 
@@ -127,12 +147,28 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       (plant.category || '').toUpperCase().includes(cat)
     );
     const unitLabel = plant.size && plant.size.length < 10 ? plant.size : ((plant.category || '').toUpperCase().includes('STONE') ? 'Ton' : 'Yard');
+    const itemNumDisplay = plant.itemNo || plant.barcode || 'N/A';
+    const sizeDisplay = plant.size || (isBulk ? unitLabel : 'Standard');
 
     triggerScannedFeedback(
-      `Added +${amount} ${isBulk ? unitLabel + '(s) of ' : ''}${plant.name} ($${(plant.price * amount).toFixed(2)}) to order!`,
+      `Added +${amount} ${isBulk ? unitLabel + '(s) of ' : ''}${plant.name} • Item #${itemNumDisplay} • Size: ${sizeDisplay} ($${(initialPrice * amount).toFixed(2)}) to order!`,
       'success',
       10500
     );
+  };
+
+  // Helper to switch or set price tier for a specific item in the order
+  const updateItemPriceLevel = (plantId: string, levelKey: PriceLevelKey, newPrice: number) => {
+    setCartItems(prev => prev.map(item => {
+      if (item.plant.id === plantId) {
+        return {
+          ...item,
+          selectedPriceLevel: levelKey,
+          selectedPrice: newPrice
+        };
+      }
+      return item;
+    }));
   };
 
   // Web Audio BEEP feedback synthesizer
@@ -159,20 +195,37 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   const unrecognizedCandidateRef = useRef<{ code: string; count: number }>({ code: '', count: 0 });
 
-  // Process detected barcode string
+  // Process detected barcode string with strict validation to eliminate false matches on iOS
   const handleScannedBarcode = (rawCode: string, isManualInput: boolean = false) => {
     const cleanCode = rawCode.trim();
-    if (!cleanCode) return;
+    if (!cleanCode || cleanCode.length < 2) return;
+
+    // Filter out short noise from camera stream
+    if (!isManualInput && !isValidBarcodeString(cleanCode)) {
+      return;
+    }
 
     const now = Date.now();
+    // Throttle rapid re-scans of the exact same code within 2 seconds
     if (lastScannedCode === cleanCode && now - lastScanTimeRef.current < 2000) {
       return;
     }
 
     const matchedPlant = findPlantByBarcode(cleanCode, inventory);
 
-    // For unrecognized codes from live video stream, require 2 consecutive frame detections to prevent single-frame glitches on iOS
-    if (!matchedPlant && !isManualInput) {
+    // 1. If an exact barcode / itemNo / SKU match is found in inventory
+    if (matchedPlant) {
+      unrecognizedCandidateRef.current = { code: '', count: 0 };
+      lastScanTimeRef.current = now;
+      setLastScannedCode(cleanCode);
+      addPlantToCart(matchedPlant);
+      return;
+    }
+
+    // 2. If barcode is NOT in catalog:
+    // When scanning from LIVE CAMERA STREAM:
+    if (!isManualInput) {
+      // Require 2 consecutive frame detections of the uncataloged code to prevent single-frame video noise on iOS
       if (unrecognizedCandidateRef.current.code === cleanCode) {
         unrecognizedCandidateRef.current.count += 1;
       } else {
@@ -183,52 +236,55 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       if (unrecognizedCandidateRef.current.count < 2) {
         return; // Wait for second frame verification
       }
+
+      // Reset candidate ref once accepted
+      unrecognizedCandidateRef.current = { code: '', count: 0 };
+      lastScanTimeRef.current = now;
+      setLastScannedCode(cleanCode);
+
+      // NEVER match a random plant via fuzzy substring during a live camera scan!
+      setUnrecognizedCode(cleanCode);
+      triggerScannedFeedback(
+        `Scanned code "${cleanCode}" - Barcode not found in catalog. Tap to assign to a plant.`,
+        'warning',
+        10500
+      );
+      return;
     }
 
-    // Reset candidate ref once accepted
-    unrecognizedCandidateRef.current = { code: '', count: 0 };
-
+    // 3. When searching from MANUAL INPUT (user explicitly typed into search box):
     lastScanTimeRef.current = now;
     setLastScannedCode(cleanCode);
 
-    playBeepSound();
-    if (typeof navigator !== 'undefined' && navigator.vibrate) {
-      try { navigator.vibrate(100); } catch (e) {}
-    }
+    // Check for fuzzy name / category matches when user enters text manually
+    const nameMatches = inventory.filter(p =>
+      p.name.toLowerCase().includes(cleanCode.toLowerCase()) ||
+      (p.botanicalName && p.botanicalName.toLowerCase().includes(cleanCode.toLowerCase())) ||
+      (p.commonName && p.commonName.toLowerCase().includes(cleanCode.toLowerCase())) ||
+      (p.category && p.category.toLowerCase().includes(cleanCode.toLowerCase()))
+    );
 
-    if (matchedPlant) {
-      addPlantToCart(matchedPlant);
-    } else {
-      // Check for fuzzy name / category matches when user enters text manually or barcode is unreadable
-      const nameMatches = inventory.filter(p =>
-        p.name.toLowerCase().includes(cleanCode.toLowerCase()) ||
-        (p.botanicalName && p.botanicalName.toLowerCase().includes(cleanCode.toLowerCase())) ||
-        (p.commonName && p.commonName.toLowerCase().includes(cleanCode.toLowerCase())) ||
-        (p.category && p.category.toLowerCase().includes(cleanCode.toLowerCase()))
+    if (nameMatches.length === 1) {
+      addPlantToCart(nameMatches[0]);
+    } else if (nameMatches.length > 1) {
+      setCatalogSearchQuery(cleanCode);
+      setIsCatalogModalOpen(true);
+      triggerScannedFeedback(
+        `Found ${nameMatches.length} plants matching "${cleanCode}". Select your plant below:`,
+        'success',
+        10500
       );
-
-      if (nameMatches.length === 1) {
-        addPlantToCart(nameMatches[0]);
-      } else if (nameMatches.length > 1) {
-        setCatalogSearchQuery(cleanCode);
-        setIsCatalogModalOpen(true);
-        triggerScannedFeedback(
-          `Found ${nameMatches.length} plants matching "${cleanCode}". Select your plant below:`,
-          'success',
-          10500
-        );
-      } else {
-        setUnrecognizedCode(cleanCode);
-        triggerScannedFeedback(
-          `Scanned code "${cleanCode}" - Item not found in catalog. Select plant to assign.`,
-          'warning',
-          10500
-        );
-      }
+    } else {
+      setUnrecognizedCode(cleanCode);
+      triggerScannedFeedback(
+        `Search "${cleanCode}" - No matching plant found. Select from catalog to assign.`,
+        'warning',
+        10500
+      );
     }
   };
 
-  // Continuous Camera Frame Barcode Scanner Loop
+  // Continuous Camera Frame Barcode Scanner Loop with iOS Safari Multi-Pass Pre-processing
   useEffect(() => {
     if (!cameraActive || !cameraStream) return;
 
@@ -239,14 +295,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
         BarcodeFormat.CODE_128,
-        BarcodeFormat.CODE_39,
-        BarcodeFormat.EAN_13,
-        BarcodeFormat.EAN_8,
         BarcodeFormat.UPC_A,
         BarcodeFormat.UPC_E,
-        BarcodeFormat.QR_CODE,
-        BarcodeFormat.DATA_MATRIX,
-        BarcodeFormat.ITF
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.QR_CODE
       ]);
       hints.set(DecodeHintType.TRY_HARDER, true);
       zxingReaderRef.current = new BrowserMultiFormatReader(hints);
@@ -257,7 +311,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     if ('BarcodeDetector' in window) {
       try {
         nativeDetector = new (window as any).BarcodeDetector({
-          formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code', 'data_matrix', 'itf']
+          formats: ['code_128', 'code_39', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code']
         });
       } catch (e) {
         nativeDetector = null;
@@ -266,27 +320,34 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
     const canvas = document.createElement('canvas');
     const ctx = canvas.getContext('2d', { willReadFrequently: true });
+    let isProcessing = false;
 
     const processFrame = async () => {
-      if (isCancelled) return;
+      if (isCancelled || isProcessing) return;
       const video = videoRef.current;
 
       if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+        isProcessing = true;
         let detectedRawCode: string | null = null;
 
-        // 1. Native BarcodeDetector (if available on device)
+        // 1. Native BarcodeDetector (High accuracy on Android Chrome and iOS 17+)
         if (nativeDetector) {
           try {
             const barcodes = await nativeDetector.detect(video);
-            if (barcodes && barcodes.length > 0 && barcodes[0].rawValue) {
-              detectedRawCode = barcodes[0].rawValue;
+            if (barcodes && barcodes.length > 0) {
+              for (const b of barcodes) {
+                if (b.rawValue && isValidBarcodeString(b.rawValue)) {
+                  detectedRawCode = b.rawValue;
+                  break;
+                }
+              }
             }
           } catch (e) {
             // ignore frame error
           }
         }
 
-        // 2. Fallback ZXing decode focused on central Region of Interest (ROI)
+        // 2. High-Precision ZXing Multi-pass Decoder for iOS Safari
         if (!detectedRawCode && ctx) {
           try {
             const vw = video.videoWidth;
@@ -298,27 +359,73 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             const cropX = Math.floor((vw - cropW) / 2);
             const cropY = Math.floor((vh - cropH) / 2);
 
-            canvas.width = Math.min(cropW, 800);
-            canvas.height = Math.min(cropH, 600);
+            canvas.width = Math.min(cropW, 960);
+            canvas.height = Math.min(cropH, 720);
 
+            // Pass 1: Standard high-res cropped frame
             ctx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, canvas.width, canvas.height);
 
-            const result = reader.decodeFromCanvas(canvas);
-            if (result && result.getText()) {
-              detectedRawCode = result.getText();
+            try {
+              const result = reader.decodeFromCanvas(canvas);
+              if (result && result.getText() && isValidBarcodeString(result.getText())) {
+                detectedRawCode = result.getText();
+              }
+            } catch (err1) {
+              // Pass 2: High-contrast binarization for outdoor / glossy nursery tags on iOS
+              const imgData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+              const data = imgData.data;
+              const len = data.length;
+              for (let i = 0; i < len; i += 4) {
+                // Perceived luminance
+                const lum = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
+                // High contrast curve
+                const enhanced = lum < 110 ? 0 : (lum > 160 ? 255 : (lum < 135 ? 30 : 230));
+                data[i] = enhanced;
+                data[i + 1] = enhanced;
+                data[i + 2] = enhanced;
+              }
+              ctx.putImageData(imgData, 0, 0);
+
+              try {
+                const result2 = reader.decodeFromCanvas(canvas);
+                if (result2 && result2.getText() && isValidBarcodeString(result2.getText())) {
+                  detectedRawCode = result2.getText();
+                }
+              } catch (err2) {
+                // Pass 3: Full uncropped frame at scaled resolution
+                try {
+                  const fullCanvas = document.createElement('canvas');
+                  fullCanvas.width = Math.min(vw, 800);
+                  fullCanvas.height = Math.min(vh, 600);
+                  const fullCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
+                  if (fullCtx) {
+                    fullCtx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height);
+                    const result3 = reader.decodeFromCanvas(fullCanvas);
+                    if (result3 && result3.getText() && isValidBarcodeString(result3.getText())) {
+                      detectedRawCode = result3.getText();
+                    }
+                  }
+                } catch (err3) {
+                  // No barcode in this frame
+                }
+              }
             }
           } catch (err) {
             // Expected when frame has no barcode in ROI
           }
         }
 
+        isProcessing = false;
+
         if (detectedRawCode && !isCancelled) {
           handleScannedBarcode(detectedRawCode, false);
         }
+      } else {
+        isProcessing = false;
       }
     };
 
-    intervalId = setInterval(processFrame, 220);
+    intervalId = setInterval(processFrame, 180);
 
     return () => {
       isCancelled = true;
@@ -395,21 +502,29 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
   };
 
-  // Start camera stream with specific device or mode
+  // Start camera stream with specific device or mode with iPhone high-res & autofocus optimizations
   const startCameraStream = async (deviceId?: string, mode: 'environment' | 'user' = facingMode) => {
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
+      setIsTorchOn(false);
     }
 
     try {
-      let constraints: MediaStreamConstraints = { video: true };
+      let constraints: MediaStreamConstraints = {
+        video: {
+          width: { ideal: 1920, min: 1280 },
+          height: { ideal: 1080, min: 720 },
+          facingMode: { ideal: mode }
+        }
+      };
+
       if (deviceId) {
-        constraints = { video: { deviceId: { exact: deviceId } } };
-      } else {
         constraints = {
           video: {
-            facingMode: { ideal: mode }
+            deviceId: { exact: deviceId },
+            width: { ideal: 1920, min: 1280 },
+            height: { ideal: 1080, min: 720 }
           }
         };
       }
@@ -418,8 +533,45 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       try {
         stream = await navigator.mediaDevices.getUserMedia(constraints);
       } catch (err1) {
-        // Fallback to basic video request if constraints fail
-        stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: { ideal: mode } }
+          });
+        } catch (err2) {
+          stream = await navigator.mediaDevices.getUserMedia({ video: true });
+        }
+      }
+
+      // Check track capabilities (Torch, Zoom, Continuous Focus)
+      const track = stream.getVideoTracks()[0];
+      if (track) {
+        try {
+          if ('getCapabilities' in track) {
+            const caps = (track as any).getCapabilities ? (track as any).getCapabilities() : {};
+            if (caps && caps.torch) {
+              setIsTorchSupported(true);
+            } else {
+              setIsTorchSupported(false);
+            }
+            if (caps && caps.zoom) {
+              setMinZoom(caps.zoom.min || 1);
+              setMaxZoom(caps.zoom.max || 1);
+              setZoomLevel(caps.zoom.min || 1);
+            }
+          }
+          // Request continuous focus and auto-exposure if supported
+          if ('applyConstraints' in track) {
+            await track.applyConstraints({
+              advanced: [
+                { focusMode: 'continuous' } as any,
+                { exposureMode: 'continuous' } as any,
+                { whiteBalanceMode: 'continuous' } as any
+              ]
+            }).catch(() => {});
+          }
+        } catch (e) {
+          // Ignore capability check errors
+        }
       }
 
       setCameraStream(stream);
@@ -444,6 +596,39 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       console.error('Camera access error:', err);
       setCameraActive(false);
       setCameraError('Camera access denied or unavailable. Click to simulate barcode scan.');
+    }
+  };
+
+  // Toggle Torch / Flashlight for outdoor/shadow scanning
+  const toggleTorch = async () => {
+    if (!cameraStream) return;
+    const track = cameraStream.getVideoTracks()[0];
+    if (track && 'applyConstraints' in track) {
+      try {
+        const nextState = !isTorchOn;
+        await track.applyConstraints({
+          advanced: [{ torch: nextState }] as any
+        });
+        setIsTorchOn(nextState);
+      } catch (e) {
+        console.warn('Torch toggle not supported on this track:', e);
+      }
+    }
+  };
+
+  // Set hardware camera zoom (e.g. 1x, 2x for small tags)
+  const setZoom = async (newZoom: number) => {
+    if (!cameraStream) return;
+    const track = cameraStream.getVideoTracks()[0];
+    if (track && 'applyConstraints' in track) {
+      try {
+        await track.applyConstraints({
+          advanced: [{ zoom: newZoom }] as any
+        });
+        setZoomLevel(newZoom);
+      } catch (e) {
+        console.warn('Zoom constraint not supported:', e);
+      }
     }
   };
 
@@ -477,6 +662,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       if (videoRef.current) {
         videoRef.current.srcObject = null;
       }
+      setIsTorchOn(false);
       setCameraActive(false);
     } else {
       await startCameraStream(undefined, facingMode);
@@ -519,7 +705,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   };
 
   const calculateTotal = () => {
-    return cartItems.reduce((acc, item) => acc + (item.plant.price * item.quantity), 0);
+    return cartItems.reduce((acc, item) => acc + (getItemEffectiveUnitPrice(item) * item.quantity), 0);
   };
 
   const handleComplete = () => {
@@ -1110,6 +1296,32 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             </span>
 
             <div className="flex items-center gap-1.5 pointer-events-auto">
+              {cameraActive && isTorchSupported && (
+                <button
+                  type="button"
+                  onClick={toggleTorch}
+                  className={`backdrop-blur-xs border px-2 py-1 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 ${
+                    isTorchOn
+                      ? 'bg-[#a0f4c8] text-[#002113] border-[#0e6c4a] font-bold shadow-[0_0_8px_#a0f4c8]'
+                      : 'bg-black/60 hover:bg-black/80 text-white border-white/20'
+                  }`}
+                  title="Toggle flashlight / torch for dark nursery areas"
+                >
+                  {isTorchOn ? <Zap className="w-3.5 h-3.5 text-[#002113]" /> : <ZapOff className="w-3.5 h-3.5 text-white/80" />}
+                  <span>{isTorchOn ? 'Flash ON' : 'Flash'}</span>
+                </button>
+              )}
+              {cameraActive && maxZoom > 1 && (
+                <button
+                  type="button"
+                  onClick={() => setZoom(zoomLevel === 1 ? Math.min(2, maxZoom) : 1)}
+                  className="bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/20 px-2 py-1 rounded-md text-white text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  title="Toggle 2x camera zoom for smaller barcode tags"
+                >
+                  <ZoomIn className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                  <span>{zoomLevel > 1 ? `${zoomLevel.toFixed(1)}x` : '2x Zoom'}</span>
+                </button>
+              )}
               {cameraActive && (
                 <button
                   type="button"
@@ -1199,39 +1411,70 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           ) : (
             cartItems.map((item) => {
               const gpsLocation = gpsLoggedMap[item.plant.id];
+              const unitPrice = getItemEffectiveUnitPrice(item);
+              const lineTotal = unitPrice * item.quantity;
 
               return (
                 <div
                   key={item.plant.id}
-                  className="bg-white rounded-xl p-3.5 border border-[#c1c8c2] shadow-2xs flex flex-col gap-2 transition-all"
+                  className="bg-white rounded-xl p-3.5 border border-[#c1c8c2] shadow-2xs flex flex-col gap-2.5 transition-all"
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <div className="flex gap-3 items-center">
+                    <div className="flex gap-3 items-start min-w-0 flex-1">
                       <img
                         src={item.plant.image || DEFAULT_PLANT_IMAGE}
                         alt={item.plant.name}
-                        className="w-12 h-12 rounded-lg object-cover bg-[#f3f4f0]"
+                        className="w-12 h-12 rounded-lg object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]/60 mt-0.5"
                         referrerPolicy="no-referrer"
                         onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                       />
-                      <div>
-                        <h3 className="font-semibold text-base text-[#1a1c1a]">
-                          {item.plant.name}
-                        </h3>
-                        <div className="flex items-center gap-2 mt-0.5">
-                          <span className="bg-[#e7e9e5] text-[#414844] text-[10px] font-bold px-2 py-0.5 rounded tracking-wider uppercase">
-                            {item.plant.lightRequirement}
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-extrabold text-base text-[#1a1c1a] truncate">
+                            {item.plant.name}
+                          </h3>
+                        </div>
+
+                        {/* High-Visibility Loading Identifiers: Product # and Size */}
+                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                          <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#012d1d] shadow-2xs">
+                            <Tag className="w-3 h-3 text-[#a0f4c8]" />
+                            #{item.plant.itemNo || item.plant.barcode || 'N/A'}
                           </span>
-                          <span className="text-sm font-semibold text-[#012d1d]">
-                            ${item.plant.price.toFixed(2)}
+                          <span className="bg-[#461702] text-amber-100 text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#461702] shadow-2xs">
+                            <Package className="w-3 h-3 text-amber-300" />
+                            SIZE: {item.plant.size || 'Standard'}
                           </span>
+                        </div>
+                        
+                        {(item.plant.botanicalName || item.plant.commonName) && (
+                          <p className="text-xs text-[#414844] italic truncate mt-1">
+                            {item.plant.botanicalName || item.plant.commonName}
+                          </p>
+                        )}
+
+                        {/* Interactive 4-Tier Pricing Dropdown */}
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                          <PricingDropdown
+                            plant={item.plant}
+                            currentPrice={unitPrice}
+                            selectedLevelKey={item.selectedPriceLevel}
+                            onSelectPriceLevel={(levelKey, newPrice) => updateItemPriceLevel(item.plant.id, levelKey, newPrice)}
+                            size="sm"
+                          />
+                          
+                          {item.quantity > 1 && (
+                            <span className="text-xs font-bold text-[#012d1d]">
+                              Total: ${lineTotal.toFixed(2)}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     <button
                       onClick={() => removeItem(item.plant.id)}
-                      className="text-[#ba1a1a] hover:bg-[#ffdad6] p-1.5 rounded-lg transition-colors"
+                      className="text-[#ba1a1a] hover:bg-[#ffdad6] p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
                       title="Remove Item"
                     >
                       <Trash2 className="w-4 h-4" />
@@ -1552,32 +1795,45 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                         />
                         <div className="min-w-0">
                           <h4 className="font-extrabold text-base text-[#1a1c1a] truncate">{plant.name}</h4>
-                          <p className="text-xs sm:text-sm text-[#414844] truncate italic mt-0.5">
-                            {plant.botanicalName || plant.commonName || 'Standard Container'}
-                          </p>
-                          <div className="flex items-center gap-2 mt-1">
-                            <span className="text-xs font-bold bg-[#e7e9e5] text-[#414844] px-2 py-0.5 rounded">
-                              {plant.size || '3 GAL'}
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
+                              #{plant.itemNo || plant.barcode || 'N/A'}
                             </span>
-                            <span className="text-xs text-[#717973]">
+                            <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                              <Package className="w-2.5 h-2.5 text-amber-300" />
+                              SIZE: {plant.size || 'Standard'}
+                            </span>
+                            <span className="text-xs text-[#717973] ml-1">
                               Stock: <strong className="text-[#012d1d]">{plant.stock}</strong>
                             </span>
                           </div>
+                          {(plant.botanicalName || plant.commonName) && (
+                            <p className="text-xs text-[#414844] truncate italic mt-0.5">
+                              {plant.botanicalName || plant.commonName}
+                            </p>
+                          )}
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-3 shrink-0">
-                        <span className="font-extrabold text-base text-[#012d1d]">
-                          ${plant.price.toFixed(2)}
-                        </span>
+                      <div className="flex items-center gap-2.5 shrink-0 flex-wrap justify-end">
+                        <PricingDropdown
+                          plant={plant}
+                          currentPrice={plant.prices?.[customerType === 'WHOLESALE' ? 'wholesale' : 'retail'] ?? plant.price}
+                          selectedLevelKey={customerType === 'WHOLESALE' ? 'wholesale' : 'retail'}
+                          onSelectPriceLevel={(levelKey, newPrice) => {
+                            addPlantToCart(plant, 1, levelKey);
+                          }}
+                          size="xs"
+                        />
 
                         <button
                           type="button"
                           onClick={() => addPlantToCart(plant)}
-                          className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-bold px-3.5 py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                          className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs sm:text-sm font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
                         >
                           <Plus className="w-4 h-4" />
-                          <span>{inCartCount > 0 ? `Add (${inCartCount})` : 'Add to Order'}</span>
+                          <span>{inCartCount > 0 ? `Add (${inCartCount})` : 'Add'}</span>
                         </button>
                       </div>
                     </div>

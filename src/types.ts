@@ -57,8 +57,10 @@ export interface Order {
   total: number;
   type: 'Pickup' | 'Delivery' | 'Take Now' | 'Pick-up/Delivery';
   scheduledTime?: string;
+  scheduledDate?: string; // Formatted YYYY-MM-DD or calendar date
   status: 'Pending' | 'Ready for Pickup' | 'Completed' | 'In Transit' | 'Cancelled' | 'Partial Pickup';
-  date: string;
+  date: string; // Date entered/created (e.g. "Aug 18, 2026")
+  createdAt?: string; // ISO 8601 creation timestamp
   items?: OrderCartItem[];
   holdingLocation?: string;
   notes?: string;

@@ -92,7 +92,7 @@ export default function App() {
     }
     return HOLDING_AREAS;
   });
-  const [activeOrder, setActiveOrder] = useState<Order | null>(INITIAL_ORDERS[2]); // ORD-90210-A
+  const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [screenHistory, setScreenHistory] = useState<ScreenType[]>(['home']);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
 
@@ -260,16 +260,22 @@ export default function App() {
   const handleCompleteScanOrder = (cartItems: OrderCartItem[], customerName: string) => {
     const newOrderId = `ORD-${Math.floor(100 + Math.random() * 900)}`;
     const totalAmount = cartItems.reduce((sum, item) => sum + item.plant.price * item.quantity, 0);
+    const now = new Date();
+    const formattedCreatedDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const formattedSchedTime = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+    const todayIsoDate = now.toISOString().split('T')[0];
 
     const newOrder: Order = {
       id: newOrderId,
-      customerName: customerName || 'Sarah Jenkins',
+      customerName: customerName.trim() || 'Retail Walk-in',
       itemsCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
       total: totalAmount,
       type: 'Take Now',
-      scheduledTime: 'Today',
+      scheduledTime: formattedSchedTime,
+      scheduledDate: todayIsoDate,
       status: 'Pending',
-      date: 'Just Now',
+      date: formattedCreatedDate,
+      createdAt: now.toISOString(),
       items: cartItems,
       holdingLocation: 'Greenhouse B, Aisle 4, Bay 12'
     };
@@ -417,6 +423,7 @@ export default function App() {
             activeOrder={activeOrder}
             onUpdateActiveOrder={handleUpdateOrder}
             onStartNewOrder={() => setActiveOrder(null)}
+            onDeleteOrder={handleDeleteOrder}
           />
         )}
 
@@ -478,7 +485,12 @@ export default function App() {
             onNavigate={navigateTo}
             orders={orders}
             onSelectOrder={(ord) => setActiveOrder(ord)}
-            onCreateNewOrderClick={() => navigateTo('scan')}
+            onCreateNewOrderClick={() => {
+              setActiveOrder(null);
+              navigateTo('scan');
+            }}
+            onDeleteOrder={handleDeleteOrder}
+            onUpdateOrder={handleUpdateOrder}
           />
         )}
 

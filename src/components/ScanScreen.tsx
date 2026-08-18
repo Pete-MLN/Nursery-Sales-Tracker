@@ -15,6 +15,7 @@ interface ScanScreenProps {
   activeOrder?: Order | null;
   onUpdateActiveOrder?: (updatedOrder: Order) => void;
   onStartNewOrder?: () => void;
+  onDeleteOrder?: (orderId: string) => void;
 }
 
 export const ScanScreen: React.FC<ScanScreenProps> = ({
@@ -24,7 +25,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   onCompleteOrder,
   activeOrder,
   onUpdateActiveOrder,
-  onStartNewOrder
+  onStartNewOrder,
+  onDeleteOrder
 }) => {
   const [cartItems, setCartItems] = useState<OrderCartItem[]>(() => {
     if (activeOrder && activeOrder.items && activeOrder.items.length > 0) {
@@ -33,6 +35,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     return [];
   });
   const [selectedCustomer, setSelectedCustomer] = useState<string>(activeOrder?.customerName || '');
+  const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
   const [customerSearch, setCustomerSearch] = useState<string>(activeOrder?.customerName || '');
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [customerType, setCustomerType] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
@@ -44,15 +47,28 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   // Sync state when activeOrder changes
   useEffect(() => {
     if (activeOrder) {
-      if (activeOrder.items) {
-        setCartItems(activeOrder.items);
+      if (activeOrder.items && activeOrder.items.length > 0) {
+        setCartItems(activeOrder.items.map(item => ({ ...item })));
+      } else {
+        setCartItems([]);
       }
       if (activeOrder.customerName) {
         setSelectedCustomer(activeOrder.customerName);
         setCustomerSearch(activeOrder.customerName);
+      } else {
+        setSelectedCustomer('');
+        setCustomerSearch('');
       }
+    } else {
+      // Clean blank order: reset all customer and product cart state
+      setCartItems([]);
+      setSelectedCustomer('');
+      setCustomerSearch('');
+      setItemFulfillmentMap({});
+      setGpsLoggedMap({});
+      setCustomerType('RETAIL');
     }
-  }, [activeOrder?.id]);
+  }, [activeOrder]);
 
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -832,7 +848,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           {/* Searchable Dropdown Container */}
           <div className="relative flex-1" ref={dropdownRef}>
             <div className="relative">
-              <Search className="w-4 h-4 text-[#717973] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <Search className="w-5 h-5 text-[#717973] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={customerSearch}
@@ -842,10 +858,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   setSelectedCustomer(e.target.value);
                   setIsDropdownOpen(true);
                 }}
-                placeholder="Customer Name (e.g., Retail Walk-in, John Smith)..."
-                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-16 py-2.5 text-base font-semibold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white transition-all shadow-2xs placeholder:text-sm placeholder:font-normal"
+                placeholder="Customer Name (e.g. Retail Walk-in, John Smith)..."
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-11 pr-16 py-3 text-lg font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white transition-all shadow-2xs placeholder:text-base placeholder:font-normal"
               />
-              <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-1">
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 {customerSearch && (
                   <button
                     type="button"
@@ -857,7 +873,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     className="p-1.5 text-[#717973] hover:text-[#1a1c1a] rounded cursor-pointer"
                     title="Clear search"
                   >
-                    <X className="w-4 h-4" />
+                    <X className="w-5 h-5" />
                   </button>
                 )}
                 <button
@@ -866,22 +882,22 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   className="p-1.5 text-[#717973] hover:text-[#012d1d] rounded cursor-pointer"
                   title="Toggle customer list"
                 >
-                  {isDropdownOpen ? <ChevronUp className="w-4.5 h-4.5" /> : <ChevronDown className="w-4.5 h-4.5" />}
+                  {isDropdownOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
                 </button>
               </div>
             </div>
 
             {/* Searchable Dropdown Popup Menu */}
             {isDropdownOpen && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-[#c1c8c2] rounded-xl shadow-lg overflow-hidden max-h-64 overflow-y-auto animate-fade-in">
-                <div className="p-2 flex flex-col gap-1">
-                  <div className="px-3 py-1.5 text-xs font-bold text-[#717973] uppercase tracking-wider bg-[#f9faf6] rounded-md flex justify-between items-center">
+              <div className="absolute left-0 right-0 top-full mt-1.5 z-40 bg-white border border-[#c1c8c2] rounded-2xl shadow-2xl overflow-hidden max-h-72 overflow-y-auto animate-fade-in">
+                <div className="p-2 flex flex-col gap-1.5">
+                  <div className="px-3.5 py-2 text-xs sm:text-sm font-extrabold text-[#717973] uppercase tracking-wider bg-[#f9faf6] rounded-lg flex justify-between items-center">
                     <span>Customer Accounts ({matchingCustomers.length})</span>
-                    <span className="text-[11px] font-normal text-[#717973]">Type to filter</span>
+                    <span className="text-xs font-semibold text-[#717973]">Type to filter</span>
                   </div>
 
                   {matchingCustomers.length === 0 ? (
-                    <div className="p-3 text-center text-sm text-[#717973]">
+                    <div className="p-4 text-center text-base text-[#717973]">
                       <span>No matching customers found.</span>
                       {customerSearch && (
                         <button
@@ -890,9 +906,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             setSelectedCustomer(customerSearch);
                             setIsDropdownOpen(false);
                           }}
-                          className="mt-2 w-full bg-[#a0f4c8]/30 hover:bg-[#a0f4c8] text-[#002113] font-bold py-2.5 px-3 rounded-lg text-sm transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                          className="mt-2.5 w-full bg-[#a0f4c8]/30 hover:bg-[#a0f4c8] text-[#002113] font-black py-3 px-4 rounded-xl text-base transition-colors flex items-center justify-center gap-2 cursor-pointer shadow-2xs"
                         >
-                          <User className="w-4 h-4 text-[#0e6c4a]" />
+                          <User className="w-5 h-5 text-[#0e6c4a]" />
                           <span>Use "{customerSearch}" as customer</span>
                         </button>
                       )}
@@ -912,29 +928,29 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             }
                             setIsDropdownOpen(false);
                           }}
-                          className={`w-full text-left px-3.5 py-2.5 rounded-lg text-sm sm:text-base font-medium flex items-center justify-between transition-colors cursor-pointer ${
+                          className={`w-full text-left px-4 py-3 rounded-xl text-base sm:text-lg font-medium flex items-center justify-between transition-colors cursor-pointer ${
                             isSelected
                               ? 'bg-[#012d1d] text-white font-bold'
                               : 'hover:bg-[#f3f4f0] text-[#1a1c1a]'
                           }`}
                         >
-                          <div className="flex items-center gap-2.5 min-w-0">
-                            <User className={`w-4 h-4 shrink-0 ${isSelected ? 'text-[#a0f4c8]' : 'text-[#0e6c4a]'}`} />
+                          <div className="flex items-center gap-3 min-w-0">
+                            <User className={`w-5 h-5 shrink-0 ${isSelected ? 'text-[#a0f4c8]' : 'text-[#0e6c4a]'}`} />
                             <div className="flex flex-col min-w-0">
-                              <span className={`font-bold text-sm sm:text-base truncate ${isSelected ? 'text-white' : 'text-[#1a1c1a]'}`}>
+                              <span className={`font-extrabold text-base sm:text-lg truncate ${isSelected ? 'text-white' : 'text-[#1a1c1a]'}`}>
                                 {cust.name}
                               </span>
                               {cust.company && cust.company !== cust.name && (
-                                <span className={`text-xs truncate ${isSelected ? 'text-[#a0f4c8]/80' : 'text-[#717973]'}`}>
+                                <span className={`text-xs sm:text-sm font-semibold truncate mt-0.5 ${isSelected ? 'text-[#a0f4c8]/80' : 'text-[#717973]'}`}>
                                   {cust.company}
                                 </span>
                               )}
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2 shrink-0 ml-2">
+                          <div className="flex items-center gap-2.5 shrink-0 ml-2">
                             <span
-                              className={`text-xs font-bold px-2 py-0.5 rounded ${
+                              className={`text-xs sm:text-sm font-black px-2.5 py-1 rounded-md ${
                                 isSelected
                                   ? 'bg-[#a0f4c8] text-[#002113]'
                                   : 'bg-[#e2e3df] text-[#414844]'
@@ -942,7 +958,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             >
                               {cust.type}
                             </span>
-                            {isSelected && <Check className="w-4 h-4 text-[#a0f4c8]" />}
+                            {isSelected && <Check className="w-5 h-5 text-[#a0f4c8]" />}
                           </div>
                         </button>
                       );
@@ -955,7 +971,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
           <button
             onClick={() => setCustomerType(prev => prev === 'RETAIL' ? 'WHOLESALE' : 'RETAIL')}
-            className="border border-[#012d1d] px-3.5 py-2.5 rounded-xl text-sm font-extrabold text-[#012d1d] hover:bg-[#e7e9e5] transition-colors shrink-0 cursor-pointer shadow-2xs"
+            className="border border-[#012d1d] px-4 py-3 rounded-xl text-base font-extrabold text-[#012d1d] hover:bg-[#e7e9e5] transition-colors shrink-0 cursor-pointer shadow-2xs"
             title="Toggle customer rate classification"
           >
             {customerType}
@@ -1577,38 +1593,164 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         </div>
 
         {activeOrder ? (
-          <div className="flex flex-col sm:flex-row gap-2.5">
+          <div className="flex flex-col gap-2.5">
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <button
+                type="button"
+                onClick={handleComplete}
+                disabled={cartItems.length === 0}
+                className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base"
+              >
+                <CheckCircle className="w-5 h-5" />
+                <span>Save & Return to Order {activeOrder.id}</span>
+              </button>
+              <button
+                type="button"
+                onClick={handleCompleteAndGoToHolding}
+                disabled={cartItems.length === 0}
+                className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm shrink-0"
+                title="Save changes and proceed to staging map"
+              >
+                <MapPin className="w-4 h-4" />
+                <span>Holding Map</span>
+              </button>
+            </div>
+            
             <button
               type="button"
-              onClick={handleComplete}
-              disabled={cartItems.length === 0}
-              className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base"
+              onClick={() => setIsCancelModalOpen(true)}
+              className="w-full bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 font-bold py-2.5 rounded-xl transition-all flex justify-center items-center gap-2 cursor-pointer text-xs"
             >
-              <CheckCircle className="w-5 h-5" />
-              <span>Save & Return to Order {activeOrder.id}</span>
-            </button>
-            <button
-              type="button"
-              onClick={handleCompleteAndGoToHolding}
-              disabled={cartItems.length === 0}
-              className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm shrink-0"
-              title="Save changes and proceed to staging map"
-            >
-              <MapPin className="w-4 h-4" />
-              <span>Holding Map</span>
+              <Trash2 className="w-4 h-4 text-red-600" />
+              <span>Cancel or Delete Order {activeOrder.id}</span>
             </button>
           </div>
         ) : (
-          <button
-            onClick={handleComplete}
-            disabled={cartItems.length === 0}
-            className="w-full bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer"
-          >
-            <CheckCircle className="w-5 h-5" />
-            <span>Complete Order</span>
-          </button>
+          <div className="flex flex-col gap-2.5">
+            <button
+              onClick={handleComplete}
+              disabled={cartItems.length === 0}
+              className="w-full bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer"
+            >
+              <CheckCircle className="w-5 h-5" />
+              <span>Complete Order</span>
+            </button>
+            
+            {cartItems.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(true)}
+                className="w-full bg-[#f3f4f0] hover:bg-red-50 hover:text-red-700 text-[#717973] font-bold py-2 rounded-xl transition-all flex justify-center items-center gap-1.5 cursor-pointer text-xs"
+              >
+                <Trash2 className="w-3.5 h-3.5" />
+                <span>Cancel / Clear Order</span>
+              </button>
+            )}
+          </div>
         )}
       </section>
+
+      {/* Cancel Order Confirmation Modal */}
+      {isCancelModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setIsCancelModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-100 text-red-700 rounded-xl shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-extrabold text-base text-[#1a1c1a]">
+                  {activeOrder ? `Cancel or Delete Order #${activeOrder.id}?` : 'Cancel and Discard Order?'}
+                </h3>
+                <p className="text-xs text-[#717973] mt-0.5">
+                  {cartItems.reduce((acc, item) => acc + item.quantity, 0)} plants in cart (${calculateTotal().toFixed(2)})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsCancelModalOpen(false)}
+                className="p-1 text-[#717973] hover:text-[#1a1c1a] rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-[#f3f4f0] p-3 rounded-xl text-xs text-[#414844] space-y-1">
+              <p className="font-bold text-[#1a1c1a]">
+                {activeOrder ? 'Choose how you want to handle this order:' : 'Are you sure you want to discard all scanned items in this order?'}
+              </p>
+              {activeOrder && (
+                <ul className="list-disc list-inside space-y-0.5 text-[11px] text-[#717973]">
+                  <li><strong className="text-red-700">Delete Order:</strong> Erases this order completely from system database.</li>
+                  <li><strong className="text-amber-800">Discard Changes:</strong> Reverts unsaved changes and goes back to orders list.</li>
+                </ul>
+              )}
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[#e2e3df]">
+              {activeOrder ? (
+                <>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (onDeleteOrder && activeOrder) {
+                        onDeleteOrder(activeOrder.id);
+                      }
+                      setIsCancelModalOpen(false);
+                      onNavigate('orders');
+                    }}
+                    className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                    <span>Delete Permanently</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCancelModalOpen(false);
+                      onNavigate('orders');
+                    }}
+                    className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                  >
+                    <span>Discard Edits & Exit</span>
+                  </button>
+                </>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCartItems([]);
+                    setSelectedCustomer('');
+                    setCustomerSearch('');
+                    setIsCancelModalOpen(false);
+                    if (onStartNewOrder) onStartNewOrder();
+                    onNavigate('orders');
+                  }}
+                  className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                >
+                  <Trash2 className="w-4 h-4" />
+                  <span>Discard Order & Return to Orders</span>
+                </button>
+              )}
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsCancelModalOpen(false)}
+              className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer"
+            >
+              Keep Editing Order
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Unrecognized Barcode Assignment Modal */}
       {unrecognizedCode && (

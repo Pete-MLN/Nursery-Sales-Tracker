@@ -46,6 +46,7 @@ import {
 } from 'lucide-react';
 import { PricingDropdown } from './PricingDropdown';
 import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
+import { formatOrderCreatedDate, formatOrderScheduledTime, extractDateForInput, getTodayDateInputValue, formatRawDateString } from '../utils/dateUtils';
 
 interface OrderFinalizationScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -94,6 +95,20 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
         ...order,
         items: order.items ? order.items.map(item => ({ ...item })) : []
       });
+      setCustomerName(order.customerName || '');
+      setFulfillment(order.type || 'Take Now');
+      setScheduledDate(extractDateForInput(order.scheduledDate || order.scheduledTime));
+      if (order.scheduledTime && !/^\d{4}-\d{2}-\d{2}$/.test(order.scheduledTime)) {
+        setScheduledTime(order.scheduledTime);
+      } else {
+        setScheduledTime(order.type === 'Take Now' ? 'Immediate (Take Now)' : 'Morning (8:00 AM - 12:00 PM)');
+      }
+      setOrderStatus(order.status || 'Pending');
+      setHoldingLocation(order.holdingLocation || 'Holding Area B - North Greenhouse');
+      setOrderNotes(order.notes || '');
+      setItems(order.items ? order.items.map(item => ({ ...item })) : []);
+      setRemainingPickupDate(order.remainingPickupDate || '');
+      setPartialPickupNotes(order.partialPickupNotes || '');
     }
   }, [order]);
 
@@ -101,7 +116,15 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [customerName, setCustomerName] = useState<string>(currentOrder.customerName);
   const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
   const [fulfillment, setFulfillment] = useState<'Take Now' | 'Pickup Later' | 'Delivery' | 'Pick-up/Delivery'>(currentOrder.type || 'Take Now');
-  const [scheduledDate, setScheduledDate] = useState<string>(currentOrder.scheduledTime || new Date().toISOString().split('T')[0]);
+  const [scheduledDate, setScheduledDate] = useState<string>(() => {
+    return extractDateForInput(currentOrder.scheduledDate || currentOrder.scheduledTime);
+  });
+  const [scheduledTime, setScheduledTime] = useState<string>(() => {
+    if (currentOrder.scheduledTime && !/^\d{4}-\d{2}-\d{2}$/.test(currentOrder.scheduledTime)) {
+      return currentOrder.scheduledTime;
+    }
+    return currentOrder.type === 'Take Now' ? 'Immediate (Take Now)' : 'Morning (8:00 AM - 12:00 PM)';
+  });
   const [orderStatus, setOrderStatus] = useState<'Pending' | 'Ready for Pickup' | 'Completed' | 'In Transit' | 'Cancelled' | 'Partial Pickup'>(currentOrder.status || 'Pending');
   const [holdingLocation, setHoldingLocation] = useState<string>(currentOrder.holdingLocation || 'Holding Area B - North Greenhouse');
   const [orderNotes, setOrderNotes] = useState<string>(currentOrder.notes || '');
@@ -146,6 +169,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [customLocationText, setCustomLocationText] = useState<string>('');
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
+  const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
 
   // Robust customer matching helper
   const findMatchingCustomer = (name: string, customerList: Customer[]): Customer | undefined => {
@@ -407,7 +431,10 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       ...currentOrder,
       customerName: customerName.trim() || 'Retail Walk-in',
       type: fulfillment,
-      scheduledTime: scheduledDate,
+      scheduledTime: scheduledTime.trim() || 'Scheduled',
+      scheduledDate: scheduledDate.trim(),
+      date: currentOrder.date ? formatOrderCreatedDate(currentOrder) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+      createdAt: currentOrder.createdAt || new Date().toISOString(),
       status: finalStatus,
       holdingLocation: holdingLocation,
       notes: orderNotes.trim(),
@@ -429,15 +456,35 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     showToast(`Order ${updated.id} saved & synced to cloud!`);
   };
 
-  // Delete / Cancel entire order
+  // Delete / Cancel entire order handlers
   const handleDeleteOrder = () => {
-    if (window.confirm(`Are you sure you want to cancel and delete Order ${currentOrder.id}? This action cannot be undone.`)) {
-      if (onDeleteOrder) {
-        onDeleteOrder(currentOrder.id);
-      }
-      showToast(`Order ${currentOrder.id} has been cancelled.`);
-      onNavigate('orders');
+    setIsDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (onDeleteOrder) {
+      onDeleteOrder(currentOrder.id);
     }
+    showToast(`Order ${currentOrder.id} has been permanently deleted.`);
+    setIsDeleteModalOpen(false);
+    onNavigate('orders');
+  };
+
+  const handleMarkAsCancelled = () => {
+    const updated: Order = {
+      ...currentOrder,
+      customerName: customerName.trim() || 'Retail Customer',
+      status: 'Cancelled',
+      holdingLocation: holdingLocation,
+      notes: orderNotes
+    };
+    setCurrentOrder(updated);
+    setOrderStatus('Cancelled');
+    if (onUpdateOrder) {
+      onUpdateOrder(updated);
+    }
+    showToast(`Order ${currentOrder.id} marked as Cancelled.`);
+    setIsDeleteModalOpen(false);
   };
 
   // Copy holding slip to clipboard
@@ -703,10 +750,19 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
         <div className="flex items-center gap-2">
           {hasUnsavedChanges && (
-            <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse">
+            <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse hidden sm:inline">
               Unsaved Edits
             </span>
           )}
+          <button
+            type="button"
+            onClick={handleDeleteOrder}
+            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors cursor-pointer"
+            title="Cancel or Delete this order"
+          >
+            <Trash2 className="w-3.5 h-3.5 text-red-600" />
+            <span>Cancel / Delete</span>
+          </button>
           <button
             type="button"
             onClick={handleSaveChanges}
@@ -726,7 +782,14 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               <span className="text-xs font-bold uppercase tracking-wider text-[#717973]">
                 Order {currentOrder.id}
               </span>
-              <span className="text-xs text-[#717973]">• {currentOrder.date || 'Today'}</span>
+              <span className="text-xs text-[#012d1d] font-semibold bg-[#f3f4f0] px-2 py-0.5 rounded-md flex items-center gap-1">
+                <Calendar className="w-3 h-3 text-[#0e6c4a]" />
+                <span>Entered: <strong>{formatOrderCreatedDate(currentOrder)}</strong></span>
+              </span>
+              <span className="text-xs text-[#012d1d] font-semibold bg-[#f3f4f0] px-2 py-0.5 rounded-md flex items-center gap-1">
+                <Clock className="w-3 h-3 text-[#461702]" />
+                <span>Scheduled: <strong>{formatOrderScheduledTime({ scheduledTime, scheduledDate, type: fulfillment })}</strong></span>
+              </span>
               {isPartialPickupActive && (
                 <span className="text-[11px] font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-full flex items-center gap-1">
                   <AlertCircle className="w-3 h-3 text-amber-700" />
@@ -785,7 +848,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
         </div>
 
         {/* Status & Quick Metadata Bar */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1">
           {/* Order Status Selector */}
           <div>
             <label className="block text-[11px] font-extrabold text-[#012d1d] uppercase tracking-wider mb-1">
@@ -815,22 +878,33 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           {/* Fulfillment Type Selector */}
           <div>
             <label className="block text-[11px] font-extrabold text-[#012d1d] uppercase tracking-wider mb-1">
-              Fulfillment Type & Date
+              Fulfillment Method
+            </label>
+            <select
+              value={fulfillment}
+              onChange={(e) => {
+                const newType = e.target.value as any;
+                setFulfillment(newType);
+                if (newType === 'Take Now') {
+                  setScheduledTime('Immediate (Take Now)');
+                }
+                setHasUnsavedChanges(true);
+              }}
+              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+            >
+              <option value="Take Now">Take Now (Immediate Walk-in)</option>
+              <option value="Pickup Later">Pickup Later (Staged for Customer)</option>
+              <option value="Delivery">Delivery (Nursery Truck Route)</option>
+              <option value="Pick-up/Delivery">Pick-up/Delivery (Hybrid)</option>
+            </select>
+          </div>
+
+          {/* Scheduled Date & Time Slot */}
+          <div className="flex flex-col gap-1.5">
+            <label className="block text-[11px] font-extrabold text-[#012d1d] uppercase tracking-wider">
+              Scheduled Date & Time
             </label>
             <div className="flex gap-2">
-              <select
-                value={fulfillment}
-                onChange={(e) => {
-                  setFulfillment(e.target.value as any);
-                  setHasUnsavedChanges(true);
-                }}
-                className="w-1/2 bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-2.5 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
-              >
-                <option value="Take Now">Take Now</option>
-                <option value="Pickup Later">Pickup Later</option>
-                <option value="Delivery">Delivery</option>
-                <option value="Pick-up/Delivery">Pick-up/Delivery</option>
-              </select>
               <input
                 type="date"
                 value={scheduledDate}
@@ -838,8 +912,82 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                   setScheduledDate(e.target.value);
                   setHasUnsavedChanges(true);
                 }}
-                className="w-1/2 bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-2.5 py-2 text-xs font-semibold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                className="w-1/2 bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-2.5 py-1.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
+                title="Target Fulfillment Date"
               />
+              <select
+                value={scheduledTime}
+                onChange={(e) => {
+                  setScheduledTime(e.target.value);
+                  setHasUnsavedChanges(true);
+                }}
+                className="w-1/2 bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-2 py-1.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                title="Target Time Slot"
+              >
+                {fulfillment === 'Take Now' && <option value="Immediate (Take Now)">Immediate (Now)</option>}
+                <optgroup label="General Time Slots">
+                  <option value="Morning (8:00 AM - 12:00 PM)">Morning (8am-12pm)</option>
+                  <option value="Afternoon (12:00 PM - 5:00 PM)">Afternoon (12pm-5pm)</option>
+                  <option value="All Day / Anytime">All Day / Anytime</option>
+                </optgroup>
+                <optgroup label="Specific Appointment Hours">
+                  <option value="8:00 AM">8:00 AM</option>
+                  <option value="9:00 AM">9:00 AM</option>
+                  <option value="10:00 AM">10:00 AM</option>
+                  <option value="11:00 AM">11:00 AM</option>
+                  <option value="12:00 PM">12:00 PM (Noon)</option>
+                  <option value="1:00 PM">1:00 PM</option>
+                  <option value="2:00 PM">2:00 PM</option>
+                  <option value="3:00 PM">3:00 PM</option>
+                  <option value="4:00 PM">4:00 PM</option>
+                  <option value="5:00 PM">5:00 PM</option>
+                </optgroup>
+                {scheduledTime && !['Immediate (Take Now)', 'Morning (8:00 AM - 12:00 PM)', 'Afternoon (12:00 PM - 5:00 PM)', 'All Day / Anytime', '8:00 AM', '9:00 AM', '10:00 AM', '11:00 AM', '12:00 PM', '1:00 PM', '2:00 PM', '3:00 PM', '4:00 PM', '5:00 PM'].includes(scheduledTime) && (
+                  <option value={scheduledTime}>{scheduledTime}</option>
+                )}
+              </select>
+            </div>
+            {/* Quick date shortcuts */}
+            <div className="flex items-center gap-1.5 flex-wrap">
+              <span className="text-[10px] text-[#717973] font-semibold">Quick Date:</span>
+              <button
+                type="button"
+                onClick={() => {
+                  setScheduledDate(getTodayDateInputValue());
+                  setHasUnsavedChanges(true);
+                }}
+                className="text-[10px] font-bold px-2 py-0.5 rounded bg-white border border-[#c1c8c2] hover:bg-[#012d1d] hover:text-white text-[#012d1d] transition-colors cursor-pointer"
+              >
+                Today
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const tm = new Date(Date.now() + 24 * 60 * 60 * 1000);
+                  const y = tm.getFullYear();
+                  const m = String(tm.getMonth() + 1).padStart(2, '0');
+                  const d = String(tm.getDate()).padStart(2, '0');
+                  setScheduledDate(`${y}-${m}-${d}`);
+                  setHasUnsavedChanges(true);
+                }}
+                className="text-[10px] font-bold px-2 py-0.5 rounded bg-white border border-[#c1c8c2] hover:bg-[#012d1d] hover:text-white text-[#012d1d] transition-colors cursor-pointer"
+              >
+                Tomorrow
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const tm = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+                  const y = tm.getFullYear();
+                  const m = String(tm.getMonth() + 1).padStart(2, '0');
+                  const d = String(tm.getDate()).padStart(2, '0');
+                  setScheduledDate(`${y}-${m}-${d}`);
+                  setHasUnsavedChanges(true);
+                }}
+                className="text-[10px] font-bold px-2 py-0.5 rounded bg-white border border-[#c1c8c2] hover:bg-[#012d1d] hover:text-white text-[#012d1d] transition-colors cursor-pointer"
+              >
+                +1 Week
+              </button>
             </div>
           </div>
         </div>
@@ -1604,6 +1752,16 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={handleDeleteOrder}
+              className="bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 py-2.5 px-4 rounded-full font-bold text-xs uppercase tracking-wider transition-all flex items-center gap-1.5 cursor-pointer shadow-2xs"
+              title="Cancel or Delete this order"
+            >
+              <Trash2 className="w-4 h-4 text-red-600" />
+              <span>Cancel / Delete</span>
+            </button>
+
             <button
               type="button"
               onClick={handleSaveChanges}
@@ -2575,6 +2733,73 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+      {/* Cancel / Delete Order Confirmation Modal */}
+      {isDeleteModalOpen && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setIsDeleteModalOpen(false)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-100 text-red-700 rounded-xl shrink-0">
+                <Trash2 className="w-6 h-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-extrabold text-base text-[#1a1c1a]">Cancel or Delete Order?</h3>
+                <p className="text-xs text-[#717973] mt-0.5">
+                  Order <span className="font-bold text-[#012d1d]">#{currentOrder.id}</span> • {customerName || 'Retail Customer'} (${calculatedTotal.toFixed(2)})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsDeleteModalOpen(false)}
+                className="p-1 text-[#717973] hover:text-[#1a1c1a] rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-[#f3f4f0] p-3.5 rounded-xl border border-[#e2e3df] text-xs text-[#414844] space-y-1.5">
+              <p className="font-bold text-[#1a1c1a]">Select an action for this order:</p>
+              <ul className="list-disc list-inside space-y-1 text-[11px] text-[#717973]">
+                <li><strong className="text-red-700">Permanently Delete:</strong> Erases this order completely from database and orders list.</li>
+                <li><strong className="text-amber-800">Mark as Cancelled:</strong> Retains order record with status set to "Cancelled" for sales history.</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[#e2e3df]">
+              <button
+                type="button"
+                onClick={handleConfirmDelete}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Permanently</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleMarkAsCancelled}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              >
+                <X className="w-4 h-4" />
+                <span>Mark as Cancelled</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setIsDeleteModalOpen(false)}
+              className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer"
+            >
+              Keep Order (Go Back)
+            </button>
           </div>
         </div>
       )}

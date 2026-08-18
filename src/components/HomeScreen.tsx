@@ -1,6 +1,7 @@
 import React from 'react';
 import { ScreenType, Order, PlantItem } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
+import { formatOrderScheduledTime } from '../utils/dateUtils';
 import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode } from 'lucide-react';
 
 interface HomeScreenProps {
@@ -85,7 +86,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
                       <span className="text-xs text-[#414844] font-medium shrink-0">{order.itemsCount} items</span>
                     </div>
                     <div className="flex items-center gap-2 mt-1 text-xs text-[#414844] flex-wrap">
-                      <span>{order.type}: {order.scheduledTime || 'Scheduled'}</span>
+                      <span>{order.type}: <strong>{formatOrderScheduledTime(order)}</strong></span>
                       {order.holdingLocation && (
                         <>
                           <span className="text-[#c1c8c2]">•</span>

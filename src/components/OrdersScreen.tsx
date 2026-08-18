@@ -1,22 +1,28 @@
 import React, { useState } from 'react';
 import { ScreenType, Order } from '../types';
-import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Tag } from 'lucide-react';
+import { formatOrderCreatedDate, formatOrderScheduledTime } from '../utils/dateUtils';
+import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Tag, Trash2, X, AlertTriangle, CheckCircle } from 'lucide-react';
 
 interface OrdersScreenProps {
   onNavigate: (screen: ScreenType) => void;
   orders: Order[];
   onSelectOrder: (order: Order) => void;
   onCreateNewOrderClick: () => void;
+  onDeleteOrder?: (orderId: string) => void;
+  onUpdateOrder?: (updatedOrder: Order) => void;
 }
 
 export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   onNavigate,
   orders,
   onSelectOrder,
-  onCreateNewOrderClick
+  onCreateNewOrderClick,
+  onDeleteOrder,
+  onUpdateOrder
 }) => {
-  const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Ready' | 'Partial Pickup' | 'Completed'>('All');
+  const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Ready' | 'Partial Pickup' | 'Completed' | 'Cancelled'>('All');
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
 
   const filteredOrders = orders.filter(o => {
     const isPartial = o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0);
@@ -26,7 +32,8 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       activeTab === 'Pending' ? o.status === 'Pending' :
       activeTab === 'Ready' ? (o.status === 'Ready for Pickup' || (o.status === 'Partial Pickup' && !isPartial)) :
       activeTab === 'Partial Pickup' ? isPartial :
-      o.status === 'Completed';
+      activeTab === 'Completed' ? o.status === 'Completed' :
+      o.status === 'Cancelled';
 
     const matchesSearch = 
       o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -44,7 +51,25 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
     }
   };
 
+  const handleConfirmDelete = (orderId: string) => {
+    if (onDeleteOrder) {
+      onDeleteOrder(orderId);
+    }
+    setOrderToDelete(null);
+  };
+
+  const handleMarkAsCancelled = (order: Order) => {
+    if (onUpdateOrder) {
+      onUpdateOrder({
+        ...order,
+        status: 'Cancelled'
+      });
+    }
+    setOrderToDelete(null);
+  };
+
   const partialOrdersCount = orders.filter(o => o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0)).length;
+  const cancelledOrdersCount = orders.filter(o => o.status === 'Cancelled').length;
 
   return (
     <div className="flex-1 px-4 py-6 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-5">
@@ -76,7 +101,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
       {/* Tabs */}
       <div className="flex border-b border-[#c1c8c2] gap-2 overflow-x-auto text-xs font-bold">
-        {(['All', 'Pending', 'Ready', 'Partial Pickup', 'Completed'] as const).map((tab) => (
+        {(['All', 'Pending', 'Ready', 'Partial Pickup', 'Completed', 'Cancelled'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
@@ -86,7 +111,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                 : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
             }`}
           >
-            {tab} {tab === 'All' ? `(${orders.length})` : tab === 'Partial Pickup' && partialOrdersCount > 0 ? `(${partialOrdersCount})` : ''}
+            {tab} {tab === 'All' ? `(${orders.length})` : tab === 'Partial Pickup' && partialOrdersCount > 0 ? `(${partialOrdersCount})` : tab === 'Cancelled' && cancelledOrdersCount > 0 ? `(${cancelledOrdersCount})` : ''}
           </button>
         ))}
       </div>
@@ -113,6 +138,8 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                 className={`bg-white rounded-2xl p-4 sm:p-5 border shadow-2xs hover:shadow-md transition-all flex flex-col gap-3 cursor-pointer group ${
                   isPartial 
                     ? 'border-amber-300 hover:border-amber-500 bg-amber-50/20' 
+                    : order.status === 'Cancelled'
+                    ? 'border-red-200 bg-red-50/20 opacity-80'
                     : 'border-[#c1c8c2] hover:border-[#012d1d]'
                 }`}
               >
@@ -135,15 +162,25 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                             ? 'bg-[#facc15]/30 text-[#461702]'
                             : order.status === 'Completed'
                             ? 'bg-[#e2e3df] text-[#414844]'
+                            : order.status === 'Cancelled'
+                            ? 'bg-red-100 text-red-800 border border-red-300'
                             : 'bg-[#f3f4f0] text-[#717973]'
                         }`}>
                           {order.status}
                         </span>
                       )}
                     </div>
-                    <span className="block text-xs text-[#717973] mt-0.5">
-                      Created: {order.date || 'Today'} • Scheduled: {order.scheduledTime || 'Scheduled'}
-                    </span>
+                    <div className="flex items-center gap-2 text-xs text-[#525a55] mt-1 flex-wrap font-medium">
+                      <span className="inline-flex items-center gap-1 bg-[#f3f4f0] px-2 py-0.5 rounded-md text-[#313733]">
+                        <Calendar className="w-3 h-3 text-[#0e6c4a]" />
+                        <span>Created: <strong>{formatOrderCreatedDate(order)}</strong></span>
+                      </span>
+                      <span className="text-[#c1c8c2]">•</span>
+                      <span className="inline-flex items-center gap-1 bg-[#f3f4f0] px-2 py-0.5 rounded-md text-[#313733]">
+                        <Clock className="w-3 h-3 text-[#461702]" />
+                        <span>Scheduled: <strong>{formatOrderScheduledTime(order)}</strong></span>
+                      </span>
+                    </div>
                   </div>
 
                   <div className="text-right shrink-0">
@@ -203,13 +240,26 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                 )}
 
                 {/* Card Footer Actions */}
-                <div className="flex justify-between items-center text-xs text-[#414844] pt-2 border-t border-[#f3f4f0]">
+                <div className="flex flex-wrap justify-between items-center text-xs text-[#414844] pt-2 border-t border-[#f3f4f0] gap-2">
                   <div className="flex items-center gap-1.5">
                     {getFulfillmentIcon(order.type)}
                     <span className="font-semibold">{order.type}</span>
                   </div>
 
                   <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setOrderToDelete(order);
+                      }}
+                      className="p-1.5 px-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
+                      title="Cancel or Delete this order"
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      <span>Cancel / Delete</span>
+                    </button>
+
                     <button
                       type="button"
                       onClick={(e) => {
@@ -243,6 +293,74 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           })
         )}
       </div>
+
+      {/* Delete / Cancel Order Confirmation Modal */}
+      {orderToDelete && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setOrderToDelete(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-red-100 text-red-700 rounded-xl shrink-0">
+                <AlertTriangle className="w-6 h-6" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-extrabold text-base text-[#1a1c1a]">Cancel or Delete Order?</h3>
+                <p className="text-xs text-[#717973] mt-0.5">
+                  Order <span className="font-bold text-[#012d1d]">#{orderToDelete.id}</span> • {orderToDelete.customerName} (${orderToDelete.total.toFixed(2)})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrderToDelete(null)}
+                className="p-1 text-[#717973] hover:text-[#1a1c1a] rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-[#f3f4f0] p-3 rounded-xl border border-[#e2e3df] text-xs text-[#414844] space-y-1">
+              <p className="font-bold text-[#1a1c1a]">Choose an action:</p>
+              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-[#717973]">
+                <li><strong className="text-red-700">Delete Permanently:</strong> Completely removes this order from the system and database.</li>
+                <li><strong className="text-amber-800">Mark as Cancelled:</strong> Keeps the record in system history with a "Cancelled" status for bookkeeping.</li>
+              </ul>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[#e2e3df]">
+              <button
+                type="button"
+                onClick={() => handleConfirmDelete(orderToDelete.id)}
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              >
+                <Trash2 className="w-4 h-4" />
+                <span>Delete Permanently</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => handleMarkAsCancelled(orderToDelete)}
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              >
+                <X className="w-4 h-4" />
+                <span>Mark as Cancelled</span>
+              </button>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOrderToDelete(null)}
+              className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer"
+            >
+              Keep Order (Go Back)
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

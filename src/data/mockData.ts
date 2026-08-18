@@ -341,8 +341,10 @@ export const INITIAL_ORDERS: Order[] = [
     total: 87.50,
     type: 'Pickup',
     scheduledTime: '2:00 PM',
+    scheduledDate: '2026-08-18',
     status: 'Pending',
-    date: 'Today',
+    date: 'Aug 18, 2026',
+    createdAt: '2026-08-18T08:30:00.000Z',
     holdingLocation: 'Greenhouse B, Aisle 4, Bay 12',
     items: [
       {
@@ -362,8 +364,10 @@ export const INITIAL_ORDERS: Order[] = [
     total: 245.00,
     type: 'Delivery',
     scheduledTime: '4:30 PM',
+    scheduledDate: '2026-08-18',
     status: 'Pending',
-    date: 'Today',
+    date: 'Aug 17, 2026',
+    createdAt: '2026-08-17T14:15:00.000Z',
     holdingLocation: 'Holding Area C - Staging Freight',
     items: [
       { plant: INITIAL_PLANTS[2], quantity: 2 },
@@ -376,9 +380,11 @@ export const INITIAL_ORDERS: Order[] = [
     itemsCount: 14,
     total: 1450.00,
     type: 'Take Now',
-    scheduledTime: '10/27/2023',
+    scheduledTime: '10:00 AM',
+    scheduledDate: '2023-10-27',
     status: 'Ready for Pickup',
     date: 'Oct 24, 2023',
+    createdAt: '2023-10-24T09:00:00.000Z',
     holdingLocation: 'Greenhouse B, Aisle 4, Bay 12',
     items: [
       { plant: INITIAL_PLANTS[0], quantity: 3 },

@@ -113,6 +113,28 @@ export const INITIAL_PLANTS: PlantItem[] = [
     storeLocId: '101'
   },
   {
+    id: 'p10007-neg',
+    itemNo: '10007-NEG',
+    name: 'Kickin® Carmine Red Aster',
+    commonName: 'Kickin® Carmine Red Aster',
+    botanicalName: 'Aster n. Kickin® Carmine Red',
+    size: '2 GAL',
+    lightRequirement: 'FULL SUN',
+    price: 26.00,
+    prices: {
+      retail: 26.00,
+      wholesale: 20.00
+    },
+    image: DEFAULT_PLANT_IMAGE,
+    stock: -3,
+    quantityCommitted: 3,
+    status: 'critical',
+    barcode: '41688-NEG',
+    category: 'PERN_RE-W/',
+    statusActive: true,
+    storeLocId: '101'
+  },
+  {
     id: 'p10008',
     itemNo: '10008',
     name: 'Black-Eyed Susan',

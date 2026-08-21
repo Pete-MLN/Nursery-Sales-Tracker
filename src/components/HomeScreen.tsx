@@ -2,7 +2,9 @@ import React from 'react';
 import { ScreenType, Order, PlantItem } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { formatOrderScheduledTime } from '../utils/dateUtils';
-import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode } from 'lucide-react';
+import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode, Package, ClipboardList } from 'lucide-react';
+import { DraftRecoveryBanner } from './DraftRecoveryBanner';
+import { OrderDraft } from '../services/orderAutoSaveService';
 
 interface HomeScreenProps {
   userName: string;
@@ -10,6 +12,7 @@ interface HomeScreenProps {
   orders: Order[];
   inventory: PlantItem[];
   onSelectOrder?: (order: Order) => void;
+  onResumeDraft?: (draft: OrderDraft) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -17,12 +20,24 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   onNavigate,
   orders,
   inventory,
-  onSelectOrder
+  onSelectOrder,
+  onResumeDraft
 }) => {
   const pendingOrders = orders.filter(o => o.status === 'Pending' || o.status === 'Ready for Pickup');
 
   return (
     <div className="flex-1 px-4 py-6 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-6">
+      {/* Draft Recovery Banner if uncommitted draft exists */}
+      <DraftRecoveryBanner 
+        onResumeDraft={(draft) => {
+          if (onResumeDraft) {
+            onResumeDraft(draft);
+          } else {
+            onNavigate('scan');
+          }
+        }}
+      />
+
       {/* Welcome & Primary CTA */}
       <section className="flex flex-col gap-4">
         <div>
@@ -58,50 +73,62 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
             </span>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-            {pendingOrders.slice(0, 4).map((order) => {
-              const thumbImage = order.items?.[0]?.plant.image || DEFAULT_PLANT_IMAGE;
+          {pendingOrders.length === 0 ? (
+            <div className="bg-white rounded-xl p-6 border border-[#c1c8c2]/50 text-center flex flex-col items-center justify-center gap-2">
+              <div className="w-11 h-11 rounded-full bg-[#f3f4f0] flex items-center justify-center text-[#012d1d]">
+                <Package className="w-5 h-5 text-[#717973]" />
+              </div>
+              <h3 className="text-sm sm:text-base font-bold text-[#012d1d]">No Active Orders Pending</h3>
+              <p className="text-xs text-[#525a55] max-w-sm">
+                No orders are currently waiting in staging. Tap <strong>New Order</strong> above to create or scan a new customer order.
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {pendingOrders.slice(0, 4).map((order) => {
+                const thumbImage = order.items?.[0]?.plant.image || DEFAULT_PLANT_IMAGE;
 
-              return (
-                <div
-                  key={order.id}
-                  onClick={() => {
-                    if (onSelectOrder) onSelectOrder(order);
-                    onNavigate('finalization');
-                  }}
-                  className="flex gap-3 items-center bg-white p-3 rounded-xl border border-[#c1c8c2]/40 hover:border-[#012d1d] cursor-pointer transition-all shadow-2xs group"
-                >
-                  <img
-                    src={thumbImage}
-                    alt={order.id}
-                    className="w-14 h-14 rounded-lg object-cover shrink-0"
-                    referrerPolicy="no-referrer"
-                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                  />
-                  <div className="flex-grow min-w-0">
-                    <div className="flex justify-between items-baseline gap-2">
-                      <span className="font-semibold text-base text-[#012d1d] group-hover:underline truncate">
-                        {order.customerName ? `${order.customerName} - ${order.id}` : order.id}
-                      </span>
-                      <span className="text-xs text-[#414844] font-medium shrink-0">{order.itemsCount} items</span>
+                return (
+                  <div
+                    key={order.id}
+                    onClick={() => {
+                      if (onSelectOrder) onSelectOrder(order);
+                      onNavigate('finalization');
+                    }}
+                    className="flex gap-3 items-center bg-white p-3 rounded-xl border border-[#c1c8c2]/40 hover:border-[#012d1d] cursor-pointer transition-all shadow-2xs group"
+                  >
+                    <img
+                      src={thumbImage}
+                      alt={order.id}
+                      className="w-14 h-14 rounded-lg object-cover shrink-0"
+                      referrerPolicy="no-referrer"
+                      onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                    />
+                    <div className="flex-grow min-w-0">
+                      <div className="flex justify-between items-baseline gap-2">
+                        <span className="font-semibold text-base text-[#012d1d] group-hover:underline truncate">
+                          {order.customerName ? `${order.customerName} - ${order.id}` : order.id}
+                        </span>
+                        <span className="text-xs text-[#414844] font-medium shrink-0">{order.itemsCount} items</span>
+                      </div>
+                      <div className="flex items-center gap-2 mt-1 text-xs text-[#414844] flex-wrap">
+                        <span>{order.type}: <strong>{formatOrderScheduledTime(order)}</strong></span>
+                        {order.holdingLocation && (
+                          <>
+                            <span className="text-[#c1c8c2]">•</span>
+                            <span className="text-[#012d1d] font-bold truncate max-w-[140px]">
+                              {order.holdingLocation}
+                            </span>
+                          </>
+                        )}
+                      </div>
                     </div>
-                    <div className="flex items-center gap-2 mt-1 text-xs text-[#414844] flex-wrap">
-                      <span>{order.type}: <strong>{formatOrderScheduledTime(order)}</strong></span>
-                      {order.holdingLocation && (
-                        <>
-                          <span className="text-[#c1c8c2]">•</span>
-                          <span className="text-[#012d1d] font-bold truncate max-w-[140px]">
-                            {order.holdingLocation}
-                          </span>
-                        </>
-                      )}
-                    </div>
+                    <ChevronRight className="w-5 h-5 text-[#717973] group-hover:text-[#012d1d] transition-colors" />
                   </div>
-                  <ChevronRight className="w-5 h-5 text-[#717973] group-hover:text-[#012d1d] transition-colors" />
-                </div>
-              );
-            })}
-          </div>
+                );
+              })}
+            </div>
+          )}
 
           <button
             onClick={() => onNavigate('orders')}

@@ -47,6 +47,14 @@ import {
 import { PricingDropdown } from './PricingDropdown';
 import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
 import { formatOrderCreatedDate, formatOrderScheduledTime, extractDateForInput, getTodayDateInputValue, formatRawDateString } from '../utils/dateUtils';
+import { AutoSaveBadge } from './AutoSaveBadge';
+import { 
+  autoSaveDraft, 
+  clearActiveDraft, 
+  initAutoSaveLifecycleListeners, 
+  OrderDraft, 
+  getDraftForOrderId 
+} from '../services/orderAutoSaveService';
 
 interface OrderFinalizationScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -71,6 +79,9 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   onDeleteOrder,
   onSendNotification
 }) => {
+  // Check if uncommitted edit draft exists for this order
+  const savedEditDraft = order?.id ? getDraftForOrderId(order.id) : null;
+
   // Primary Order State (Editable in-memory until saved)
   const [currentOrder, setCurrentOrder] = useState<Order>(() => {
     if (order) return { ...order, items: order.items ? [...order.items] : [] };
@@ -144,7 +155,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [isChangingLocationModalOpen, setIsChangingLocationModalOpen] = useState<boolean>(false);
   const [isHoldSlipModalOpen, setIsHoldSlipModalOpen] = useState<boolean>(false);
   const [isEmailStaffModalOpen, setIsEmailStaffModalOpen] = useState<boolean>(false);
-  const [staffEmailAddress, setStaffEmailAddress] = useState<string>('yard@maplelanenursery.com');
+  const [staffEmailAddress, setStaffEmailAddress] = useState<string>('pete@maplelanenursery.com');
 
   // Customer & Office Communication Modals
   const [isEmailReceiptModalOpen, setIsEmailReceiptModalOpen] = useState<boolean>(false);
@@ -154,14 +165,16 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   // Office Email State with default persistence
   const [isEmailOfficeModalOpen, setIsEmailOfficeModalOpen] = useState<boolean>(false);
   const [officeEmailAddress, setOfficeEmailAddress] = useState<string>(() => {
-    return localStorage.getItem('nursery_default_office_email') || 'office@maplelanenursery.com';
+    return localStorage.getItem('nursery_default_office_email') || 'pete@maplelanenursery.com';
   });
   const [selectedOfficeEmployeeId, setSelectedOfficeEmployeeId] = useState<string>('');
   const [isDefaultOfficeSaved, setIsDefaultOfficeSaved] = useState<boolean>(false);
 
   // Text Crew / SMS State
   const [isTextCrewModalOpen, setIsTextCrewModalOpen] = useState<boolean>(false);
-  const [crewPhoneNumber, setCrewPhoneNumber] = useState<string>('');
+  const [crewPhoneNumber, setCrewPhoneNumber] = useState<string>(() => {
+    return localStorage.getItem('nursery_default_crew_phone') || '518.223.1235';
+  });
   const [selectedCrewEmployeeId, setSelectedCrewEmployeeId] = useState<string>('');
 
   const [plantSearchQuery, setPlantSearchQuery] = useState<string>('');
@@ -235,6 +248,53 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     setPartialPickupNotes(currentOrder.partialPickupNotes || '');
     setHasUnsavedChanges(false);
   }, [currentOrder.id, customers]);
+
+  // LIVE AUTO-SAVE: Every edit made in finalization (status, items, staging bay, date, customer name, notes) is auto-saved to disk and synced
+  useEffect(() => {
+    const hasData = items.length > 0 || customerName.trim().length > 0 || orderNotes.trim().length > 0;
+    if (hasData || currentOrder.id) {
+      const draft: OrderDraft = {
+        orderId: currentOrder.id,
+        isEditingExisting: true,
+        customerName: customerName.trim() || currentOrder.customerName || 'Retail Walk-in',
+        cartItems: items,
+        fulfillmentType: fulfillment,
+        scheduledDate: scheduledDate,
+        scheduledTime: scheduledTime,
+        holdingLocation: holdingLocation,
+        notes: orderNotes,
+        orderStatus: orderStatus,
+        remainingPickupDate: remainingPickupDate,
+        partialPickupNotes: partialPickupNotes,
+        lastSavedAt: new Date().toISOString()
+      };
+      autoSaveDraft(draft);
+    }
+  }, [customerName, fulfillment, scheduledDate, scheduledTime, orderStatus, holdingLocation, orderNotes, items, remainingPickupDate, partialPickupNotes, currentOrder.id]);
+
+  // Emergency lifecycle listeners: flush changes before tab closes or page is hidden
+  useEffect(() => {
+    const cleanup = initAutoSaveLifecycleListeners(() => {
+      const hasData = items.length > 0 || customerName.trim().length > 0 || orderNotes.trim().length > 0;
+      if (!hasData && !currentOrder.id) return null;
+      return {
+        orderId: currentOrder.id,
+        isEditingExisting: true,
+        customerName: customerName.trim() || currentOrder.customerName || 'Retail Walk-in',
+        cartItems: items,
+        fulfillmentType: fulfillment,
+        scheduledDate: scheduledDate,
+        scheduledTime: scheduledTime,
+        holdingLocation: holdingLocation,
+        notes: orderNotes,
+        orderStatus: orderStatus,
+        remainingPickupDate: remainingPickupDate,
+        partialPickupNotes: partialPickupNotes,
+        lastSavedAt: new Date().toISOString()
+      };
+    });
+    return cleanup;
+  }, [customerName, fulfillment, scheduledDate, scheduledTime, orderStatus, holdingLocation, orderNotes, items, remainingPickupDate, partialPickupNotes, currentOrder.id]);
 
   // Computed Totals
   const calculatedTotal = items.reduce((sum, item) => sum + (getItemEffectiveUnitPrice(item) * item.quantity), 0);
@@ -452,8 +512,10 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     if (onUpdateOrder) {
       onUpdateOrder(updated);
     }
+    clearActiveDraft(updated.id);
     setHasUnsavedChanges(false);
     showToast(`Order ${updated.id} saved & synced to cloud!`);
+    onNavigate('home');
   };
 
   // Delete / Cancel entire order handlers
@@ -462,6 +524,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   };
 
   const handleConfirmDelete = () => {
+    clearActiveDraft(currentOrder.id);
     if (onDeleteOrder) {
       onDeleteOrder(currentOrder.id);
     }
@@ -471,6 +534,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   };
 
   const handleMarkAsCancelled = () => {
+    clearActiveDraft(currentOrder.id);
     const updated: Order = {
       ...currentOrder,
       customerName: customerName.trim() || 'Retail Customer',
@@ -601,21 +665,55 @@ For questions, contact us at (555) 345-6789 or office@maplelanenursery.com.`;
     setTimeout(() => setIsDefaultOfficeSaved(false), 3500);
   };
 
+  const handleSaveDefaultCrewPhone = (phoneToSave: string) => {
+    if (!phoneToSave || !phoneToSave.trim()) return;
+    localStorage.setItem('nursery_default_crew_phone', phoneToSave.trim());
+    showToast(`Saved "${phoneToSave.trim()}" as default Crew phone!`);
+  };
+
   // Helper to clean phone numbers for SMS dialing links
   const cleanPhoneForDialer = (phoneStr: string) => {
     if (!phoneStr) return '';
     return phoneStr.replace(/[^\d+]/g, '');
   };
 
+  // Universal cross-platform opener for mailto: and sms: protocol URLs
+  const openExternalProtocol = (url: string) => {
+    try {
+      const link = document.createElement('a');
+      link.href = url;
+      link.style.display = 'none';
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (document.body.contains(link)) {
+          document.body.removeChild(link);
+        }
+      }, 800);
+    } catch {
+      window.location.href = url;
+    }
+  };
+
+  // Generate standard cross-platform SMS URL (iOS Safari, Android Chrome, macOS Messages)
+  const getSmsUrl = (phoneStr: string, bodyText: string) => {
+    const rawDigits = cleanPhoneForDialer(phoneStr) || '5182231235';
+    const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1));
+    const separator = isIOS ? '&' : '?';
+    return `sms:${rawDigits}${separator}body=${encodeURIComponent(bodyText)}`;
+  };
+
   // Trigger Email Receipt using default phone/desktop mail app
   const handleEmailReceipt = (targetEmail?: string) => {
-    const emailToUse = targetEmail !== undefined ? targetEmail : (customerEmailAddress || '');
+    const emailToUse = targetEmail !== undefined ? targetEmail : (customerEmailAddress || (matchedCustomer?.email || ''));
     const { subject, body } = getReceiptEmailContent();
-    const mailtoUrl = `mailto:${encodeURIComponent(emailToUse)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    const mailtoUrl = emailToUse
+      ? `mailto:${encodeURIComponent(emailToUse)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`
+      : `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
-    // Open default mail app
-    window.location.href = mailtoUrl;
-    showToast(emailToUse ? `Email opened for ${emailToUse}` : `Receipt email opened in mail app`);
+    // Open default mail app with receipt & prefilled customer recipient
+    openExternalProtocol(mailtoUrl);
+    showToast(emailToUse ? `Opening Email app for ${emailToUse}...` : `Opening Email app with customer receipt...`);
     setIsEmailReceiptModalOpen(true);
   };
 
@@ -665,13 +763,13 @@ Timestamp: ${new Date().toLocaleString()}`;
 
   // Trigger Email Office using default phone/desktop mail app
   const handleEmailOffice = (targetEmail?: string) => {
-    const emailToUse = targetEmail !== undefined ? targetEmail : (officeEmailAddress || 'office@maplelanenursery.com');
+    const emailToUse = targetEmail !== undefined ? targetEmail : (officeEmailAddress || 'pete@maplelanenursery.com');
     const { subject, body } = getOfficeEmailContent();
     const mailtoUrl = `mailto:${encodeURIComponent(emailToUse)}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
     
-    // Open default mail app
-    window.location.href = mailtoUrl;
-    showToast(`Office dispatch email opened (${emailToUse})`);
+    // Open default mail app with prefilled pete@maplelanenursery.com recipient
+    openExternalProtocol(mailtoUrl);
+    showToast(`Opening Email app for office (${emailToUse})...`);
     setIsEmailOfficeModalOpen(true);
   };
 
@@ -697,17 +795,13 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
   // Trigger Text Crew using default phone SMS/Messaging app
   const handleTextCrew = (targetPhone?: string) => {
+    const phoneToUse = targetPhone !== undefined ? targetPhone : (crewPhoneNumber || '518.223.1235');
     const text = getCrewSmsContent();
-    const rawPhone = targetPhone !== undefined ? targetPhone : (crewPhoneNumber || '');
-    const cleanPhone = cleanPhoneForDialer(rawPhone);
-    // SMS URL scheme supported across iOS Safari & Android Chrome
-    const smsUrl = cleanPhone
-      ? `sms:${encodeURIComponent(cleanPhone)}?&body=${encodeURIComponent(text)}`
-      : `sms:?&body=${encodeURIComponent(text)}`;
+    const smsUrl = getSmsUrl(phoneToUse, text);
     
-    // Open default SMS app
-    window.location.href = smsUrl;
-    showToast(rawPhone ? `Opening SMS app for ${rawPhone}...` : 'Opening SMS app for staging crew...');
+    // Open default SMS app with prefilled 518.223.1235 recipient
+    openExternalProtocol(smsUrl);
+    showToast(`Opening Text/SMS app for ${phoneToUse}...`);
     setIsTextCrewModalOpen(true);
   };
 
@@ -749,6 +843,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
         </button>
 
         <div className="flex items-center gap-2">
+          <AutoSaveBadge />
           {hasUnsavedChanges && (
             <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse hidden sm:inline">
               Unsaved Edits
@@ -1051,15 +1146,16 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           {/* Email Customer Receipt Button */}
           <button
             type="button"
+            id="btn-quick-email-receipt"
             onClick={() => handleEmailReceipt()}
             className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white font-bold py-3 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-[#a0f4c8]/20"
-            title="Send order receipt to customer via mail app"
+            title="Open default email app with complete order receipt prefilled"
           >
             <Mail className="w-4 h-4 text-[#a0f4c8]" />
             <div className="flex flex-col items-start text-left leading-tight">
               <span className="font-extrabold">Email Receipt</span>
               <span className="text-[10px] text-white/80 font-normal truncate max-w-[130px]">
-                {customerEmailAddress || (matchedCustomer?.email || 'Customer')}
+                {customerEmailAddress || (matchedCustomer?.email || 'Customer Receipt')}
               </span>
             </div>
           </button>
@@ -1067,15 +1163,16 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           {/* Email Office Button */}
           <button
             type="button"
+            id="btn-quick-email-office"
             onClick={() => handleEmailOffice()}
             className="bg-[#461702] hover:bg-[#622c13] text-white font-bold py-3 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-amber-500/20"
-            title="Send order record to office / staff"
+            title="Open default email app with complete order log prefilled to pete@maplelanenursery.com"
           >
             <Building className="w-4 h-4 text-amber-200" />
             <div className="flex flex-col items-start text-left leading-tight">
               <span className="font-extrabold">Email Office</span>
               <span className="text-[10px] text-amber-100 font-normal truncate max-w-[130px]">
-                {officeEmailAddress}
+                {officeEmailAddress || 'pete@maplelanenursery.com'}
               </span>
             </div>
           </button>
@@ -1083,15 +1180,16 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           {/* Text Crew / SMS Button */}
           <button
             type="button"
+            id="btn-quick-text-crew"
             onClick={() => handleTextCrew()}
             className="bg-[#0e6c4a] hover:bg-[#012d1d] text-white font-bold py-3 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-[#a0f4c8]/20"
-            title="Send SMS message to yard staff or employee"
+            title="Open default SMS app with complete staging order prefilled to 518.223.1235"
           >
             <MessageSquare className="w-4 h-4 text-[#a0f4c8]" />
             <div className="flex flex-col items-start text-left leading-tight">
               <span className="font-extrabold">Text Crew (SMS)</span>
               <span className="text-[10px] text-emerald-100 font-normal truncate max-w-[130px]">
-                {crewPhoneNumber || 'Select Employee'}
+                {crewPhoneNumber || '518.223.1235'}
               </span>
             </div>
           </button>
@@ -1689,32 +1787,50 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
           <button
             type="button"
+            id="btn-bottom-email-receipt"
             onClick={() => handleEmailReceipt()}
-            className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98"
-            title="Open default email app to send receipt to customer"
+            className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-[#a0f4c8]/20"
+            title="Open default email app with complete customer receipt prefilled"
           >
-            <Mail className="w-4 h-4" />
-            <span>Email Receipt</span>
+            <Mail className="w-4 h-4 text-[#a0f4c8]" />
+            <div className="flex flex-col items-start text-left leading-tight">
+              <span className="font-extrabold">Email Receipt</span>
+              <span className="text-[10px] text-white/80 font-normal truncate max-w-[130px]">
+                {customerEmailAddress || (matchedCustomer?.email || 'Customer Receipt')}
+              </span>
+            </div>
           </button>
 
           <button
             type="button"
+            id="btn-bottom-email-office"
             onClick={() => handleEmailOffice()}
-            className="w-full bg-[#461702] hover:bg-[#622c13] text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98"
-            title="Open default email app to dispatch order record to office"
+            className="w-full bg-[#461702] hover:bg-[#622c13] text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-amber-500/20"
+            title="Open default email app with complete order log prefilled to pete@maplelanenursery.com"
           >
-            <Building className="w-4 h-4" />
-            <span>Email Office</span>
+            <Building className="w-4 h-4 text-amber-200" />
+            <div className="flex flex-col items-start text-left leading-tight">
+              <span className="font-extrabold">Email Office</span>
+              <span className="text-[10px] text-amber-100 font-normal truncate max-w-[130px]">
+                {officeEmailAddress || 'pete@maplelanenursery.com'}
+              </span>
+            </div>
           </button>
 
           <button
             type="button"
+            id="btn-bottom-text-crew"
             onClick={() => handleTextCrew()}
-            className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] font-bold py-3 px-3 rounded-xl transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98"
-            title="Open default SMS / text messaging app to notify yard crew"
+            className="w-full bg-[#0e6c4a] hover:bg-[#012d1d] text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-[#a0f4c8]/20"
+            title="Open default SMS app with complete staging order prefilled to 518.223.1235"
           >
-            <MessageSquare className="w-4 h-4" />
-            <span>Text Crew</span>
+            <MessageSquare className="w-4 h-4 text-[#a0f4c8]" />
+            <div className="flex flex-col items-start text-left leading-tight">
+              <span className="font-extrabold">Text Crew (SMS)</span>
+              <span className="text-[10px] text-emerald-100 font-normal truncate max-w-[130px]">
+                {crewPhoneNumber || '518.223.1235'}
+              </span>
+            </div>
           </button>
         </div>
       </div>
@@ -1752,6 +1868,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <AutoSaveBadge compact />
             <button
               type="button"
               onClick={handleDeleteOrder}
@@ -1864,8 +1981,17 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                             <Package className="w-2.5 h-2.5 text-amber-300" />
                             SIZE: {plant.size || 'Standard'}
                           </span>
-                          <span className="text-xs text-[#717973] ml-1">
-                            Avail: <strong className="text-[#012d1d]">{plant.stock}</strong>
+                          <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                            plant.stock < 0
+                              ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                              : plant.stock === 0
+                              ? 'bg-red-100 text-red-700 border border-red-200'
+                              : plant.stock < 5
+                              ? 'bg-amber-100 text-amber-800'
+                              : 'bg-[#f3f4f0] text-[#414844]'
+                          }`}>
+                            Avail: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
+                            {plant.stock < 0 ? <span className="text-[10px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[10px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
                           </span>
                           <span className="text-xs font-bold text-[#012d1d] ml-1">
                             ${plant.price.toFixed(2)}
@@ -2482,13 +2608,24 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 type="email"
                 value={officeEmailAddress}
                 onChange={(e) => setOfficeEmailAddress(e.target.value)}
-                placeholder="office@maplelanenursery.com"
+                placeholder="pete@maplelanenursery.com"
                 className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#461702] focus:bg-white"
               />
               
               {/* Quick Employee Chips */}
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-[11px] font-semibold text-[#717973]">Quick Select:</span>
+                <button
+                  type="button"
+                  onClick={() => setOfficeEmailAddress('pete@maplelanenursery.com')}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                    officeEmailAddress === 'pete@maplelanenursery.com'
+                      ? 'bg-[#461702] text-white border-[#461702]'
+                      : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
+                  }`}
+                >
+                  Pete (Manager)
+                </button>
                 <button
                   type="button"
                   onClick={() => setOfficeEmailAddress('office@maplelanenursery.com')}
@@ -2624,7 +2761,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 }}
                 className="w-full bg-white border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
               >
-                <option value="">-- Choose Employee / Team --</option>
+                <option value="518.223.1235">Default Crew: 518.223.1235</option>
                 {employees.length > 0 && (
                   <optgroup label="Nursery Employees & Crew">
                     {employees.map(emp => (
@@ -2649,19 +2786,43 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
             {/* Phone Number Input & Employee Chips */}
             <div className="flex flex-col gap-2">
-              <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
-                Crew Phone Number (Optional)
-              </label>
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
+                  Crew Phone Number
+                </label>
+                <button
+                  type="button"
+                  onClick={() => handleSaveDefaultCrewPhone(crewPhoneNumber)}
+                  className="text-[11px] text-[#0e6c4a] hover:underline font-bold cursor-pointer"
+                  title="Save this phone number as the default for SMS crew notifications"
+                >
+                  Save as Default
+                </button>
+              </div>
               <input
                 type="tel"
                 value={crewPhoneNumber}
                 onChange={(e) => setCrewPhoneNumber(e.target.value)}
-                placeholder="e.g. 555-234-5678 (or leave blank to pick contact in SMS app)"
+                placeholder="518.223.1235 (or leave blank to pick contact in SMS app)"
                 className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
               />
               
               <div className="flex items-center gap-1.5 flex-wrap pt-0.5">
                 <span className="text-[11px] font-semibold text-[#717973]">Quick Select:</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCrewPhoneNumber('518.223.1235');
+                    setSelectedCrewEmployeeId('');
+                  }}
+                  className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                    crewPhoneNumber === '518.223.1235'
+                      ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
+                      : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
+                  }`}
+                >
+                  518.223.1235 (Default)
+                </button>
                 {employees.map((emp) => (
                   <button
                     key={emp.id}
@@ -2711,12 +2872,10 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                   type="button"
                   onClick={() => {
                     const text = getCrewSmsContent();
-                    const cleanPhone = cleanPhoneForDialer(crewPhoneNumber);
-                    const smsUrl = cleanPhone
-                      ? `sms:${encodeURIComponent(cleanPhone)}?&body=${encodeURIComponent(text)}`
-                      : `sms:?&body=${encodeURIComponent(text)}`;
-                    window.location.href = smsUrl;
-                    showToast(crewPhoneNumber ? `Opening SMS for ${crewPhoneNumber}...` : 'Opening Messages app...');
+                    const phoneToUse = crewPhoneNumber || '518.223.1235';
+                    const smsUrl = getSmsUrl(phoneToUse, text);
+                    openExternalProtocol(smsUrl);
+                    showToast(`Opening SMS app for ${phoneToUse}...`);
                   }}
                   className="w-full sm:w-auto px-4 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-sm"
                 >

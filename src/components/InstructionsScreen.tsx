@@ -574,7 +574,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                   <span>Click "Email to Staff"</span>
                 </div>
                 <p className="text-[#414844]">
-                  Tap <strong>"Email to Staff"</strong> to generate the formatted hold email for <code>yard@maplelanenursery.com</code>.
+                  Tap <strong>"Email to Staff"</strong> to generate the formatted hold email for <code>pete@maplelanenursery.com</code>.
                 </p>
               </div>
             </div>
@@ -738,7 +738,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
                   <span>Email Office</span>
                 </div>
                 <p className="text-[#414844] text-[11px]">
-                  Dispatches internal order log and staging bay assignment directly to <code>office@maplelanenursery.com</code> for accounting records.
+                  Dispatches internal order log and staging bay assignment directly to <code>pete@maplelanenursery.com</code> for accounting records.
                 </p>
               </div>
 
@@ -748,7 +748,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
                   <span>Text Crew (SMS)</span>
                 </div>
                 <p className="text-[#414844] text-[11px]">
-                  Opens your device's Messages / SMS app with order staging details pre-filled so you can quickly text the yard crew or loading dock lead.
+                  Opens your device's Messages / SMS app addressed directly to <code>518.223.1235</code> with order staging details and plants to load pre-filled.
                 </p>
               </div>
             </div>

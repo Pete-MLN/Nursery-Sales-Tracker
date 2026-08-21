@@ -84,17 +84,6 @@ export async function seedInitialFirestoreData() {
       console.log('Firestore: Employees initialized');
     }
 
-    const ordersSnap = await getDocs(collection(db, ORDERS_COL));
-    if (ordersSnap.empty) {
-      const batch = writeBatch(db);
-      INITIAL_ORDERS.forEach((order) => {
-        const ref = doc(db, ORDERS_COL, order.id);
-        batch.set(ref, cleanForFirestore(order));
-      });
-      await batch.commit();
-      console.log('Firestore: Orders initialized');
-    }
-
     const uploadsSnap = await getDocs(collection(db, UPLOADS_COL));
     if (uploadsSnap.empty) {
       const batch = writeBatch(db);

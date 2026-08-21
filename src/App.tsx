@@ -38,6 +38,7 @@ import {
   deleteHoldingLocationFromFirestore
 } from './services/firebaseService';
 import { sanitizeCustomerName } from './utils/customerNameCleaner';
+import { flushOfflineSyncQueue, OrderDraft } from './services/orderAutoSaveService';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
@@ -76,7 +77,7 @@ export default function App() {
   });
 
   const [inventory, setInventory] = useState<PlantItem[]>(INITIAL_PLANTS);
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [uploads, setUploads] = useState<RecentUpload[]>(INITIAL_UPLOADS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
@@ -257,27 +258,30 @@ export default function App() {
   };
 
   // Create order from ScanScreen
-  const handleCompleteScanOrder = (cartItems: OrderCartItem[], customerName: string) => {
-    const newOrderId = `ORD-${Math.floor(100 + Math.random() * 900)}`;
-    const totalAmount = cartItems.reduce((sum, item) => sum + item.plant.price * item.quantity, 0);
+  const handleCompleteScanOrder = (cartItems: OrderCartItem[], customerName: string, overrides?: Partial<Order>) => {
+    const newOrderId = overrides?.id || `ORD-${Math.floor(100 + Math.random() * 900)}`;
+    const totalAmount = cartItems.reduce((sum, item) => sum + (item.selectedPrice ?? item.plant.price) * item.quantity, 0);
     const now = new Date();
     const formattedCreatedDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     const formattedSchedTime = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
     const todayIsoDate = now.toISOString().split('T')[0];
+
+    const isDirectTaken = overrides?.holdingLocation?.includes('Taken by Customer') || overrides?.status === 'Completed';
 
     const newOrder: Order = {
       id: newOrderId,
       customerName: customerName.trim() || 'Retail Walk-in',
       itemsCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
       total: totalAmount,
-      type: 'Take Now',
+      type: overrides?.type || 'Take Now',
       scheduledTime: formattedSchedTime,
       scheduledDate: todayIsoDate,
-      status: 'Pending',
+      status: overrides?.status || (isDirectTaken ? 'Completed' : 'Pending'),
       date: formattedCreatedDate,
       createdAt: now.toISOString(),
-      items: cartItems,
-      holdingLocation: 'Greenhouse B, Aisle 4, Bay 12'
+      items: isDirectTaken ? cartItems.map(i => ({ ...i, pickedUpQuantity: i.quantity })) : (overrides?.items || cartItems),
+      holdingLocation: overrides?.holdingLocation || 'Greenhouse B, Aisle 4, Bay 12',
+      ...overrides
     };
 
     setOrders(prev => [newOrder, ...prev]);
@@ -315,6 +319,41 @@ export default function App() {
       setActiveOrder(null);
     }
     deleteOrderFromFirestore(orderId);
+  };
+
+  // Resume uncommitted draft from DraftRecoveryBanner
+  const handleResumeDraft = (draft: OrderDraft) => {
+    if (draft.isEditingExisting && draft.orderId) {
+      const existing = orders.find(o => o.id === draft.orderId);
+      if (existing) {
+        setActiveOrder({
+          ...existing,
+          customerName: draft.customerName || existing.customerName,
+          items: draft.cartItems || existing.items,
+          itemsCount: (draft.cartItems || existing.items).reduce((s, i) => s + i.quantity, 0),
+          holdingLocation: draft.holdingLocation || existing.holdingLocation,
+          notes: draft.notes || existing.notes,
+          status: draft.orderStatus || existing.status,
+          type: draft.fulfillmentType || existing.type
+        });
+      } else {
+        setActiveOrder({
+          id: draft.orderId,
+          customerName: draft.customerName || 'Customer',
+          total: (draft.cartItems || []).reduce((s, i) => s + (i.plant.price * i.quantity), 0),
+          itemsCount: (draft.cartItems || []).reduce((s, i) => s + i.quantity, 0),
+          type: draft.fulfillmentType || 'Take Now',
+          scheduledTime: draft.scheduledTime || 'Immediate',
+          status: draft.orderStatus || 'Pending',
+          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+          createdAt: new Date().toISOString(),
+          items: draft.cartItems || []
+        });
+      }
+    } else {
+      setActiveOrder(null);
+    }
+    navigateTo('scan');
   };
 
   // Handle uploading dataset in Data Management
@@ -411,6 +450,7 @@ export default function App() {
             orders={orders}
             inventory={inventory}
             onSelectOrder={(ord) => setActiveOrder(ord)}
+            onResumeDraft={handleResumeDraft}
           />
         )}
 

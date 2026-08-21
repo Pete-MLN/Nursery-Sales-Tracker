@@ -18,7 +18,8 @@ import {
   Layers, 
   Sprout, 
   Check,
-  Building2
+  Building2,
+  CheckCircle2
 } from 'lucide-react';
 
 interface HoldingLocationScreenProps {
@@ -291,6 +292,30 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
             <span className="font-semibold text-[#414844]">{activeOrder.customerName}</span>
           </div>
         )}
+
+        {/* Customer Took Order Bypass Option */}
+        <div className="mt-3 p-3.5 bg-emerald-50/90 border border-emerald-300 rounded-xl flex items-center justify-between gap-3 flex-wrap shadow-2xs">
+          <div className="flex items-center gap-2.5 min-w-0 flex-1">
+            <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg shrink-0">
+              <CheckCircle2 className="w-5 h-5 text-emerald-700" />
+            </div>
+            <div>
+              <p className="text-xs font-bold text-emerald-950">Customer taking order right now?</p>
+              <p className="text-[11px] text-emerald-800">Skip staging and mark whole order as taken by customer</p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => {
+              onConfirmLocation('Taken by Customer / No Holding Area');
+              onNavigate('finalization');
+            }}
+            className="px-3.5 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white rounded-xl text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border border-[#a0f4c8]/30"
+          >
+            <span>Customer Took All (Skip Holding)</span>
+            <span>→</span>
+          </button>
+        </div>
       </div>
 
       {/* Holding Locations Selection List */}
@@ -596,15 +621,29 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
             Selected: <span className="font-bold text-[#012d1d]">{activeSelectedArea?.title || 'Holding Zone'}</span>
           </div>
 
-          <button
-            id="confirm-location-btn-sticky"
-            type="button"
-            onClick={handleConfirm}
-            className="bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-[#a0f4c8] hover:text-white py-2.5 px-5 rounded-full font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 cursor-pointer shrink-0 border border-[#a0f4c8]/30"
-          >
-            <CheckCircle className="w-4 h-4 text-[#a0f4c8]" />
-            <span>Confirm & Continue →</span>
-          </button>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                onConfirmLocation('Taken by Customer / No Holding Area');
+                onNavigate('finalization');
+              }}
+              className="text-xs font-bold text-[#012d1d] hover:bg-[#e7e9e5] px-3 py-2 rounded-xl transition-colors cursor-pointer"
+              title="Skip holding location because customer is taking order immediately"
+            >
+              Skip (Customer Took Order)
+            </button>
+
+            <button
+              id="confirm-location-btn-sticky"
+              type="button"
+              onClick={handleConfirm}
+              className="bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-[#a0f4c8] hover:text-white py-2.5 px-5 rounded-full font-bold text-xs uppercase tracking-wider shadow-md transition-all flex items-center gap-2 cursor-pointer shrink-0 border border-[#a0f4c8]/30"
+            >
+              <CheckCircle className="w-4 h-4 text-[#a0f4c8]" />
+              <span>Confirm & Continue →</span>
+            </button>
+          </div>
         </div>
       </div>
     </div>

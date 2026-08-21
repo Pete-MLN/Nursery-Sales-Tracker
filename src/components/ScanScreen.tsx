@@ -6,12 +6,22 @@ import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/
 import { findPlantByBarcode, isValidBarcodeString } from '../utils/barcodeUtils';
 import { PricingDropdown } from './PricingDropdown';
 import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
+import { PlantVerificationModal } from './PlantVerificationModal';
+import { AutoSaveBadge } from './AutoSaveBadge';
+import { 
+  autoSaveDraft, 
+  getActiveDraft, 
+  clearActiveDraft, 
+  initAutoSaveLifecycleListeners, 
+  OrderDraft, 
+  getDraftForOrderId 
+} from '../services/orderAutoSaveService';
 
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
   inventory: PlantItem[];
   customers: Customer[];
-  onCompleteOrder: (cartItems: OrderCartItem[], customerName: string) => void;
+  onCompleteOrder: (cartItems: OrderCartItem[], customerName: string, overrides?: Partial<Order>) => void;
   activeOrder?: Order | null;
   onUpdateActiveOrder?: (updatedOrder: Order) => void;
   onStartNewOrder?: () => void;
@@ -28,47 +38,126 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   onStartNewOrder,
   onDeleteOrder
 }) => {
+  // Check if an uncommitted draft exists in localStorage
+  const initialDraft = (!activeOrder ? getActiveDraft() : getDraftForOrderId(activeOrder.id));
+
   const [cartItems, setCartItems] = useState<OrderCartItem[]>(() => {
     if (activeOrder && activeOrder.items && activeOrder.items.length > 0) {
       return activeOrder.items;
     }
+    if (initialDraft && initialDraft.cartItems && initialDraft.cartItems.length > 0) {
+      return initialDraft.cartItems;
+    }
     return [];
   });
-  const [selectedCustomer, setSelectedCustomer] = useState<string>(activeOrder?.customerName || '');
+  const [selectedCustomer, setSelectedCustomer] = useState<string>(
+    activeOrder?.customerName || initialDraft?.customerName || ''
+  );
   const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
-  const [customerSearch, setCustomerSearch] = useState<string>(activeOrder?.customerName || '');
+  const [customerSearch, setCustomerSearch] = useState<string>(
+    activeOrder?.customerName || initialDraft?.customerName || ''
+  );
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
-  const [customerType, setCustomerType] = useState<'RETAIL' | 'WHOLESALE'>('RETAIL');
+  const [customerType, setCustomerType] = useState<'RETAIL' | 'WHOLESALE'>(
+    initialDraft?.customerType || 'RETAIL'
+  );
   const [isScanning, setIsScanning] = useState<boolean>(false);
   const [cameraActive, setCameraActive] = useState<boolean>(false);
-  const [gpsLoggedMap, setGpsLoggedMap] = useState<Record<string, string>>({});
-  const [itemFulfillmentMap, setItemFulfillmentMap] = useState<Record<string, 'Take Now' | 'Pick-up/Delivery'>>({});
+  const [gpsLoggedMap, setGpsLoggedMap] = useState<Record<string, string>>(
+    initialDraft?.gpsLoggedMap || {}
+  );
+  const [itemFulfillmentMap, setItemFulfillmentMap] = useState<Record<string, 'Take Now' | 'Pick-up/Delivery'>>(
+    initialDraft?.itemFulfillmentMap || {}
+  );
 
   // Sync state when activeOrder changes
   useEffect(() => {
     if (activeOrder) {
-      if (activeOrder.items && activeOrder.items.length > 0) {
+      const editDraft = getDraftForOrderId(activeOrder.id);
+      if (editDraft && editDraft.cartItems && editDraft.cartItems.length > 0) {
+        setCartItems(editDraft.cartItems.map(item => ({ ...item })));
+        if (editDraft.customerName) {
+          setSelectedCustomer(editDraft.customerName);
+          setCustomerSearch(editDraft.customerName);
+        }
+      } else if (activeOrder.items && activeOrder.items.length > 0) {
         setCartItems(activeOrder.items.map(item => ({ ...item })));
       } else {
         setCartItems([]);
       }
-      if (activeOrder.customerName) {
+      if (activeOrder.customerName && (!editDraft || !editDraft.customerName)) {
         setSelectedCustomer(activeOrder.customerName);
         setCustomerSearch(activeOrder.customerName);
-      } else {
-        setSelectedCustomer('');
-        setCustomerSearch('');
       }
     } else {
-      // Clean blank order: reset all customer and product cart state
-      setCartItems([]);
-      setSelectedCustomer('');
-      setCustomerSearch('');
-      setItemFulfillmentMap({});
-      setGpsLoggedMap({});
-      setCustomerType('RETAIL');
+      const activeDraft = getActiveDraft();
+      if (activeDraft && activeDraft.cartItems && activeDraft.cartItems.length > 0 && !activeDraft.isEditingExisting) {
+        setCartItems(activeDraft.cartItems.map(item => ({ ...item })));
+        setSelectedCustomer(activeDraft.customerName || '');
+        setCustomerSearch(activeDraft.customerName || '');
+        setItemFulfillmentMap(activeDraft.itemFulfillmentMap || {});
+        setGpsLoggedMap(activeDraft.gpsLoggedMap || {});
+        setCustomerType(activeDraft.customerType || 'RETAIL');
+      } else {
+        // Clean blank order
+        setCartItems([]);
+        setSelectedCustomer('');
+        setCustomerSearch('');
+        setItemFulfillmentMap({});
+        setGpsLoggedMap({});
+        setCustomerType('RETAIL');
+      }
     }
   }, [activeOrder]);
+
+  // CONTINUOUS AUTO-SAVE: Every single plant added/removed, quantity adjusted, price tier changed, or customer name typed is instantly saved to local disk & queued to cloud
+  useEffect(() => {
+    const hasData = cartItems.length > 0 || (selectedCustomer && selectedCustomer.trim().length > 0) || (customerSearch && customerSearch.trim().length > 0);
+    if (hasData || activeOrder) {
+      const draft: OrderDraft = {
+        orderId: activeOrder?.id,
+        isEditingExisting: Boolean(activeOrder),
+        customerName: (selectedCustomer || customerSearch || '').trim(),
+        customerType: customerType,
+        cartItems: cartItems,
+        itemFulfillmentMap: itemFulfillmentMap,
+        gpsLoggedMap: gpsLoggedMap,
+        fulfillmentType: activeOrder?.type || 'Take Now',
+        scheduledDate: activeOrder?.scheduledDate,
+        scheduledTime: activeOrder?.scheduledTime,
+        holdingLocation: activeOrder?.holdingLocation,
+        notes: activeOrder?.notes,
+        orderStatus: activeOrder?.status,
+        lastSavedAt: new Date().toISOString()
+      };
+      autoSaveDraft(draft);
+    }
+  }, [cartItems, selectedCustomer, customerSearch, customerType, itemFulfillmentMap, gpsLoggedMap, activeOrder]);
+
+  // LIFECYCLE HOOKS: guarantee flush to local storage before browser close, backgrounding, or crash
+  useEffect(() => {
+    const cleanup = initAutoSaveLifecycleListeners(() => {
+      const hasData = cartItems.length > 0 || (selectedCustomer && selectedCustomer.trim().length > 0) || (customerSearch && customerSearch.trim().length > 0);
+      if (!hasData && !activeOrder) return null;
+      return {
+        orderId: activeOrder?.id,
+        isEditingExisting: Boolean(activeOrder),
+        customerName: (selectedCustomer || customerSearch || '').trim(),
+        customerType: customerType,
+        cartItems: cartItems,
+        itemFulfillmentMap: itemFulfillmentMap,
+        gpsLoggedMap: gpsLoggedMap,
+        fulfillmentType: activeOrder?.type || 'Take Now',
+        scheduledDate: activeOrder?.scheduledDate,
+        scheduledTime: activeOrder?.scheduledTime,
+        holdingLocation: activeOrder?.holdingLocation,
+        notes: activeOrder?.notes,
+        orderStatus: activeOrder?.status,
+        lastSavedAt: new Date().toISOString()
+      };
+    });
+    return cleanup;
+  }, [cartItems, selectedCustomer, customerSearch, customerType, itemFulfillmentMap, gpsLoggedMap, activeOrder]);
 
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -117,6 +206,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [catalogCategory, setCatalogCategory] = useState<string>('All');
   const [showPlantSuggestions, setShowPlantSuggestions] = useState<boolean>(false);
 
+  // Plant Verification & Quantity Confirmation Modal State
+  const [verifyingPlant, setVerifyingPlant] = useState<{
+    plant: PlantItem;
+    initialQty?: number;
+    existingCartItem?: OrderCartItem | null;
+  } | null>(null);
+  const verifyingPlantRef = useRef(verifyingPlant);
+  useEffect(() => {
+    verifyingPlantRef.current = verifyingPlant;
+  }, [verifyingPlant]);
+
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
@@ -130,29 +230,55 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }));
   };
 
-  // Helper to add a plant directly to the cart with customizable increment and price tier
-  const addPlantToCart = (plant: PlantItem, amount: number = 1, priceLevel?: PriceLevelKey) => {
-    const defaultLevel: PriceLevelKey = priceLevel || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
-    const tiers = getPlantPriceTiers(plant);
-    const matchedTier = tiers.find(t => t.key === defaultLevel) || tiers[0];
-    const initialPrice = matchedTier.price;
+  // Open the plant verification and quantity pop-up
+  const openPlantVerification = (plant: PlantItem, defaultQty?: number) => {
+    const existing = cartItems.find(i => i.plant.id === plant.id) || null;
+    const isBulkItem = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
+      (plant.category || '').toUpperCase().includes(cat) || plant.name.toUpperCase().includes(cat)
+    );
+    setVerifyingPlant({
+      plant,
+      initialQty: defaultQty !== undefined ? defaultQty : (existing ? existing.quantity : (isBulkItem ? 1.0 : 1)),
+      existingCartItem: existing
+    });
+  };
 
+  // Confirm addition or update from the verification modal
+  const handleConfirmPlantVerification = (
+    plant: PlantItem,
+    quantity: number,
+    priceLevel: PriceLevelKey,
+    unitPrice: number,
+    fulfillmentChoice: 'Take Now' | 'Pick-up/Delivery'
+  ) => {
     setCartItems(prev => {
-      const existing = prev.find(i => i.plant.id === plant.id);
-      if (existing) {
-        return prev.map(i => i.plant.id === plant.id ? { 
-          ...i, 
-          quantity: parseFloat((i.quantity + amount).toFixed(2)) 
-        } : i);
+      const existingIndex = prev.findIndex(i => i.plant.id === plant.id);
+      if (existingIndex >= 0) {
+        const updated = [...prev];
+        updated[existingIndex] = {
+          ...updated[existingIndex],
+          quantity: quantity,
+          selectedPriceLevel: priceLevel,
+          selectedPrice: unitPrice
+        };
+        return updated;
       } else {
-        return [...prev, { 
-          plant, 
-          quantity: amount,
-          selectedPriceLevel: defaultLevel,
-          selectedPrice: initialPrice
-        }];
+        return [
+          ...prev,
+          {
+            plant,
+            quantity,
+            selectedPriceLevel: priceLevel,
+            selectedPrice: unitPrice
+          }
+        ];
       }
     });
+
+    setItemFulfillmentMap(prev => ({
+      ...prev,
+      [plant.id]: fulfillmentChoice
+    }));
 
     playBeepSound();
     if (typeof navigator !== 'undefined' && navigator.vibrate) {
@@ -160,17 +286,23 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
 
     const isBulk = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
-      (plant.category || '').toUpperCase().includes(cat)
+      (plant.category || '').toUpperCase().includes(cat) || plant.name.toUpperCase().includes(cat)
     );
-    const unitLabel = plant.size && plant.size.length < 10 ? plant.size : ((plant.category || '').toUpperCase().includes('STONE') ? 'Ton' : 'Yard');
+    const isStone = (plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE');
+    const unitLabel = plant.size && plant.size.length < 10 ? plant.size : (isStone ? 'Ton' : (isBulk ? 'Yard' : 'Plant'));
     const itemNumDisplay = plant.itemNo || plant.barcode || 'N/A';
     const sizeDisplay = plant.size || (isBulk ? unitLabel : 'Standard');
 
     triggerScannedFeedback(
-      `Added +${amount} ${isBulk ? unitLabel + '(s) of ' : ''}${plant.name} • Item #${itemNumDisplay} • Size: ${sizeDisplay} ($${(initialPrice * amount).toFixed(2)}) to order!`,
+      `Verified & Added ${quantity} ${isBulk ? unitLabel + '(s) of ' : ''}${plant.name} • Item #${itemNumDisplay} • Size: ${sizeDisplay} ($${(unitPrice * quantity).toFixed(2)}) to order!`,
       'success',
       10500
     );
+  };
+
+  // Helper to add a plant directly to the cart with customizable increment and price tier
+  const addPlantToCart = (plant: PlantItem, amount: number = 1, priceLevel?: PriceLevelKey) => {
+    openPlantVerification(plant, amount);
   };
 
   // Helper to switch or set price tier for a specific item in the order
@@ -338,7 +470,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     let isProcessing = false;
 
     const processFrame = async () => {
-      if (isCancelled || isProcessing) return;
+      if (isCancelled || isProcessing || verifyingPlantRef.current !== null) return;
       const video = videoRef.current;
 
       if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
@@ -745,6 +877,44 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
   };
 
+  // Direct hand-off when customer takes entire order with them (skipping staging / holding area page)
+  const handleCustomerTookOrder = () => {
+    if (cartItems.length === 0) return;
+    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
+    const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+    const totalAmt = calculateTotal();
+
+    const itemsTaken = cartItems.map(item => ({
+      ...item,
+      pickedUpQuantity: item.quantity
+    }));
+
+    if (activeOrder && onUpdateActiveOrder) {
+      const updated: Order = {
+        ...activeOrder,
+        customerName: finalCustomer,
+        items: itemsTaken,
+        itemsCount: totalCount,
+        total: totalAmt,
+        type: 'Take Now',
+        holdingLocation: 'Taken by Customer / No Staging',
+        status: 'Completed'
+      };
+      onUpdateActiveOrder(updated);
+      clearActiveDraft(activeOrder.id);
+    } else {
+      onCompleteOrder(itemsTaken, finalCustomer, {
+        type: 'Take Now',
+        holdingLocation: 'Taken by Customer / No Staging',
+        status: 'Completed',
+        items: itemsTaken
+      });
+      clearActiveDraft();
+    }
+    // Directly navigate to finalization, skipping the holding area page
+    onNavigate('finalization');
+  };
+
   const handleCompleteAndGoToHolding = () => {
     if (cartItems.length === 0) return;
     const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
@@ -816,6 +986,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           </div>
 
           <div className="flex items-center gap-2 shrink-0">
+            <AutoSaveBadge compact />
             <button
               type="button"
               onClick={() => onNavigate('finalization')}
@@ -827,6 +998,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               <button
                 type="button"
                 onClick={() => {
+                  clearActiveDraft(activeOrder?.id);
                   onStartNewOrder();
                   setCartItems([]);
                   setSelectedCustomer('');
@@ -1167,8 +1339,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                               <Package className="w-2.5 h-2.5 text-amber-300" />
                               SIZE: {plant.size || 'Standard'}
                             </span>
-                            <span className="text-xs text-[#717973] font-medium ml-1">
-                              Avail: <strong className="text-[#012d1d]">{plant.stock}</strong>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                              plant.stock < 0
+                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                : plant.stock === 0
+                                ? 'bg-red-100 text-red-700 border border-red-200'
+                                : plant.stock < 5
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-[#f3f4f0] text-[#414844]'
+                            }`}>
+                              Avail: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
+                              {plant.stock < 0 ? <span className="text-[10px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[10px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
                             </span>
                           </div>
                           {(plant.botanicalName || plant.commonName) && (
@@ -1447,17 +1628,21 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   className="bg-white rounded-xl p-3.5 border border-[#c1c8c2] shadow-2xs flex flex-col gap-2.5 transition-all"
                 >
                   <div className="flex justify-between items-start gap-2">
-                    <div className="flex gap-3 items-start min-w-0 flex-1">
+                    <div 
+                      onClick={() => openPlantVerification(item.plant)}
+                      className="flex gap-3 items-start min-w-0 flex-1 cursor-pointer group"
+                      title="Tap to verify plant details & adjust quantity"
+                    >
                       <img
                         src={item.plant.image || DEFAULT_PLANT_IMAGE}
                         alt={item.plant.name}
-                        className="w-12 h-12 rounded-lg object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]/60 mt-0.5"
+                        className="w-12 h-12 rounded-lg object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]/60 mt-0.5 group-hover:border-[#0e6c4a] transition-colors"
                         referrerPolicy="no-referrer"
                         onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-extrabold text-base text-[#1a1c1a] truncate">
+                          <h3 className="font-extrabold text-base text-[#1a1c1a] group-hover:text-[#0e6c4a] transition-colors truncate">
                             {item.plant.name}
                           </h3>
                         </div>
@@ -1481,7 +1666,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                         )}
 
                         {/* Interactive 4-Tier Pricing Dropdown */}
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
                           <PricingDropdown
                             plant={item.plant}
                             currentPrice={unitPrice}
@@ -1499,13 +1684,23 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       </div>
                     </div>
 
-                    <button
-                      onClick={() => removeItem(item.plant.id)}
-                      className="text-[#ba1a1a] hover:bg-[#ffdad6] p-1.5 rounded-lg transition-colors cursor-pointer shrink-0"
-                      title="Remove Item"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => openPlantVerification(item.plant)}
+                        className="text-xs font-bold text-[#0e6c4a] bg-[#a0f4c8]/40 hover:bg-[#a0f4c8] px-2 py-1 rounded-lg transition-colors cursor-pointer"
+                        title="Verify plant & edit quantity"
+                      >
+                        Verify / Qty
+                      </button>
+                      <button
+                        onClick={() => removeItem(item.plant.id)}
+                        className="text-[#ba1a1a] hover:bg-[#ffdad6] p-1.5 rounded-lg transition-colors cursor-pointer"
+                        title="Remove Item"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
 
                   {/* Quantity, Pick-up/Delivery & GPS Action Controls */}
@@ -1582,7 +1777,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       <section className="mt-4 pt-4 border-t border-[#c1c8c2] pb-6 mb-12 flex flex-col gap-3">
         <div className="flex justify-between items-center">
           <div>
-            <span className="font-bold text-xl text-[#012d1d] block">Total</span>
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-xl text-[#012d1d] block">Total</span>
+              <AutoSaveBadge />
+            </div>
             <span className="text-xs text-[#717973] font-semibold">
               {cartItems.reduce((acc, item) => acc + item.quantity, 0)} items in order
             </span>
@@ -1597,16 +1795,33 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <div className="flex flex-col sm:flex-row gap-2.5">
               <button
                 type="button"
-                onClick={handleComplete}
+                onClick={() => {
+                  handleComplete();
+                }}
                 disabled={cartItems.length === 0}
                 className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base"
               >
                 <CheckCircle className="w-5 h-5" />
                 <span>Save & Return to Order {activeOrder.id}</span>
               </button>
+
               <button
                 type="button"
-                onClick={handleCompleteAndGoToHolding}
+                id="btn-customer-took-order-active"
+                onClick={handleCustomerTookOrder}
+                disabled={cartItems.length === 0}
+                className="bg-[#0e6c4a] hover:bg-[#0b5338] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm shrink-0 border border-[#a0f4c8]/30"
+                title="Customer took all items now - skip staging holding area"
+              >
+                <CheckCircle2 className="w-4 h-4 text-[#a0f4c8]" />
+                <span>Customer Took All</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  handleCompleteAndGoToHolding();
+                }}
                 disabled={cartItems.length === 0}
                 className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm shrink-0"
                 title="Save changes and proceed to staging map"
@@ -1627,14 +1842,33 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           </div>
         ) : (
           <div className="flex flex-col gap-2.5">
-            <button
-              onClick={handleComplete}
-              disabled={cartItems.length === 0}
-              className="w-full bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer"
-            >
-              <CheckCircle className="w-5 h-5" />
-              <span>Complete Order</span>
-            </button>
+            <div className="flex flex-col sm:flex-row gap-2.5">
+              <button
+                type="button"
+                id="btn-customer-took-order"
+                onClick={handleCustomerTookOrder}
+                disabled={cartItems.length === 0}
+                className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base border border-[#a0f4c8]/30"
+                title="Customer took the entire order with them now - skips holding area staging"
+              >
+                <CheckCircle2 className="w-5 h-5 text-[#a0f4c8]" />
+                <span>Customer Took Entire Order (Skip Holding)</span>
+              </button>
+
+              <button
+                type="button"
+                id="btn-stage-holding-area"
+                onClick={() => {
+                  handleComplete();
+                }}
+                disabled={cartItems.length === 0}
+                className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm shrink-0"
+                title="Assign holding area for staging / later pickup"
+              >
+                <MapPin className="w-4 h-4" />
+                <span>Stage in Holding Area</span>
+              </button>
+            </div>
             
             {cartItems.length > 0 && (
               <button
@@ -1699,6 +1933,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      clearActiveDraft(activeOrder.id);
                       if (onDeleteOrder && activeOrder) {
                         onDeleteOrder(activeOrder.id);
                       }
@@ -1714,6 +1949,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   <button
                     type="button"
                     onClick={() => {
+                      clearActiveDraft(activeOrder.id);
                       setIsCancelModalOpen(false);
                       onNavigate('orders');
                     }}
@@ -1726,6 +1962,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => {
+                    clearActiveDraft();
                     setCartItems([]);
                     setSelectedCustomer('');
                     setCustomerSearch('');
@@ -1961,8 +2198,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                               <Package className="w-2.5 h-2.5 text-amber-300" />
                               SIZE: {plant.size || 'Standard'}
                             </span>
-                            <span className="text-xs text-[#717973] ml-1">
-                              Stock: <strong className="text-[#012d1d]">{plant.stock}</strong>
+                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                              plant.stock < 0
+                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                : plant.stock === 0
+                                ? 'bg-red-100 text-red-700 border border-red-200'
+                                : plant.stock < 5
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-[#f3f4f0] text-[#414844]'
+                            }`}>
+                              Stock: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
+                              {plant.stock < 0 ? <span className="text-[10px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[10px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
                             </span>
                           </div>
                           {(plant.botanicalName || plant.commonName) && (
@@ -2014,6 +2260,16 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           </div>
         </div>
       )}
+      {/* Plant Verification & Quantity Confirmation Pop-up Modal */}
+      <PlantVerificationModal
+        isOpen={verifyingPlant !== null}
+        plant={verifyingPlant?.plant || null}
+        initialQuantity={verifyingPlant?.initialQty}
+        existingCartItem={verifyingPlant?.existingCartItem}
+        customerType={customerType}
+        onConfirm={handleConfirmPlantVerification}
+        onClose={() => setVerifyingPlant(null)}
+      />
     </div>
   );
 };

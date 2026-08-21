@@ -35,9 +35,18 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       activeTab === 'Completed' ? o.status === 'Completed' :
       o.status === 'Cancelled';
 
+    const q = searchQuery.toLowerCase().trim();
     const matchesSearch = 
-      o.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      o.customerName.toLowerCase().includes(searchQuery.toLowerCase());
+      !q ||
+      o.id.toLowerCase().includes(q) ||
+      o.customerName.toLowerCase().includes(q) ||
+      (o.items && o.items.some(item => 
+        (item.plant.name && item.plant.name.toLowerCase().includes(q)) ||
+        (item.plant.botanicalName && item.plant.botanicalName.toLowerCase().includes(q)) ||
+        (item.plant.commonName && item.plant.commonName.toLowerCase().includes(q)) ||
+        (item.plant.itemNo && item.plant.itemNo.toLowerCase().includes(q)) ||
+        (item.plant.barcode && item.plant.barcode.toLowerCase().includes(q))
+      ));
 
     return matchesTab && matchesSearch;
   });
@@ -94,7 +103,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search by order # or customer name..."
+          placeholder="Search by order #, customer, or plant name / SKU..."
           className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
         />
       </div>

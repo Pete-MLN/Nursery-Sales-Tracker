@@ -1,15 +1,17 @@
 import React, { useState, useEffect } from 'react';
-import { Sparkles, ArrowRight, Trash2, X, Clock, ShoppingCart } from 'lucide-react';
+import { Sparkles, ArrowRight, Trash2, X, Clock, ShoppingCart, Check } from 'lucide-react';
 import { getActiveDraft, clearActiveDraft, OrderDraft } from '../services/orderAutoSaveService';
 
 interface DraftRecoveryBannerProps {
   onResumeDraft: (draft: OrderDraft) => void;
+  onSaveDraft?: (draft: OrderDraft) => void;
   onDiscardDraft?: () => void;
   className?: string;
 }
 
 export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
   onResumeDraft,
+  onSaveDraft,
   onDiscardDraft,
   className = ''
 }) => {
@@ -42,6 +44,15 @@ export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
     clearActiveDraft(draft.orderId);
     setDraft(null);
     if (onDiscardDraft) onDiscardDraft();
+  };
+
+  const handleSaveOrder = () => {
+    if (onSaveDraft) {
+      onSaveDraft(draft);
+    } else {
+      clearActiveDraft(draft.orderId);
+    }
+    setDraft(null);
   };
 
   const handleResume = () => {
@@ -77,11 +88,11 @@ export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
         </div>
       </div>
 
-      <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end pt-1 sm:pt-0 border-t sm:border-t-0 border-amber-200">
+      <div className="flex items-center gap-2 w-full sm:w-auto shrink-0 justify-end pt-2 sm:pt-0 border-t sm:border-t-0 border-amber-200 flex-wrap">
         <button
           type="button"
           onClick={handleDiscard}
-          className="px-3 py-2 text-xs font-bold text-amber-900 hover:bg-amber-200/60 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+          className="px-2.5 py-2 text-xs font-bold text-amber-900 hover:bg-amber-200/60 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
           title="Discard this recovered draft"
         >
           <Trash2 className="w-3.5 h-3.5" />
@@ -90,11 +101,22 @@ export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
 
         <button
           type="button"
-          onClick={handleResume}
-          className="flex-1 sm:flex-initial px-4 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs sm:text-sm font-extrabold rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+          onClick={handleSaveOrder}
+          className="px-3.5 py-2 bg-[#0e6c4a] hover:bg-[#012d1d] text-white text-xs sm:text-sm font-extrabold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95 border border-[#a0f4c8]/20"
+          title="Save the order to database and remove this draft warning"
         >
-          <span>Resume Order</span>
-          <ArrowRight className="w-4 h-4" />
+          <Check className="w-4 h-4 text-[#a0f4c8]" />
+          <span>Save Order</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={handleResume}
+          className="flex-1 sm:flex-initial px-3.5 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs sm:text-sm font-extrabold rounded-xl transition-all shadow-xs flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+          title="Continue scanning and editing this order"
+        >
+          <span>Resume</span>
+          <ArrowRight className="w-3.5 h-3.5" />
         </button>
 
         <button

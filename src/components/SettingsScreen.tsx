@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ScreenType, User, StockAlertSettings } from '../types';
-import { User as UserIcon, LogOut, FileSpreadsheet, MapPin, Database, Bell, Shield, Moon, Sun, Check, Smartphone, QrCode, Copy, ExternalLink, Wifi, AlertTriangle, Plus, Minus, Sliders, CheckCircle2, BookOpen } from 'lucide-react';
+import { User as UserIcon, LogOut, FileSpreadsheet, MapPin, Database, Bell, Shield, Moon, Sun, Check, Smartphone, QrCode, Copy, ExternalLink, Wifi, AlertTriangle, Plus, Minus, Sliders, CheckCircle2, BookOpen, Camera, Clock, Timer, BatteryCharging } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface SettingsScreenProps {
@@ -9,6 +9,8 @@ interface SettingsScreenProps {
   onNavigate: (screen: ScreenType) => void;
   stockAlertSettings: StockAlertSettings;
   onUpdateStockAlertSettings: (newSettings: StockAlertSettings) => void;
+  cameraTimeout?: number;
+  onUpdateCameraTimeout?: (seconds: number) => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
@@ -16,7 +18,9 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onLogout,
   onNavigate,
   stockAlertSettings,
-  onUpdateStockAlertSettings
+  onUpdateStockAlertSettings,
+  cameraTimeout = 15,
+  onUpdateCameraTimeout
 }) => {
   const [gpsEnabled, setGpsEnabled] = useState<boolean>(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
@@ -38,6 +42,13 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
       warningThreshold: val
     });
     triggerSavedFeedback();
+  };
+
+  const handleUpdateCameraTimeout = (val: number) => {
+    if (onUpdateCameraTimeout) {
+      onUpdateCameraTimeout(val);
+      triggerSavedFeedback();
+    }
   };
 
   const triggerSavedFeedback = () => {
@@ -425,6 +436,95 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               }`}
             />
           </button>
+        </div>
+      </div>
+
+      {/* Camera Scanner Auto-Shutoff Timeout Section */}
+      <div className="bg-white p-5 rounded-2xl border border-[#c1c8c2] shadow-2xs flex flex-col gap-4">
+        <div className="flex items-start justify-between gap-3 border-b border-[#f3f4f0] pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-9 h-9 rounded-xl bg-[#e8f5e9] text-[#0e6c4a] flex items-center justify-center shrink-0">
+              <Camera className="w-5 h-5" />
+            </div>
+            <div>
+              <h3 className="font-bold text-base text-[#012d1d]">Camera Scanner Auto-Shutoff</h3>
+              <p className="text-xs text-[#414844]">Turn off the camera stream after inactivity to save battery and prevent overheating</p>
+            </div>
+          </div>
+          {savedFeedback ? (
+            <span className="bg-[#a0f4c8] text-[#002113] text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0 flex items-center gap-1 animate-fade-in">
+              <CheckCircle2 className="w-3 h-3 text-[#0e6c4a]" />
+              Saved
+            </span>
+          ) : (
+            <span className="bg-[#e7e9e5] text-[#414844] text-[10px] font-extrabold px-2.5 py-1 rounded-full uppercase tracking-wider shrink-0">
+              {cameraTimeout === 0 ? 'Never (Continuous)' : `${cameraTimeout}s`}
+            </span>
+          )}
+        </div>
+
+        {/* Controls */}
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <div>
+              <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                <Clock className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                Auto-Shutoff Timeout
+              </label>
+              <p className="text-xs text-[#717973] mt-0.5">
+                {cameraTimeout === 0 
+                  ? 'Camera stays ON continuously until manually stopped' 
+                  : `Camera automatically turns off after ${cameraTimeout} seconds without scanning`}
+              </p>
+            </div>
+
+            <div className="flex items-center gap-1 bg-[#f3f4f0] p-1 rounded-xl border border-[#c1c8c2]">
+              <button
+                type="button"
+                onClick={() => handleUpdateCameraTimeout(Math.max(5, (cameraTimeout || 15) - 5))}
+                className="w-8 h-8 rounded-lg bg-white border border-[#c1c8c2] hover:bg-[#e7e9e5] text-[#1a1c1a] font-bold flex items-center justify-center text-sm cursor-pointer active:scale-95 transition-all"
+                title="Decrease timeout by 5 seconds"
+              >
+                <Minus className="w-4 h-4" />
+              </button>
+              <div className="w-16 text-center font-bold text-sm text-[#012d1d]">
+                {cameraTimeout === 0 ? 'Never' : `${cameraTimeout}s`}
+              </div>
+              <button
+                type="button"
+                onClick={() => handleUpdateCameraTimeout(Math.min(120, (cameraTimeout || 0) + 5))}
+                className="w-8 h-8 rounded-lg bg-white border border-[#c1c8c2] hover:bg-[#e7e9e5] text-[#1a1c1a] font-bold flex items-center justify-center text-sm cursor-pointer active:scale-95 transition-all"
+                title="Increase timeout by 5 seconds"
+              >
+                <Plus className="w-4 h-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Quick Presets */}
+          <div className="flex flex-wrap items-center gap-1.5 mt-1">
+            <span className="text-[11px] font-medium text-[#717973]">Quick Presets:</span>
+            {[
+              { label: '10s (Fast)', val: 10 },
+              { label: '15s (Standard)', val: 15 },
+              { label: '30s (Extended)', val: 30 },
+              { label: '60s (Long)', val: 60 },
+              { label: 'Never / Off', val: 0 }
+            ].map((item) => (
+              <button
+                key={item.val}
+                type="button"
+                onClick={() => handleUpdateCameraTimeout(item.val)}
+                className={`px-2.5 py-1 text-xs font-bold rounded-lg border transition-all cursor-pointer ${
+                  cameraTimeout === item.val
+                    ? 'bg-[#0e6c4a] text-white border-[#0e6c4a] shadow-2xs font-extrabold'
+                    : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+                }`}
+              >
+                {item.label}
+              </button>
+            ))}
+          </div>
         </div>
       </div>
 

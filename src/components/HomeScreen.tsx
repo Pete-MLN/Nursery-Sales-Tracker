@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ScreenType, Order, PlantItem } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { formatOrderScheduledTime } from '../utils/dateUtils';
-import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode, Package, ClipboardList } from 'lucide-react';
+import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode, Package, ClipboardList, CheckCircle2, X } from 'lucide-react';
 import { DraftRecoveryBanner } from './DraftRecoveryBanner';
 import { OrderDraft } from '../services/orderAutoSaveService';
 
@@ -13,6 +13,7 @@ interface HomeScreenProps {
   inventory: PlantItem[];
   onSelectOrder?: (order: Order) => void;
   onResumeDraft?: (draft: OrderDraft) => void;
+  onSaveDraft?: (draft: OrderDraft) => void;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -21,12 +22,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   orders,
   inventory,
   onSelectOrder,
-  onResumeDraft
+  onResumeDraft,
+  onSaveDraft
 }) => {
-  const pendingOrders = orders.filter(o => o.status === 'Pending' || o.status === 'Ready for Pickup');
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = (msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(prev => prev === msg ? null : prev);
+    }, 4000);
+  };
+
+  const pendingOrders = orders.filter(o => o && o.id && !o.id.startsWith('ORD-DRAFT-') && (o.status === 'Pending' || o.status === 'Ready for Pickup'));
 
   return (
     <div className="flex-1 px-4 py-6 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-6">
+      {/* Toast Notification */}
+      {toastMessage && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-[#012d1d] text-white px-4 py-3 rounded-2xl shadow-2xl border border-[#a0f4c8]/30 flex items-center gap-3 animate-fade-in max-w-md w-[92%]">
+          <CheckCircle2 className="w-5 h-5 text-[#a0f4c8] shrink-0" />
+          <span className="flex-1 text-xs font-bold text-[#f3f4f0]">{toastMessage}</span>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="text-white/60 hover:text-white p-1 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
       {/* Draft Recovery Banner if uncommitted draft exists */}
       <DraftRecoveryBanner 
         onResumeDraft={(draft) => {
@@ -35,6 +61,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           } else {
             onNavigate('scan');
           }
+        }}
+        onSaveDraft={(draft) => {
+          if (onSaveDraft) {
+            onSaveDraft(draft);
+          }
+          showToast(`Order for ${draft.customerName || 'Retail Walk-in'} has been saved and the draft warning removed.`);
         }}
       />
 

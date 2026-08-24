@@ -682,12 +682,12 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
             </div>
 
             <div className="p-4 bg-[#f3f4f0] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2">
-              <span className="px-2 py-0.5 bg-[#e2e3df] text-[#414844] font-extrabold rounded w-fit text-[10px]">
-                Completed
+              <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-extrabold rounded w-fit text-[10px]">
+                Completed / Archived
               </span>
-              <strong className="text-sm font-extrabold text-[#012d1d]">Fully Picked Up / Delivered</strong>
+              <strong className="text-sm font-extrabold text-[#012d1d]">Customer Picked Up & Archived</strong>
               <p className="text-[#414844]">
-                Customer has driven off with all plants or delivery truck driver has signed off the bill of lading.
+                Tap the green <strong>"Completed"</strong> button on the order card when the customer picks up their items. The order is automatically archived from the active queue into the <strong>Completed (Archived)</strong> tab for permanent sales records (never permanently deleted).
               </p>
             </div>
           </div>
@@ -745,10 +745,10 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
               <div className="bg-white p-3.5 rounded-xl border border-[#c1c8c2] flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-[#012d1d]">
                   <MessageSquare className="w-4 h-4 text-[#012d1d]" />
-                  <span>Text Crew (SMS)</span>
+                  <span>Text Employee (SMS)</span>
                 </div>
                 <p className="text-[#414844] text-[11px]">
-                  Opens your device's Messages / SMS app addressed directly to <code>518.223.1235</code> with order staging details and plants to load pre-filled.
+                  Opens your device's Messages / SMS app addressed directly to nursery employees (defaulting to Pete at <code>518-227-1235</code>) with order staging details and plants to load pre-filled.
                 </p>
               </div>
             </div>

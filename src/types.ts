@@ -69,6 +69,8 @@ export interface Order {
   pickedUpItemsCount?: number; // Number of items already taken
   remainingPickupDate?: string; // Estimated date for customer to pick up remainder
   partialPickupNotes?: string; // Specific pickup remarks
+  completedAt?: string; // Timestamp when order was completed/picked up
+  archived?: boolean; // Archived from active order queue
 }
 
 export interface Customer {
@@ -121,5 +123,9 @@ export interface HoldingArea {
   subtitle: string;
   icon: string;
   isCustom?: boolean;
+}
+
+export interface CameraSettings {
+  timeoutSeconds: number; // 0 for Never, 10, 15, 30, 60, etc.
 }
 

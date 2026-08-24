@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer, Order } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode, isValidBarcodeString } from '../utils/barcodeUtils';
 import { PricingDropdown } from './PricingDropdown';
@@ -26,6 +26,8 @@ interface ScanScreenProps {
   onUpdateActiveOrder?: (updatedOrder: Order) => void;
   onStartNewOrder?: () => void;
   onDeleteOrder?: (orderId: string) => void;
+  cameraTimeout?: number;
+  onUpdateCameraTimeout?: (seconds: number) => void;
 }
 
 export const ScanScreen: React.FC<ScanScreenProps> = ({
@@ -36,7 +38,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   activeOrder,
   onUpdateActiveOrder,
   onStartNewOrder,
-  onDeleteOrder
+  onDeleteOrder,
+  cameraTimeout = 15,
+  onUpdateCameraTimeout
 }) => {
   // Check if an uncommitted draft exists in localStorage
   const initialDraft = (!activeOrder ? getActiveDraft() : getDraftForOrderId(activeOrder.id));
@@ -196,6 +200,80 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     };
   }, []);
 
+  // Camera Timeout Countdown & Quick Settings State
+  const [cameraTimeLeft, setCameraTimeLeft] = useState<number>(cameraTimeout || 15);
+  const [isTimeoutMenuOpen, setIsTimeoutMenuOpen] = useState<boolean>(false);
+  const timeoutMenuRef = useRef<HTMLDivElement | null>(null);
+
+  // Sync cameraTimeLeft when cameraTimeout prop changes
+  useEffect(() => {
+    setCameraTimeLeft(cameraTimeout);
+  }, [cameraTimeout]);
+
+  // Reset camera inactivity timer
+  const resetCameraTimer = () => {
+    if (cameraActive && cameraTimeout > 0) {
+      setCameraTimeLeft(cameraTimeout);
+    }
+  };
+
+  // Close quick timeout popover on outside click
+  useEffect(() => {
+    const handleOutsideClick = (e: MouseEvent) => {
+      if (timeoutMenuRef.current && !timeoutMenuRef.current.contains(e.target as Node)) {
+        setIsTimeoutMenuOpen(false);
+      }
+    };
+    if (isTimeoutMenuOpen) {
+      document.addEventListener('mousedown', handleOutsideClick);
+    }
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+    };
+  }, [isTimeoutMenuOpen]);
+
+  // Countdown timer effect for camera auto-shutoff
+  useEffect(() => {
+    if (!cameraActive) {
+      setCameraTimeLeft(cameraTimeout || 15);
+      return;
+    }
+
+    if (cameraTimeout === 0) {
+      // 0 means Disabled / Never shut off automatically
+      return;
+    }
+
+    setCameraTimeLeft(cameraTimeout);
+
+    const timerInterval = setInterval(() => {
+      setCameraTimeLeft((prev) => {
+        if (prev <= 1) {
+          clearInterval(timerInterval);
+          // Turn off camera stream
+          if (cameraStream) {
+            cameraStream.getTracks().forEach((track) => track.stop());
+            setCameraStream(null);
+          }
+          if (videoRef.current) {
+            videoRef.current.srcObject = null;
+          }
+          setIsTorchOn(false);
+          setCameraActive(false);
+          triggerScannedFeedback(
+            `Camera auto-paused after ${cameraTimeout}s to preserve battery. Tap "Start Camera" to scan again.`,
+            'warning',
+            7000
+          );
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+
+    return () => clearInterval(timerInterval);
+  }, [cameraActive, cameraTimeout, cameraStream]);
+
   // Bulk Quick Selector State
   const [bulkTab, setBulkTab] = useState<'ALL' | 'MULCH' | 'STONE' | 'TOP SOIL'>('ALL');
   const [isBulkSectionOpen, setIsBulkSectionOpen] = useState<boolean>(false);
@@ -345,6 +423,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   // Process detected barcode string with strict validation to eliminate false matches on iOS
   const handleScannedBarcode = (rawCode: string, isManualInput: boolean = false) => {
+    resetCameraTimer();
     const cleanCode = rawCode.trim();
     if (!cleanCode || cleanCode.length < 2) return;
 
@@ -748,6 +827,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   // Toggle Torch / Flashlight for outdoor/shadow scanning
   const toggleTorch = async () => {
+    resetCameraTimer();
     if (!cameraStream) return;
     const track = cameraStream.getVideoTracks()[0];
     if (track && 'applyConstraints' in track) {
@@ -765,6 +845,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   // Set hardware camera zoom (e.g. 1x, 2x for small tags)
   const setZoom = async (newZoom: number) => {
+    resetCameraTimer();
     if (!cameraStream) return;
     const track = cameraStream.getVideoTracks()[0];
     if (track && 'applyConstraints' in track) {
@@ -779,8 +860,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
   };
 
-  // Switch to next available camera device or toggle facing mode
+  // Switch to next available camera device or flip camera
   const switchCameraDevice = async () => {
+    resetCameraTimer();
     if (videoDevices.length > 1) {
       const nextIndex = (activeDeviceIndex + 1) % videoDevices.length;
       setActiveDeviceIndex(nextIndex);
@@ -853,6 +935,39 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   const calculateTotal = () => {
     return cartItems.reduce((acc, item) => acc + (getItemEffectiveUnitPrice(item) * item.quantity), 0);
+  };
+
+  const [isSavedInPlace, setIsSavedInPlace] = useState<boolean>(false);
+
+  // Save current order in place without leaving the scan screen or changing views
+  const handleSaveInPlace = () => {
+    if (cartItems.length === 0) {
+      triggerScannedFeedback('Add at least one item to save the order.', 'warning');
+      return;
+    }
+    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
+    const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
+    const totalAmt = calculateTotal();
+
+    if (activeOrder && onUpdateActiveOrder) {
+      const updated: Order = {
+        ...activeOrder,
+        customerName: finalCustomer,
+        items: cartItems,
+        itemsCount: totalCount,
+        total: totalAmt
+      };
+      onUpdateActiveOrder(updated);
+      triggerScannedFeedback(`Saved changes to Order #${activeOrder.id}`, 'success');
+    } else {
+      onCompleteOrder(cartItems, finalCustomer);
+      triggerScannedFeedback('Order saved successfully!', 'success');
+    }
+
+    setIsSavedInPlace(true);
+    setTimeout(() => {
+      setIsSavedInPlace(false);
+    }, 2500);
   };
 
   const handleComplete = () => {
@@ -987,6 +1102,30 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
           <div className="flex items-center gap-2 shrink-0">
             <AutoSaveBadge compact />
+            <button
+              type="button"
+              id="btn-save-in-place-header"
+              onClick={handleSaveInPlace}
+              disabled={cartItems.length === 0}
+              className={`text-xs font-extrabold px-3 py-1.5 rounded-xl border transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 ${
+                isSavedInPlace
+                  ? 'bg-[#0e6c4a] text-white border-[#0e6c4a]'
+                  : 'bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white border-[#012d1d]'
+              } disabled:opacity-50`}
+              title="Save current order changes without leaving this scan screen"
+            >
+              {isSavedInPlace ? (
+                <>
+                  <Check className="w-3.5 h-3.5 text-white" />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-3.5 h-3.5" />
+                  <span>Save</span>
+                </>
+              )}
+            </button>
             <button
               type="button"
               onClick={() => onNavigate('finalization')}
@@ -1498,12 +1637,108 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-between p-3.5 pointer-events-none z-10">
           {/* Top Bar */}
           <div className="w-full flex justify-between items-center text-white/90 text-xs">
-            <span className="flex items-center gap-1 font-mono bg-black/60 backdrop-blur-xs px-2 py-1 rounded-md border border-white/10">
-              <QrCode className="w-3.5 h-3.5 text-[#a0f4c8]" />
-              {cameraActive ? 'CAMERA LIVE' : 'DEMO SCANNER'}
-            </span>
+            <div className="flex items-center gap-1.5 pointer-events-auto">
+              <span className="flex items-center gap-1 font-mono bg-black/60 backdrop-blur-xs px-2 py-1 rounded-md border border-white/10">
+                <QrCode className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                {cameraActive ? 'CAMERA LIVE' : 'DEMO SCANNER'}
+              </span>
+
+              {cameraActive && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (cameraTimeout > 0) {
+                      resetCameraTimer();
+                      triggerScannedFeedback(`Camera timer reset to ${cameraTimeout}s`, 'success', 2500);
+                    }
+                  }}
+                  className={`backdrop-blur-xs border px-2 py-1 rounded-md text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                    cameraTimeout === 0
+                      ? 'bg-black/60 text-white/90 border-white/20'
+                      : cameraTimeLeft <= 4
+                      ? 'bg-amber-500/90 text-black border-amber-300 font-extrabold shadow-[0_0_8px_#f59e0b] animate-pulse'
+                      : 'bg-black/60 hover:bg-black/80 text-white border-white/20'
+                  }`}
+                  title={cameraTimeout === 0 ? "Continuous camera stream (No timeout)" : "Click to reset auto-off timer"}
+                >
+                  <Clock className={`w-3.5 h-3.5 ${cameraTimeout > 0 && cameraTimeLeft <= 4 ? 'text-black' : 'text-[#a0f4c8]'}`} />
+                  <span>{cameraTimeout === 0 ? 'Continuous' : `${cameraTimeLeft}s auto-off`}</span>
+                  {cameraTimeout > 0 && <RefreshCw className="w-2.5 h-2.5 opacity-70 ml-0.5" />}
+                </button>
+              )}
+            </div>
 
             <div className="flex items-center gap-1.5 pointer-events-auto">
+              {/* Quick Timeout Selector Menu */}
+              <div className="relative pointer-events-auto" ref={timeoutMenuRef}>
+                <button
+                  type="button"
+                  onClick={() => setIsTimeoutMenuOpen(!isTimeoutMenuOpen)}
+                  className={`backdrop-blur-xs border px-2 py-1 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 ${
+                    isTimeoutMenuOpen
+                      ? 'bg-[#a0f4c8] text-[#002113] border-[#0e6c4a] font-bold'
+                      : 'bg-black/60 hover:bg-black/80 text-white border-white/20'
+                  }`}
+                  title="Configure Camera Timeout (10s, 15s, 30s, 60s, Never)"
+                >
+                  <Timer className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                  <span>{cameraTimeout === 0 ? 'No Timeout' : `${cameraTimeout}s`}</span>
+                  <ChevronDown className="w-3 h-3 opacity-75" />
+                </button>
+
+                {isTimeoutMenuOpen && (
+                  <div className="absolute right-0 top-full mt-1.5 w-52 bg-[#1a1c1a] border border-[#c1c8c2]/40 rounded-xl shadow-2xl p-2 z-50 flex flex-col gap-1 text-white animate-fade-in">
+                    <div className="flex items-center justify-between pb-1.5 border-b border-white/10 px-1">
+                      <span className="text-[11px] font-bold text-[#a0f4c8] uppercase tracking-wider flex items-center gap-1">
+                        <Timer className="w-3 h-3" />
+                        Camera Timeout
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => setIsTimeoutMenuOpen(false)}
+                        className="text-white/60 hover:text-white p-0.5 cursor-pointer"
+                      >
+                        <X className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {[
+                      { label: '10s (Fast Battery Saver)', val: 10 },
+                      { label: '15s (Standard Recommended)', val: 15 },
+                      { label: '30s (Extended Scanning)', val: 30 },
+                      { label: '60s (Continuous Batch)', val: 60 },
+                      { label: 'Never (Continuous Stream)', val: 0 },
+                    ].map((opt) => (
+                      <button
+                        key={opt.val}
+                        type="button"
+                        onClick={() => {
+                          if (onUpdateCameraTimeout) {
+                            onUpdateCameraTimeout(opt.val);
+                          }
+                          if (opt.val > 0) {
+                            setCameraTimeLeft(opt.val);
+                          }
+                          setIsTimeoutMenuOpen(false);
+                          triggerScannedFeedback(
+                            `Camera auto-off set to ${opt.val === 0 ? 'Never (Continuous)' : `${opt.val}s`}`,
+                            'success',
+                            3000
+                          );
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-lg text-xs font-semibold flex items-center justify-between transition-colors cursor-pointer ${
+                          cameraTimeout === opt.val
+                            ? 'bg-[#0e6c4a] text-white font-bold'
+                            : 'hover:bg-white/10 text-white/90'
+                        }`}
+                      >
+                        <span>{opt.label}</span>
+                        {cameraTimeout === opt.val && <Check className="w-3.5 h-3.5 text-[#a0f4c8]" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
               {cameraActive && isTorchSupported && (
                 <button
                   type="button"
@@ -1795,14 +2030,38 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <div className="flex flex-col sm:flex-row gap-2.5">
               <button
                 type="button"
+                id="btn-save-in-place-active"
+                onClick={handleSaveInPlace}
+                disabled={cartItems.length === 0}
+                className={`bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base border border-[#a0f4c8]/30 ${
+                  isSavedInPlace ? '!bg-[#0e6c4a] !text-white' : ''
+                }`}
+                title="Save order changes right here without leaving this scan screen"
+              >
+                {isSavedInPlace ? (
+                  <>
+                    <Check className="w-5 h-5 text-white" />
+                    <span>Saved!</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    <span>Save</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
                 onClick={() => {
                   handleComplete();
                 }}
                 disabled={cartItems.length === 0}
-                className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base"
+                className="flex-1 bg-[#19724f] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base"
+                title="Save changes and open order details page"
               >
-                <CheckCircle className="w-5 h-5" />
-                <span>Save & Return to Order {activeOrder.id}</span>
+                <CheckCircle className="w-5 h-5 text-[#a0f4c8]" />
+                <span>Save & Go to Order</span>
               </button>
 
               <button
@@ -1810,7 +2069,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 id="btn-customer-took-order-active"
                 onClick={handleCustomerTookOrder}
                 disabled={cartItems.length === 0}
-                className="bg-[#0e6c4a] hover:bg-[#0b5338] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm shrink-0 border border-[#a0f4c8]/30"
+                className="bg-[#0e6c4a] hover:bg-[#0b5338] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 px-3 rounded-xl shadow-md transition-all flex justify-center items-center gap-1.5 cursor-pointer text-sm shrink-0 border border-[#a0f4c8]/30"
                 title="Customer took all items now - skip staging holding area"
               >
                 <CheckCircle2 className="w-4 h-4 text-[#a0f4c8]" />
@@ -1823,7 +2082,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   handleCompleteAndGoToHolding();
                 }}
                 disabled={cartItems.length === 0}
-                className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm shrink-0"
+                className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 px-3 rounded-xl shadow-md transition-all flex justify-center items-center gap-1.5 cursor-pointer text-sm shrink-0"
                 title="Save changes and proceed to staging map"
               >
                 <MapPin className="w-4 h-4" />
@@ -1845,14 +2104,37 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <div className="flex flex-col sm:flex-row gap-2.5">
               <button
                 type="button"
+                id="btn-save-in-place-new"
+                onClick={handleSaveInPlace}
+                disabled={cartItems.length === 0}
+                className={`bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base border border-[#a0f4c8]/30 ${
+                  isSavedInPlace ? '!bg-[#0e6c4a] !text-white' : ''
+                }`}
+                title="Save order without navigating away from the scan screen"
+              >
+                {isSavedInPlace ? (
+                  <>
+                    <Check className="w-5 h-5 text-white" />
+                    <span>Order Saved!</span>
+                  </>
+                ) : (
+                  <>
+                    <Save className="w-5 h-5" />
+                    <span>Save Order (Stay on Screen)</span>
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
                 id="btn-customer-took-order"
                 onClick={handleCustomerTookOrder}
                 disabled={cartItems.length === 0}
-                className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] disabled:opacity-50 text-[#a0f4c8] hover:text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base border border-[#a0f4c8]/30"
+                className="flex-1 bg-[#0e6c4a] hover:bg-[#0b5338] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base border border-[#a0f4c8]/30"
                 title="Customer took the entire order with them now - skips holding area staging"
               >
                 <CheckCircle2 className="w-5 h-5 text-[#a0f4c8]" />
-                <span>Customer Took Entire Order (Skip Holding)</span>
+                <span>Customer Took All</span>
               </button>
 
               <button

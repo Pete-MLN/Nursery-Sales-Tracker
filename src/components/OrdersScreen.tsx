@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { ScreenType, Order } from '../types';
 import { formatOrderCreatedDate, formatOrderScheduledTime } from '../utils/dateUtils';
-import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Tag, Trash2, X, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Trash2, X, AlertTriangle, CheckCircle, RotateCcw, Archive, Undo2 } from 'lucide-react';
 
 interface OrdersScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -12,6 +12,8 @@ interface OrdersScreenProps {
   onUpdateOrder?: (updatedOrder: Order) => void;
 }
 
+type TabType = 'Active' | 'Ready' | 'Pending' | 'Partial Pickup' | 'Completed' | 'Cancelled' | 'All';
+
 export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   onNavigate,
   orders,
@@ -20,20 +22,42 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   onDeleteOrder,
   onUpdateOrder
 }) => {
-  const [activeTab, setActiveTab] = useState<'All' | 'Pending' | 'Ready' | 'Partial Pickup' | 'Completed' | 'Cancelled'>('All');
+  const [activeTab, setActiveTab] = useState<TabType>('Active');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
+  const [orderToComplete, setOrderToComplete] = useState<Order | null>(null);
+  const [toastNotification, setToastNotification] = useState<{ text: string; orderToUndo?: Order } | null>(null);
 
-  const filteredOrders = orders.filter(o => {
+  const showToast = (text: string, orderToUndo?: Order) => {
+    setToastNotification({ text, orderToUndo });
+    setTimeout(() => {
+      setToastNotification((prev) => (prev?.text === text ? null : prev));
+    }, 4500);
+  };
+
+  const validOrders = orders.filter(o => o && o.id && !o.id.startsWith('ORD-DRAFT-'));
+
+  const activeOrdersCount = validOrders.filter(o => o.status !== 'Completed' && o.status !== 'Cancelled' && !o.archived).length;
+  const readyOrdersCount = validOrders.filter(o => o.status === 'Ready for Pickup' && !o.archived).length;
+  const pendingOrdersCount = validOrders.filter(o => o.status === 'Pending' && !o.archived).length;
+  const partialOrdersCount = validOrders.filter(o => (o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0)) && o.status !== 'Completed' && !o.archived).length;
+  const completedOrdersCount = validOrders.filter(o => o.status === 'Completed' || !!o.archived).length;
+  const cancelledOrdersCount = validOrders.filter(o => o.status === 'Cancelled').length;
+
+  const filteredOrders = validOrders.filter(o => {
     const isPartial = o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0);
-    
+    const isCompleted = o.status === 'Completed' || !!o.archived;
+    const isCancelled = o.status === 'Cancelled';
+    const isActive = !isCompleted && !isCancelled;
+
     const matchesTab = 
-      activeTab === 'All' ? true :
-      activeTab === 'Pending' ? o.status === 'Pending' :
-      activeTab === 'Ready' ? (o.status === 'Ready for Pickup' || (o.status === 'Partial Pickup' && !isPartial)) :
-      activeTab === 'Partial Pickup' ? isPartial :
-      activeTab === 'Completed' ? o.status === 'Completed' :
-      o.status === 'Cancelled';
+      activeTab === 'Active' ? isActive :
+      activeTab === 'Ready' ? (o.status === 'Ready for Pickup' && !isCompleted) :
+      activeTab === 'Pending' ? (o.status === 'Pending' && !isCompleted) :
+      activeTab === 'Partial Pickup' ? (isPartial && !isCompleted) :
+      activeTab === 'Completed' ? isCompleted :
+      activeTab === 'Cancelled' ? isCancelled :
+      true; // 'All'
 
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = 
@@ -60,9 +84,45 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
     }
   };
 
+  const handleConfirmComplete = (order: Order) => {
+    if (onUpdateOrder) {
+      const now = new Date();
+      const updatedOrder: Order = {
+        ...order,
+        status: 'Completed',
+        archived: true,
+        completedAt: now.toISOString(),
+        hasPartialPickup: false,
+        remainingItemsCount: 0,
+        pickedUpItemsCount: order.itemsCount,
+        items: (order.items || []).map(item => ({
+          ...item,
+          pickedUpQuantity: item.quantity
+        }))
+      };
+      onUpdateOrder(updatedOrder);
+      showToast(`Order #${order.id} marked as Completed & Archived!`, order);
+    }
+    setOrderToComplete(null);
+  };
+
+  const handleReopenOrder = (order: Order) => {
+    if (onUpdateOrder) {
+      const updatedOrder: Order = {
+        ...order,
+        status: 'Ready for Pickup',
+        archived: false,
+        completedAt: undefined
+      };
+      onUpdateOrder(updatedOrder);
+      showToast(`Order #${order.id} restored to Active orders queue.`);
+    }
+  };
+
   const handleConfirmDelete = (orderId: string) => {
     if (onDeleteOrder) {
       onDeleteOrder(orderId);
+      showToast(`Order #${orderId} permanently deleted.`);
     }
     setOrderToDelete(null);
   };
@@ -73,19 +133,60 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         ...order,
         status: 'Cancelled'
       });
+      showToast(`Order #${order.id} marked as Cancelled.`);
     }
     setOrderToDelete(null);
   };
 
-  const partialOrdersCount = orders.filter(o => o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0)).length;
-  const cancelledOrdersCount = orders.filter(o => o.status === 'Cancelled').length;
+  const formatCompletionDate = (isoStr?: string) => {
+    if (!isoStr) return '';
+    try {
+      const d = new Date(isoStr);
+      return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+    } catch {
+      return isoStr;
+    }
+  };
 
   return (
     <div className="flex-1 px-4 py-6 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-5">
+      {/* Toast Notification Banner with optional Undo */}
+      {toastNotification && (
+        <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-[#012d1d] text-white px-4 py-3 rounded-2xl shadow-2xl border border-[#a0f4c8]/30 flex items-center gap-3 animate-fade-in max-w-md w-[92%]">
+          <CheckCircle className="w-5 h-5 text-[#a0f4c8] shrink-0" />
+          <div className="flex-1 text-xs font-bold text-[#f3f4f0]">
+            {toastNotification.text}
+          </div>
+          {toastNotification.orderToUndo && (
+            <button
+              type="button"
+              onClick={() => {
+                if (toastNotification.orderToUndo) {
+                  handleReopenOrder(toastNotification.orderToUndo);
+                  setToastNotification(null);
+                }
+              }}
+              className="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-extrabold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+            >
+              <Undo2 className="w-3.5 h-3.5" />
+              <span>Undo</span>
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => setToastNotification(null)}
+            className="text-white/60 hover:text-white p-1 cursor-pointer"
+          >
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Header */}
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold text-[#012d1d]">Order Management</h2>
-          <p className="text-xs text-[#414844] mt-0.5">Track, route, and finalize nursery customer orders.</p>
+          <p className="text-xs text-[#414844] mt-0.5">Track active staging orders, customer pickups, and archived records.</p>
         </div>
         <button
           onClick={onCreateNewOrderClick}
@@ -108,34 +209,162 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         />
       </div>
 
-      {/* Tabs */}
-      <div className="flex border-b border-[#c1c8c2] gap-2 overflow-x-auto text-xs font-bold">
-        {(['All', 'Pending', 'Ready', 'Partial Pickup', 'Completed', 'Cancelled'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer ${
-              activeTab === tab
-                ? 'border-[#012d1d] text-[#012d1d]'
-                : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
-            }`}
-          >
-            {tab} {tab === 'All' ? `(${orders.length})` : tab === 'Partial Pickup' && partialOrdersCount > 0 ? `(${partialOrdersCount})` : tab === 'Cancelled' && cancelledOrdersCount > 0 ? `(${cancelledOrdersCount})` : ''}
-          </button>
-        ))}
+      {/* Tab Navigation */}
+      <div className="flex border-b border-[#c1c8c2] gap-1.5 overflow-x-auto text-xs font-bold pb-0.5 scrollbar-none">
+        <button
+          type="button"
+          onClick={() => setActiveTab('Active')}
+          className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'Active'
+              ? 'border-[#012d1d] text-[#012d1d]'
+              : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
+          }`}
+        >
+          <span>Active Orders</span>
+          <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Active' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'bg-[#e2e3df] text-[#414844]'}`}>
+            {activeOrdersCount}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Ready')}
+          className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'Ready'
+              ? 'border-[#012d1d] text-[#012d1d]'
+              : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
+          }`}
+        >
+          <span>Ready</span>
+          {readyOrdersCount > 0 && (
+            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Ready' ? 'bg-[#19724f] text-white' : 'bg-[#a0f4c8] text-[#19724f]'}`}>
+              {readyOrdersCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Pending')}
+          className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'Pending'
+              ? 'border-[#012d1d] text-[#012d1d]'
+              : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
+          }`}
+        >
+          <span>Pending</span>
+          {pendingOrdersCount > 0 && (
+            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Pending' ? 'bg-[#461702] text-white' : 'bg-[#facc15]/30 text-[#461702]'}`}>
+              {pendingOrdersCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Partial Pickup')}
+          className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'Partial Pickup'
+              ? 'border-[#012d1d] text-[#012d1d]'
+              : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
+          }`}
+        >
+          <span>Partial Pickup</span>
+          {partialOrdersCount > 0 && (
+            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Partial Pickup' ? 'bg-amber-800 text-white' : 'bg-amber-100 text-amber-900 border border-amber-300'}`}>
+              {partialOrdersCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Completed')}
+          className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'Completed'
+              ? 'border-[#012d1d] text-[#012d1d]'
+              : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
+          }`}
+          title="Orders where customer picked up plants - safely archived and stored for records"
+        >
+          <Archive className="w-3.5 h-3.5 text-[#0e6c4a]" />
+          <span>Completed (Archived)</span>
+          {completedOrdersCount > 0 && (
+            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Completed' ? 'bg-[#0e6c4a] text-white' : 'bg-emerald-100 text-emerald-800'}`}>
+              {completedOrdersCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('Cancelled')}
+          className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'Cancelled'
+              ? 'border-[#012d1d] text-[#012d1d]'
+              : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
+          }`}
+        >
+          <span>Cancelled</span>
+          {cancelledOrdersCount > 0 && (
+            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Cancelled' ? 'bg-red-700 text-white' : 'bg-red-100 text-red-800'}`}>
+              {cancelledOrdersCount}
+            </span>
+          )}
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('All')}
+          className={`pb-2.5 px-3 border-b-2 transition-colors shrink-0 cursor-pointer flex items-center gap-1.5 ${
+            activeTab === 'All'
+              ? 'border-[#012d1d] text-[#012d1d]'
+              : 'border-transparent text-[#717973] hover:text-[#1a1c1a]'
+          }`}
+        >
+          <span>All Orders</span>
+          <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'All' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'bg-[#e2e3df] text-[#414844]'}`}>
+            {validOrders.length}
+          </span>
+        </button>
       </div>
+
+      {/* Helper Banner for Completed / Archived View */}
+      {activeTab === 'Completed' && (
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-3 text-xs text-emerald-950">
+          <Archive className="w-5 h-5 text-emerald-700 shrink-0" />
+          <div className="flex-1">
+            <span className="font-extrabold block text-emerald-900">Archived Order History</span>
+            <span className="text-[11px] text-emerald-800">
+              Orders marked as Completed (Customer Picked Up) are kept safely here for sales records and history. You can reopen any order back to the active queue at any time.
+            </span>
+          </div>
+        </div>
+      )}
 
       {/* Orders List */}
       <div className="flex flex-col gap-3">
         {filteredOrders.length === 0 ? (
-          <div className="p-10 text-center bg-[#f3f4f0] rounded-xl text-[#717973]">
-            <Package className="w-8 h-8 mx-auto mb-2 text-[#c1c8c2]" />
-            <p className="text-sm font-medium">No orders found matching criteria.</p>
+          <div className="p-10 text-center bg-[#f3f4f0] rounded-xl text-[#717973] flex flex-col items-center justify-center gap-2">
+            <Package className="w-8 h-8 text-[#c1c8c2]" />
+            <p className="text-sm font-bold text-[#1a1c1a]">
+              {activeTab === 'Completed' 
+                ? 'No completed orders in the archive yet.' 
+                : activeTab === 'Active' 
+                ? 'No active orders currently awaiting fulfillment or pickup.' 
+                : 'No orders found matching criteria.'}
+            </p>
+            {activeTab === 'Active' && (
+              <p className="text-xs text-[#717973] max-w-sm">
+                Tap <strong>New Order</strong> above to create an order, or check the <strong>Completed (Archived)</strong> tab for previous customer pickups.
+              </p>
+            )}
           </div>
         ) : (
           filteredOrders.map((order) => {
             const isPartial = order.status === 'Partial Pickup' || !!order.hasPartialPickup || ((order.remainingItemsCount || 0) > 0 && (order.pickedUpItemsCount || 0) > 0);
             const remainingCount = order.remainingItemsCount ?? (isPartial ? (order.itemsCount - (order.pickedUpItemsCount || 0)) : 0);
+            const isCompleted = order.status === 'Completed' || !!order.archived;
 
             return (
               <div
@@ -145,7 +374,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                   onNavigate('finalization');
                 }}
                 className={`bg-white rounded-2xl p-4 sm:p-5 border shadow-2xs hover:shadow-md transition-all flex flex-col gap-3 cursor-pointer group ${
-                  isPartial 
+                  isCompleted
+                    ? 'border-emerald-200 bg-emerald-50/20 hover:border-emerald-500'
+                    : isPartial 
                     ? 'border-amber-300 hover:border-amber-500 bg-amber-50/20' 
                     : order.status === 'Cancelled'
                     ? 'border-red-200 bg-red-50/20 opacity-80'
@@ -158,7 +389,12 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                       <span className="font-extrabold text-base sm:text-lg text-[#012d1d] group-hover:underline">
                         {order.customerName ? `${order.customerName} - ${order.id}` : order.id}
                       </span>
-                      {isPartial ? (
+                      {isCompleted ? (
+                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3 text-emerald-700" />
+                          <span>Completed / Customer Picked Up</span>
+                        </span>
+                      ) : isPartial ? (
                         <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
                           <AlertCircle className="w-3 h-3 text-amber-700" />
                           <span>Partial Pickup ({remainingCount > 0 ? `${remainingCount} remaining` : 'Split Load'})</span>
@@ -169,8 +405,6 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                             ? 'bg-[#a0f4c8] text-[#19724f]'
                             : order.status === 'Pending'
                             ? 'bg-[#facc15]/30 text-[#461702]'
-                            : order.status === 'Completed'
-                            ? 'bg-[#e2e3df] text-[#414844]'
                             : order.status === 'Cancelled'
                             ? 'bg-red-100 text-red-800 border border-red-300'
                             : 'bg-[#f3f4f0] text-[#717973]'
@@ -189,6 +423,15 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         <Clock className="w-3 h-3 text-[#461702]" />
                         <span>Scheduled: <strong>{formatOrderScheduledTime(order)}</strong></span>
                       </span>
+                      {order.completedAt && (
+                        <>
+                          <span className="text-[#c1c8c2]">•</span>
+                          <span className="inline-flex items-center gap-1 bg-emerald-100 px-2 py-0.5 rounded-md text-emerald-900 font-bold">
+                            <CheckCircle className="w-3 h-3 text-emerald-700" />
+                            <span>Picked Up: {formatCompletionDate(order.completedAt)}</span>
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
 
@@ -210,7 +453,12 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                       {order.holdingLocation || 'Holding Location Not Assigned'}
                     </span>
                   </div>
-                  {isPartial && remainingCount > 0 ? (
+                  {isCompleted ? (
+                    <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                      <CheckCircle className="w-3 h-3 text-emerald-700" />
+                      <span>Archived in History</span>
+                    </span>
+                  ) : isPartial && remainingCount > 0 ? (
                     <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
                       <Clock className="w-3 h-3 text-amber-700" />
                       <span>{remainingCount} plants held for pickup</span>
@@ -255,14 +503,43 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                     <span className="font-semibold">{order.type}</span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {/* Primary Completed / Reopen Button */}
+                    {!isCompleted ? (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setOrderToComplete(order);
+                        }}
+                        className="p-1.5 px-3 rounded-xl bg-[#0e6c4a] hover:bg-[#012d1d] text-white flex items-center gap-1.5 text-xs font-extrabold transition-all shadow-2xs border border-[#a0f4c8]/30 cursor-pointer active:scale-98"
+                        title="Customer picked up order: mark as completed and archive from active list"
+                      >
+                        <CheckCircle className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                        <span>Completed</span>
+                      </button>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleReopenOrder(order);
+                        }}
+                        className="p-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                        title="Restore order to Active orders list"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
+                        <span>Reopen to Active</span>
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={(e) => {
                         e.stopPropagation();
                         setOrderToDelete(order);
                       }}
-                      className="p-1.5 px-2.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
+                      className="p-1.5 px-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
                       title="Cancel or Delete this order"
                     >
                       <Trash2 className="w-3.5 h-3.5 text-red-600" />
@@ -276,7 +553,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         onSelectOrder(order);
                         onNavigate('holding_location');
                       }}
-                      className="p-1.5 px-2.5 rounded-lg bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
+                      className="p-1.5 px-2.5 rounded-xl bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
                       title="Change holding area"
                     >
                       <MapPin className="w-3.5 h-3.5" />
@@ -290,7 +567,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         onSelectOrder(order);
                         onNavigate('finalization');
                       }}
-                      className="p-1.5 px-3 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white flex items-center gap-1 text-xs font-extrabold shadow-2xs transition-all cursor-pointer"
+                      className="p-1.5 px-3 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white flex items-center gap-1 text-xs font-extrabold shadow-2xs transition-all cursor-pointer"
                     >
                       <span>View & Edit</span>
                       <ChevronRight className="w-3.5 h-3.5" />
@@ -302,6 +579,71 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           })
         )}
       </div>
+
+      {/* Complete & Archive Order Confirmation Modal */}
+      {orderToComplete && (
+        <div 
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          onClick={() => setOrderToComplete(null)}
+        >
+          <div 
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-start gap-3">
+              <div className="p-2.5 bg-emerald-100 text-emerald-800 rounded-xl shrink-0">
+                <CheckCircle className="w-6 h-6 text-emerald-700" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="font-extrabold text-base text-[#1a1c1a]">Customer Picked Up Order?</h3>
+                <p className="text-xs text-[#717973] mt-0.5">
+                  Order <span className="font-bold text-[#012d1d]">#{orderToComplete.id}</span> • {orderToComplete.customerName} (${orderToComplete.total.toFixed(2)})
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setOrderToComplete(null)}
+                className="p-1 text-[#717973] hover:text-[#1a1c1a] rounded-lg cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <div className="bg-[#f3f4f0] p-3.5 rounded-xl border border-[#e2e3df] text-xs text-[#414844] flex flex-col gap-2">
+              <div className="flex items-center justify-between font-bold text-[#012d1d] border-b border-[#e2e3df] pb-2">
+                <span>Items: {orderToComplete.itemsCount} plants</span>
+                <span>Zone: {orderToComplete.holdingLocation || 'Staging Bay'}</span>
+              </div>
+              <p className="text-[11px] text-[#525a55] leading-relaxed">
+                Confirming completion marks this order as <strong>Customer Picked Up</strong> and archives it from the active order queue.
+              </p>
+              <div className="bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg p-2 text-[11px] font-medium flex items-center gap-1.5">
+                <Archive className="w-4 h-4 text-emerald-700 shrink-0" />
+                <span>The order is safely saved in the <strong>Completed (Archived)</strong> tab for sales records and history (not deleted).</span>
+              </div>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-[#e2e3df]">
+              <button
+                type="button"
+                onClick={() => handleConfirmComplete(orderToComplete)}
+                className="flex-1 bg-[#0e6c4a] hover:bg-[#012d1d] text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+              >
+                <CheckCircle className="w-4 h-4 text-[#a0f4c8]" />
+                <span>Complete & Archive</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setOrderToComplete(null)}
+                className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] font-bold py-2.5 px-4 rounded-xl text-xs transition-colors cursor-pointer"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Delete / Cancel Order Confirmation Modal */}
       {orderToDelete && (
@@ -373,3 +715,4 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
     </div>
   );
 };
+

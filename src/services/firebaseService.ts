@@ -1,6 +1,7 @@
 import { 
   collection, 
   doc, 
+  getDoc,
   setDoc, 
   updateDoc, 
   deleteDoc, 
@@ -82,6 +83,14 @@ export async function seedInitialFirestoreData() {
       });
       await batch.commit();
       console.log('Firestore: Employees initialized');
+    } else {
+      const peteDoc = await getDoc(doc(db, EMPLOYEES_COL, 'emp-pete'));
+      if (!peteDoc.exists()) {
+        const peteEmp = INITIAL_EMPLOYEES.find(e => e.id === 'emp-pete');
+        if (peteEmp) {
+          await setDoc(doc(db, EMPLOYEES_COL, 'emp-pete'), cleanForFirestore(peteEmp));
+        }
+      }
     }
 
     const uploadsSnap = await getDocs(collection(db, UPLOADS_COL));
@@ -104,6 +113,17 @@ export async function seedInitialFirestoreData() {
       });
       await batch.commit();
       console.log('Firestore: Holding Locations initialized');
+    }
+
+    const ordersSnap = await getDocs(collection(db, ORDERS_COL));
+    if (ordersSnap.empty) {
+      const batch = writeBatch(db);
+      INITIAL_ORDERS.forEach((ord) => {
+        const ref = doc(db, ORDERS_COL, ord.id);
+        batch.set(ref, cleanForFirestore(ord));
+      });
+      await batch.commit();
+      console.log('Firestore: Orders initialized');
     }
   } catch (err) {
     console.error('Error seeding Firestore data:', err);
@@ -146,7 +166,10 @@ export function subscribeToOrders(callback: (orders: Order[]) => void) {
   return onSnapshot(collection(db, ORDERS_COL), (snapshot) => {
     const items: Order[] = [];
     snapshot.forEach((doc) => {
-      items.push(doc.data() as Order);
+      const order = doc.data() as Order;
+      if (order && order.id && !order.id.startsWith('ORD-DRAFT-')) {
+        items.push(order);
+      }
     });
     callback(items);
   }, (err) => console.error('Orders snapshot error:', err));

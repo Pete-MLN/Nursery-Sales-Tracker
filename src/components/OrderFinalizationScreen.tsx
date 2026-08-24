@@ -170,12 +170,12 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [selectedOfficeEmployeeId, setSelectedOfficeEmployeeId] = useState<string>('');
   const [isDefaultOfficeSaved, setIsDefaultOfficeSaved] = useState<boolean>(false);
 
-  // Text Crew / SMS State
+  // Text Employee / SMS State (Strictly for staff/crew, default Pete 518-227-1235)
   const [isTextCrewModalOpen, setIsTextCrewModalOpen] = useState<boolean>(false);
   const [crewPhoneNumber, setCrewPhoneNumber] = useState<string>(() => {
-    return localStorage.getItem('nursery_default_crew_phone') || '518.223.1235';
+    return localStorage.getItem('nursery_default_crew_phone') || '518-227-1235';
   });
-  const [selectedCrewEmployeeId, setSelectedCrewEmployeeId] = useState<string>('');
+  const [selectedCrewEmployeeId, setSelectedCrewEmployeeId] = useState<string>('emp-pete');
 
   const [plantSearchQuery, setPlantSearchQuery] = useState<string>('');
   const [selectedPlantCategory, setSelectedPlantCategory] = useState<string>('All');
@@ -228,9 +228,6 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     const matched = findMatchingCustomer(rawName, customers);
     if (matched?.email) {
       setCustomerEmailAddress(matched.email);
-    }
-    if (matched?.phone) {
-      setCrewPhoneNumber(matched.phone);
     }
     
     setFulfillment(currentOrder.type || 'Take Now');
@@ -697,7 +694,7 @@ For questions, contact us at (555) 345-6789 or office@maplelanenursery.com.`;
 
   // Generate standard cross-platform SMS URL (iOS Safari, Android Chrome, macOS Messages)
   const getSmsUrl = (phoneStr: string, bodyText: string) => {
-    const rawDigits = cleanPhoneForDialer(phoneStr) || '5182231235';
+    const rawDigits = cleanPhoneForDialer(phoneStr) || '5182271235';
     const isIOS = typeof navigator !== 'undefined' && (/iPad|iPhone|iPod/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && (navigator.maxTouchPoints || 0) > 1));
     const separator = isIOS ? '&' : '?';
     return `sms:${rawDigits}${separator}body=${encodeURIComponent(bodyText)}`;
@@ -793,13 +790,13 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
     return body;
   };
 
-  // Trigger Text Crew using default phone SMS/Messaging app
+  // Trigger Text Employee using default phone SMS/Messaging app
   const handleTextCrew = (targetPhone?: string) => {
-    const phoneToUse = targetPhone !== undefined ? targetPhone : (crewPhoneNumber || '518.223.1235');
+    const phoneToUse = targetPhone !== undefined ? targetPhone : (crewPhoneNumber || '518-227-1235');
     const text = getCrewSmsContent();
     const smsUrl = getSmsUrl(phoneToUse, text);
     
-    // Open default SMS app with prefilled 518.223.1235 recipient
+    // Open default SMS app with prefilled Pete (518-227-1235) recipient
     openExternalProtocol(smsUrl);
     showToast(`Opening Text/SMS app for ${phoneToUse}...`);
     setIsTextCrewModalOpen(true);
@@ -1177,19 +1174,19 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             </div>
           </button>
 
-          {/* Text Crew / SMS Button */}
+          {/* Text Employee / SMS Button */}
           <button
             type="button"
             id="btn-quick-text-crew"
             onClick={() => handleTextCrew()}
             className="bg-[#0e6c4a] hover:bg-[#012d1d] text-white font-bold py-3 px-3 rounded-xl shadow-xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-[#a0f4c8]/20"
-            title="Open default SMS app with complete staging order prefilled to 518.223.1235"
+            title="Open default SMS app with complete order prefilled to Pete (518-227-1235) or selected employee"
           >
             <MessageSquare className="w-4 h-4 text-[#a0f4c8]" />
             <div className="flex flex-col items-start text-left leading-tight">
-              <span className="font-extrabold">Text Crew (SMS)</span>
+              <span className="font-extrabold">Text Employee (SMS)</span>
               <span className="text-[10px] text-emerald-100 font-normal truncate max-w-[130px]">
-                {crewPhoneNumber || '518.223.1235'}
+                {crewPhoneNumber || '518-227-1235'}
               </span>
             </div>
           </button>
@@ -1822,13 +1819,13 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             id="btn-bottom-text-crew"
             onClick={() => handleTextCrew()}
             className="w-full bg-[#0e6c4a] hover:bg-[#012d1d] text-white font-bold py-3 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer active:scale-98 border border-[#a0f4c8]/20"
-            title="Open default SMS app with complete staging order prefilled to 518.223.1235"
+            title="Open default SMS app with complete order prefilled to Pete (518-227-1235) or selected employee"
           >
             <MessageSquare className="w-4 h-4 text-[#a0f4c8]" />
             <div className="flex flex-col items-start text-left leading-tight">
-              <span className="font-extrabold">Text Crew (SMS)</span>
+              <span className="font-extrabold">Text Employee (SMS)</span>
               <span className="text-[10px] text-emerald-100 font-normal truncate max-w-[130px]">
-                {crewPhoneNumber || '518.223.1235'}
+                {crewPhoneNumber || '518-227-1235'}
               </span>
             </div>
           </button>
@@ -2425,9 +2422,6 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                     } else {
                       showToast(`Selected ${found.name} (No email on file)`);
                     }
-                    if (found.phone) {
-                      setCrewPhoneNumber(found.phone);
-                    }
                   }
                 }}
                 className="w-full bg-white border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
@@ -2709,7 +2703,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
         </div>
       )}
 
-      {/* Text Crew SMS Modal */}
+      {/* Text Employee SMS Modal */}
       {isTextCrewModalOpen && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
           <div 
@@ -2723,8 +2717,8 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                   <MessageSquare className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-extrabold text-[#1a1c1a]">Text Staging Crew (SMS)</h3>
-                  <p className="text-xs text-[#717973]">Opens default text messaging / SMS app with order staging details.</p>
+                  <h3 className="text-lg font-extrabold text-[#1a1c1a]">Text Order to Employee (SMS)</h3>
+                  <p className="text-xs text-[#717973]">Sends order details to nursery employees via SMS. Default: Pete (518-227-1235).</p>
                 </div>
               </div>
               <button
@@ -2735,15 +2729,15 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               </button>
             </div>
 
-            {/* Select Employee / Staging Team Dropdown */}
+            {/* Select Employee Dropdown (Employees ONLY) */}
             <div className="flex flex-col gap-1.5 bg-[#f9faf6] p-3 rounded-xl border border-[#e2e3df]">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
                   <Users className="w-3.5 h-3.5 text-[#012d1d]" />
-                  <span>Choose Recipient from Employee List</span>
+                  <span>Choose Employee Recipient</span>
                 </label>
                 <span className="text-[10px] font-semibold text-[#717973]">
-                  Auto-populates phone number
+                  Employees Only
                 </span>
               </div>
               <select
@@ -2761,26 +2755,14 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 }}
                 className="w-full bg-white border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
               >
-                <option value="518.223.1235">Default Crew: 518.223.1235</option>
-                {employees.length > 0 && (
-                  <optgroup label="Nursery Employees & Crew">
-                    {employees.map(emp => (
-                      <option key={emp.id} value={emp.phone}>
-                        {emp.name} ({emp.role || emp.department || 'Staff'}) - {emp.phone}
-                      </option>
-                    ))}
-                  </optgroup>
-                )}
-                <optgroup label="Staging & Yard Teams">
-                  <option value="(555) 019-2831">Yard Lead - (555) 019-2831</option>
-                  <option value="(555) 019-2832">Loading Dock - (555) 019-2832</option>
-                  <option value="(555) 019-2833">Delivery Driver - (555) 019-2833</option>
-                </optgroup>
-                {matchedCustomer?.phone && (
-                  <optgroup label="Customer Contact">
-                    <option value={matchedCustomer.phone}>Customer: {customerName} - {matchedCustomer.phone}</option>
-                  </optgroup>
-                )}
+                <option value="518-227-1235">Pete (Owner & Nursery Manager) - 518-227-1235 (Default)</option>
+                {employees
+                  .filter(emp => emp.phone !== '518-227-1235' && emp.id !== 'emp-pete')
+                  .map(emp => (
+                    <option key={emp.id} value={emp.phone}>
+                      {emp.name} ({emp.role || emp.department || 'Staff'}) - {emp.phone}
+                    </option>
+                  ))}
               </select>
             </div>
 
@@ -2788,13 +2770,13 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             <div className="flex flex-col gap-2">
               <div className="flex items-center justify-between">
                 <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
-                  Crew Phone Number
+                  Employee Phone Number
                 </label>
                 <button
                   type="button"
                   onClick={() => handleSaveDefaultCrewPhone(crewPhoneNumber)}
                   className="text-[11px] text-[#0e6c4a] hover:underline font-bold cursor-pointer"
-                  title="Save this phone number as the default for SMS crew notifications"
+                  title="Save this phone number as the default for SMS employee notifications"
                 >
                   Save as Default
                 </button>
@@ -2803,7 +2785,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 type="tel"
                 value={crewPhoneNumber}
                 onChange={(e) => setCrewPhoneNumber(e.target.value)}
-                placeholder="518.223.1235 (or leave blank to pick contact in SMS app)"
+                placeholder="518-227-1235"
                 className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-xs font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white"
               />
               
@@ -2812,34 +2794,36 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 <button
                   type="button"
                   onClick={() => {
-                    setCrewPhoneNumber('518.223.1235');
-                    setSelectedCrewEmployeeId('');
+                    setCrewPhoneNumber('518-227-1235');
+                    setSelectedCrewEmployeeId('emp-pete');
                   }}
                   className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                    crewPhoneNumber === '518.223.1235'
+                    crewPhoneNumber === '518-227-1235'
                       ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
                       : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
                   }`}
                 >
-                  518.223.1235 (Default)
+                  Pete (518-227-1235 - Default)
                 </button>
-                {employees.map((emp) => (
-                  <button
-                    key={emp.id}
-                    type="button"
-                    onClick={() => {
-                      setCrewPhoneNumber(emp.phone);
-                      setSelectedCrewEmployeeId(emp.id);
-                    }}
-                    className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
-                      crewPhoneNumber === emp.phone
-                        ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
-                        : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
-                    }`}
-                  >
-                    {emp.name.split(' ')[0]} ({emp.role ? emp.role.split(' ')[0] : 'Staff'})
-                  </button>
-                ))}
+                {employees
+                  .filter(emp => emp.phone !== '518-227-1235' && emp.id !== 'emp-pete')
+                  .map((emp) => (
+                    <button
+                      key={emp.id}
+                      type="button"
+                      onClick={() => {
+                        setCrewPhoneNumber(emp.phone);
+                        setSelectedCrewEmployeeId(emp.id);
+                      }}
+                      className={`text-[10px] font-bold px-2.5 py-1 rounded-lg border transition-all cursor-pointer ${
+                        crewPhoneNumber === emp.phone
+                          ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
+                          : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-white'
+                      }`}
+                    >
+                      {emp.name.split(' ')[0]} ({emp.role ? emp.role.split(' ')[0] : 'Staff'})
+                    </button>
+                  ))}
               </div>
             </div>
 
@@ -2872,7 +2856,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                   type="button"
                   onClick={() => {
                     const text = getCrewSmsContent();
-                    const phoneToUse = crewPhoneNumber || '518.223.1235';
+                    const phoneToUse = crewPhoneNumber || '518-227-1235';
                     const smsUrl = getSmsUrl(phoneToUse, text);
                     openExternalProtocol(smsUrl);
                     showToast(`Opening SMS app for ${phoneToUse}...`);

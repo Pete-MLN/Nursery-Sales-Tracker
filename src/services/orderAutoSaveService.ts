@@ -69,55 +69,50 @@ export function autoSaveDraft(draft: OrderDraft, immediateCloudSync: boolean = f
       customerName: draft.customerName
     });
 
-    // 2. SCHEDULE OR RUN CLOUD SYNC (Debounced to protect bandwidth while typing)
+    // 2. SCHEDULE OR RUN CLOUD SYNC ONLY IF EDITING AN EXISTING COMMITTED ORDER
+    // (Never write in-progress new order drafts to the main Firestore orders collection)
     if (cloudSaveTimeout) {
       clearTimeout(cloudSaveTimeout);
       cloudSaveTimeout = null;
     }
 
-    const performCloudSync = async () => {
-      // If offline, queue for next reconnect
-      if (!isOnline()) {
-        queueOrderForOfflineSync(draft);
-        notifyAutoSaveStatus({
-          status: 'saved_offline',
-          timestamp: nowIso,
-          orderId: draft.orderId,
-          itemCount: draft.cartItems.length,
-          customerName: draft.customerName
-        });
-        return;
-      }
+    if (draft.isEditingExisting && draft.orderId && !draft.orderId.startsWith('ORD-DRAFT-')) {
+      const performCloudSync = async () => {
+        if (!isOnline()) {
+          notifyAutoSaveStatus({
+            status: 'saved_offline',
+            timestamp: nowIso,
+            orderId: draft.orderId,
+            itemCount: draft.cartItems.length,
+            customerName: draft.customerName
+          });
+          return;
+        }
 
-      try {
-        // Construct standard Order object to sync to Firestore
-        const totalAmount = draft.cartItems.reduce((sum, item) => sum + (item.selectedPrice || item.plant.price) * item.quantity, 0);
-        const totalItemsCount = draft.cartItems.reduce((sum, item) => sum + item.quantity, 0);
-        const effectiveOrderId = draft.orderId || `ORD-DRAFT-${draft.customerName.replace(/[^a-zA-Z0-9]/g, '').slice(0, 8) || 'TEMP'}`;
+        try {
+          const totalAmount = draft.cartItems.reduce((sum, item) => sum + (item.selectedPrice || item.plant.price) * item.quantity, 0);
+          const totalItemsCount = draft.cartItems.reduce((sum, item) => sum + item.quantity, 0);
 
-        const orderToPersist: Order = {
-          id: effectiveOrderId,
-          customerName: draft.customerName.trim() || 'Retail Walk-in (In Progress)',
-          itemsCount: totalItemsCount,
-          total: totalAmount,
-          type: draft.fulfillmentType || 'Take Now',
-          scheduledTime: draft.scheduledTime || 'Immediate',
-          scheduledDate: draft.scheduledDate || new Date().toISOString().split('T')[0],
-          status: draft.orderStatus || (draft.isEditingExisting ? 'Pending' : 'Pending'),
-          date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-          createdAt: nowIso,
-          items: draft.cartItems,
-          holdingLocation: draft.holdingLocation || 'Greenhouse B, Aisle 4, Bay 12',
-          notes: draft.notes || '',
-          remainingPickupDate: draft.remainingPickupDate,
-          partialPickupNotes: draft.partialPickupNotes
-        };
+          const orderToPersist: Order = {
+            id: draft.orderId!,
+            customerName: draft.customerName.trim() || 'Retail Walk-in',
+            itemsCount: totalItemsCount,
+            total: totalAmount,
+            type: draft.fulfillmentType || 'Take Now',
+            scheduledTime: draft.scheduledTime || 'Immediate',
+            scheduledDate: draft.scheduledDate || new Date().toISOString().split('T')[0],
+            status: draft.orderStatus || 'Pending',
+            date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+            createdAt: nowIso,
+            items: draft.cartItems,
+            holdingLocation: draft.holdingLocation || 'Greenhouse B, Aisle 4, Bay 12',
+            notes: draft.notes || '',
+            remainingPickupDate: draft.remainingPickupDate,
+            partialPickupNotes: draft.partialPickupNotes
+          };
 
-        // If editing an existing order or draft has items, sync to Firestore
-        if (draft.cartItems.length > 0 || draft.orderId) {
           await saveOrderToFirestore(orderToPersist);
           
-          // Mark draft as cloud-synced
           const syncedDraft: OrderDraft = {
             ...enrichedDraft,
             isCloudSynced: true
@@ -131,24 +126,32 @@ export function autoSaveDraft(draft: OrderDraft, immediateCloudSync: boolean = f
             itemCount: draft.cartItems.length,
             customerName: draft.customerName
           });
+        } catch (err) {
+          console.warn('AutoSave Firestore sync error (cached locally):', err);
+          notifyAutoSaveStatus({
+            status: 'saved_offline',
+            timestamp: nowIso,
+            orderId: draft.orderId,
+            itemCount: draft.cartItems.length,
+            customerName: draft.customerName
+          });
         }
-      } catch (err) {
-        console.warn('AutoSave Firestore sync error (cached locally):', err);
-        queueOrderForOfflineSync(draft);
-        notifyAutoSaveStatus({
-          status: 'saved_offline',
-          timestamp: nowIso,
-          orderId: draft.orderId,
-          itemCount: draft.cartItems.length,
-          customerName: draft.customerName
-        });
-      }
-    };
+      };
 
-    if (immediateCloudSync) {
-      performCloudSync();
+      if (immediateCloudSync) {
+        performCloudSync();
+      } else {
+        cloudSaveTimeout = setTimeout(performCloudSync, 1000);
+      }
     } else {
-      cloudSaveTimeout = setTimeout(performCloudSync, 800);
+      // For new in-progress drafts, local persistence in localStorage is already completed synchronously
+      notifyAutoSaveStatus({
+        status: 'saved_cloud',
+        timestamp: nowIso,
+        orderId: undefined,
+        itemCount: draft.cartItems.length,
+        customerName: draft.customerName
+      });
     }
   } catch (e) {
     console.error('Failed to auto-save order draft:', e);
@@ -254,13 +257,12 @@ export async function flushOfflineSyncQueue() {
     if (!Array.isArray(queue) || queue.length === 0) return;
 
     for (const draft of queue) {
-      if (draft.cartItems && draft.cartItems.length > 0) {
+      if (draft.isEditingExisting && draft.orderId && !draft.orderId.startsWith('ORD-DRAFT-') && draft.cartItems && draft.cartItems.length > 0) {
         const totalAmount = draft.cartItems.reduce((sum, item) => sum + (item.selectedPrice || item.plant.price) * item.quantity, 0);
         const totalItemsCount = draft.cartItems.reduce((sum, item) => sum + item.quantity, 0);
-        const orderId = draft.orderId || `ORD-${Math.floor(100 + Math.random() * 900)}`;
 
         const order: Order = {
-          id: orderId,
+          id: draft.orderId,
           customerName: draft.customerName || 'Retail Walk-in',
           itemsCount: totalItemsCount,
           total: totalAmount,

@@ -38,7 +38,7 @@ import {
   deleteHoldingLocationFromFirestore
 } from './services/firebaseService';
 import { sanitizeCustomerName } from './utils/customerNameCleaner';
-import { flushOfflineSyncQueue, OrderDraft } from './services/orderAutoSaveService';
+import { flushOfflineSyncQueue, clearActiveDraft, OrderDraft } from './services/orderAutoSaveService';
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
@@ -77,7 +77,7 @@ export default function App() {
   });
 
   const [inventory, setInventory] = useState<PlantItem[]>(INITIAL_PLANTS);
-  const [orders, setOrders] = useState<Order[]>([]);
+  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [uploads, setUploads] = useState<RecentUpload[]>(INITIAL_UPLOADS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
@@ -115,6 +115,21 @@ export default function App() {
     localStorage.setItem('nursery_stock_alert_settings', JSON.stringify(newSettings));
   };
 
+  // Camera Auto-Shutoff Timeout (in seconds, default 15s, 0 = disabled / never)
+  const [cameraTimeout, setCameraTimeout] = useState<number>(() => {
+    const saved = localStorage.getItem('nursery_camera_timeout');
+    if (saved !== null) {
+      const parsed = parseInt(saved, 10);
+      if (!isNaN(parsed) && parsed >= 0) return parsed;
+    }
+    return 15;
+  });
+
+  const handleUpdateCameraTimeout = (seconds: number) => {
+    setCameraTimeout(seconds);
+    localStorage.setItem('nursery_camera_timeout', seconds.toString());
+  };
+
   // Sync Firebase Auth state if available
   useEffect(() => {
     const unsubscribeAuth = onAuthStateChanged(auth, (fbUser) => {
@@ -150,12 +165,21 @@ export default function App() {
     });
     const unsubOrders = subscribeToOrders((data) => {
       if (data && data.length > 0) {
-        setOrders(data);
+        const validOrders = data.filter(o => o && o.id && !o.id.startsWith('ORD-DRAFT-'));
+        setOrders(validOrders.length > 0 ? validOrders : INITIAL_ORDERS);
+
+        // Clean up any stale draft orders saved previously in Firestore
+        data.filter(o => o && o.id && o.id.startsWith('ORD-DRAFT-')).forEach(draftOrder => {
+          deleteOrderFromFirestore(draftOrder.id).catch(() => {});
+        });
+
         // keep activeOrder updated if changed on another phone
         if (activeOrder) {
-          const fresh = data.find(o => o.id === activeOrder.id);
+          const fresh = validOrders.find(o => o.id === activeOrder.id);
           if (fresh) setActiveOrder(fresh);
         }
+      } else {
+        setOrders(INITIAL_ORDERS);
       }
     });
     const unsubUploads = subscribeToUploads((data) => {
@@ -284,8 +308,9 @@ export default function App() {
       ...overrides
     };
 
-    setOrders(prev => [newOrder, ...prev]);
+    setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrderId && !o.id.startsWith('ORD-DRAFT-'))]);
     setActiveOrder(newOrder);
+    clearActiveDraft();
     saveOrderToFirestore(newOrder);
   };
 
@@ -354,6 +379,70 @@ export default function App() {
       setActiveOrder(null);
     }
     navigateTo('scan');
+  };
+
+  // Direct save of draft from DraftRecoveryBanner: commits order & clears warning
+  const handleSaveDraftAsOrder = (draft: OrderDraft) => {
+    if (draft.isEditingExisting && draft.orderId && !draft.orderId.startsWith('ORD-DRAFT-')) {
+      const existing = orders.find(o => o.id === draft.orderId);
+      const totalAmount = (draft.cartItems || []).reduce((sum, item) => sum + (item.selectedPrice ?? item.plant.price) * item.quantity, 0);
+      const itemsCount = (draft.cartItems || []).reduce((sum, item) => sum + item.quantity, 0);
+      
+      const updatedOrder: Order = {
+        id: draft.orderId,
+        customerName: (draft.customerName && draft.customerName.trim()) || (existing ? existing.customerName : 'Retail Walk-in'),
+        itemsCount: itemsCount > 0 ? itemsCount : (existing ? existing.itemsCount : 0),
+        total: totalAmount > 0 ? totalAmount : (existing ? existing.total : 0),
+        type: draft.fulfillmentType || (existing ? existing.type : 'Take Now'),
+        scheduledTime: draft.scheduledTime || (existing ? existing.scheduledTime : 'Immediate'),
+        scheduledDate: draft.scheduledDate || (existing ? existing.scheduledDate : new Date().toISOString().split('T')[0]),
+        status: draft.orderStatus || (existing ? existing.status : 'Pending'),
+        date: existing ? existing.date : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
+        createdAt: existing ? existing.createdAt : new Date().toISOString(),
+        items: draft.cartItems && draft.cartItems.length > 0 ? draft.cartItems : (existing ? existing.items : []),
+        holdingLocation: draft.holdingLocation || (existing ? existing.holdingLocation : 'Greenhouse B, Aisle 4, Bay 12'),
+        notes: draft.notes !== undefined ? draft.notes : (existing ? existing.notes : ''),
+        remainingPickupDate: draft.remainingPickupDate || (existing ? existing.remainingPickupDate : undefined),
+        partialPickupNotes: draft.partialPickupNotes || (existing ? existing.partialPickupNotes : undefined),
+        hasPartialPickup: draft.orderStatus === 'Partial Pickup' || (existing ? existing.hasPartialPickup : false)
+      };
+
+      setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
+      if (activeOrder && activeOrder.id === updatedOrder.id) {
+        setActiveOrder(updatedOrder);
+      }
+      saveOrderToFirestore(updatedOrder);
+      clearActiveDraft(draft.orderId);
+    } else {
+      const newOrderId = draft.orderId && !draft.orderId.startsWith('ORD-DRAFT-')
+        ? draft.orderId
+        : `ORD-${Math.floor(100 + Math.random() * 900)}`;
+      const totalAmount = (draft.cartItems || []).reduce((sum, item) => sum + (item.selectedPrice ?? item.plant.price) * item.quantity, 0);
+      const now = new Date();
+      const formattedCreatedDate = now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      const formattedSchedTime = draft.scheduledTime || now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      const todayIsoDate = draft.scheduledDate || now.toISOString().split('T')[0];
+
+      const newOrder: Order = {
+        id: newOrderId,
+        customerName: (draft.customerName && draft.customerName.trim()) ? draft.customerName.trim() : 'Retail Walk-in',
+        itemsCount: (draft.cartItems || []).reduce((sum, item) => sum + item.quantity, 0),
+        total: totalAmount,
+        type: draft.fulfillmentType || 'Take Now',
+        scheduledTime: formattedSchedTime,
+        scheduledDate: todayIsoDate,
+        status: draft.orderStatus || 'Pending',
+        date: formattedCreatedDate,
+        createdAt: now.toISOString(),
+        items: draft.cartItems || [],
+        holdingLocation: draft.holdingLocation || 'Greenhouse B, Aisle 4, Bay 12',
+        notes: draft.notes || ''
+      };
+
+      setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrderId && !o.id.startsWith('ORD-DRAFT-'))]);
+      saveOrderToFirestore(newOrder);
+      clearActiveDraft(draft.orderId);
+    }
   };
 
   // Handle uploading dataset in Data Management
@@ -451,6 +540,7 @@ export default function App() {
             inventory={inventory}
             onSelectOrder={(ord) => setActiveOrder(ord)}
             onResumeDraft={handleResumeDraft}
+            onSaveDraft={handleSaveDraftAsOrder}
           />
         )}
 
@@ -464,6 +554,8 @@ export default function App() {
             onUpdateActiveOrder={handleUpdateOrder}
             onStartNewOrder={() => setActiveOrder(null)}
             onDeleteOrder={handleDeleteOrder}
+            cameraTimeout={cameraTimeout}
+            onUpdateCameraTimeout={handleUpdateCameraTimeout}
           />
         )}
 
@@ -541,6 +633,8 @@ export default function App() {
             onNavigate={navigateTo}
             stockAlertSettings={stockAlertSettings}
             onUpdateStockAlertSettings={handleUpdateStockAlertSettings}
+            cameraTimeout={cameraTimeout}
+            onUpdateCameraTimeout={handleUpdateCameraTimeout}
           />
         )}
 

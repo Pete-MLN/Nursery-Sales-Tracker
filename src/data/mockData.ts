@@ -5,6 +5,15 @@ export const DEFAULT_PLANT_IMAGE = defaultPlantImg;
 
 export const INITIAL_EMPLOYEES: Employee[] = [
   {
+    id: 'emp-pete',
+    name: 'Pete',
+    email: 'pete@maplelanenursery.com',
+    phone: '518-227-1235',
+    role: 'Nursery Manager / Owner',
+    department: 'Management',
+    status: 'Active'
+  },
+  {
     id: 'emp-1',
     name: 'Alex Rivera',
     email: 'alex@maplelanenursery.com',

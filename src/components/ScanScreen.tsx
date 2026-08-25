@@ -17,6 +17,7 @@ import {
   OrderDraft, 
   getDraftForOrderId 
 } from '../services/orderAutoSaveService';
+import { savePlantToFirestore, saveOrderToFirestore } from '../services/firebaseService';
 
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -716,60 +717,71 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   // Handle GPS location logging with precise coordinates and feedback
   const handleLogGPS = (plantId: string) => {
     setHasUnsavedChanges(true);
+
+    const applyGpsUpdate = (lat: number, lng: number, coordStr: string) => {
+      const nowIso = new Date().toISOString();
+      const newGpsLocation = {
+        latitude: lat,
+        longitude: lng,
+        timestamp: nowIso
+      };
+
+      setGpsLoggedMap(prev => ({
+        ...prev,
+        [plantId]: coordStr
+      }));
+
+      const updatedCartItems = cartItems.map(item => {
+        if (item.plant.id === plantId) {
+          return {
+            ...item,
+            gpsLocation: newGpsLocation
+          };
+        }
+        return item;
+      });
+
+      setCartItems(updatedCartItems);
+
+      // 1. If modifying an existing active order, update and sync immediately to Firestore
+      if (activeOrder && onUpdateActiveOrder) {
+        const totalCount = updatedCartItems.reduce((acc, item) => acc + item.quantity, 0);
+        const updatedOrder: Order = {
+          ...activeOrder,
+          items: updatedCartItems,
+          itemsCount: totalCount
+        };
+        onUpdateActiveOrder(updatedOrder);
+        saveOrderToFirestore(updatedOrder);
+      }
+
+      // 2. Also persist GPS coordinate to the plant catalog in Firestore so it's remembered everywhere
+      const targetPlant = inventory.find(p => p.id === plantId);
+      if (targetPlant) {
+        const updatedPlant: PlantItem = {
+          ...targetPlant,
+          gpsLocation: newGpsLocation
+        };
+        savePlantToFirestore(updatedPlant);
+      }
+
+      triggerScannedFeedback(`📍 GPS location logged: ${coordStr}`, 'success', 3500);
+    };
+
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
           const lat = position.coords.latitude;
           const lng = position.coords.longitude;
           const coordStr = `${lat.toFixed(5)}° N, ${Math.abs(lng).toFixed(5)}° W`;
-          
-          setGpsLoggedMap(prev => ({
-            ...prev,
-            [plantId]: coordStr
-          }));
-
-          setCartItems(prev => prev.map(item => {
-            if (item.plant.id === plantId) {
-              return {
-                ...item,
-                gpsLocation: {
-                  latitude: lat,
-                  longitude: lng,
-                  timestamp: new Date().toISOString()
-                }
-              };
-            }
-            return item;
-          }));
-
-          triggerScannedFeedback(`📍 GPS location logged: ${coordStr}`, 'success', 3500);
+          applyGpsUpdate(lat, lng, coordStr);
         },
         () => {
           // Fallback mock GPS for nursery yard bay
           const fallbackLat = 43.1482;
           const fallbackLng = -79.4623;
           const coordStr = `${fallbackLat.toFixed(4)}° N, ${Math.abs(fallbackLng).toFixed(4)}° W (Greenhouse Bay 12)`;
-          
-          setGpsLoggedMap(prev => ({
-            ...prev,
-            [plantId]: coordStr
-          }));
-
-          setCartItems(prev => prev.map(item => {
-            if (item.plant.id === plantId) {
-              return {
-                ...item,
-                gpsLocation: {
-                  latitude: fallbackLat,
-                  longitude: fallbackLng,
-                  timestamp: new Date().toISOString()
-                }
-              };
-            }
-            return item;
-          }));
-
-          triggerScannedFeedback(`📍 GPS location logged: ${coordStr}`, 'success', 3500);
+          applyGpsUpdate(fallbackLat, fallbackLng, coordStr);
         },
         { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
@@ -777,27 +789,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const fallbackLat = 43.1482;
       const fallbackLng = -79.4623;
       const coordStr = `${fallbackLat.toFixed(4)}° N, ${Math.abs(fallbackLng).toFixed(4)}° W (Greenhouse Bay 12)`;
-      
-      setGpsLoggedMap(prev => ({
-        ...prev,
-        [plantId]: coordStr
-      }));
-
-      setCartItems(prev => prev.map(item => {
-        if (item.plant.id === plantId) {
-          return {
-            ...item,
-            gpsLocation: {
-              latitude: fallbackLat,
-              longitude: fallbackLng,
-              timestamp: new Date().toISOString()
-            }
-          };
-        }
-        return item;
-      }));
-
-      triggerScannedFeedback(`📍 GPS location recorded for item`, 'success', 3500);
+      applyGpsUpdate(fallbackLat, fallbackLng, coordStr);
     }
   };
 
@@ -1949,11 +1941,19 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     setMapModalItem(cartItems[0]);
                   }
                 }}
-                className="text-xs font-bold text-[#012d1d] hover:text-white bg-[#a0f4c8]/40 hover:bg-[#0e6c4a] px-2.5 py-1 rounded-lg border border-[#0e6c4a]/30 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
-                title="View full nursery yard map with all scanned plants"
+                className="text-xs font-bold text-[#012d1d] hover:text-[#002113] bg-[#a0f4c8] hover:bg-[#8ee4b8] px-3 py-1 rounded-lg border border-[#0e6c4a]/30 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+                title="View Google Map with pins for all plant GPS locations"
               >
-                <MapIcon className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                <span>Nursery Yard Map</span>
+                <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                <span>Plant GPS Map</span>
+                {(() => {
+                  const logged = cartItems.filter(i => !!i.gpsLocation || !!gpsLoggedMap[i.plant.id]).length;
+                  return logged > 0 ? (
+                    <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                      {logged}
+                    </span>
+                  ) : null;
+                })()}
               </button>
             )}
 
@@ -2259,10 +2259,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 }}
                 disabled={cartItems.length === 0}
                 className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] disabled:opacity-50 text-white font-bold py-3.5 px-3 rounded-xl shadow-md transition-all flex justify-center items-center gap-1.5 cursor-pointer text-sm shrink-0"
-                title="Save changes and proceed to staging map"
+                title="Save changes and proceed to staging area assignment"
               >
                 <MapPin className="w-4 h-4" />
-                <span>Holding Map</span>
+                <span>Stage in Holding Area</span>
               </button>
             </div>
             
@@ -2740,6 +2740,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         allItems={cartItems}
         gpsLoggedMap={gpsLoggedMap}
         onLogGPS={handleLogGPS}
+        orderId={activeOrder?.id}
+        customerName={selectedCustomer || customerSearch}
       />
     </div>
   );

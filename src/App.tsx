@@ -576,6 +576,7 @@ export default function App() {
             onNavigate={navigateTo}
             activeOrder={activeOrder}
             onConfirmLocation={handleConfirmLocation}
+            onUpdateActiveOrder={handleUpdateOrder}
             holdingAreas={holdingAreas}
             onUpdateHoldingArea={handleUpdateHoldingArea}
             onAddHoldingArea={handleAddHoldingArea}

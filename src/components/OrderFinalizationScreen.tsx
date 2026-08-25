@@ -57,6 +57,7 @@ import {
   OrderDraft, 
   getDraftForOrderId 
 } from '../services/orderAutoSaveService';
+import { savePlantToFirestore, saveOrderToFirestore } from '../services/firebaseService';
 
 interface OrderFinalizationScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -380,6 +381,79 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       setItems(prev => prev.filter(item => item.plant.id !== plantId));
       setHasUnsavedChanges(true);
       showToast(`Removed "${plantName}" from order.`);
+    }
+  };
+
+  // GPS logging handler for plants in finalization
+  const handleLogGPS = (plantId: string) => {
+    const applyGpsUpdate = (latitude: number, longitude: number) => {
+      const timestamp = new Date().toISOString();
+      const newGpsLocation = { latitude, longitude, timestamp };
+
+      const updatedItems = items.map(item => {
+        if (item.plant.id === plantId) {
+          return {
+            ...item,
+            gpsLocation: newGpsLocation
+          };
+        }
+        return item;
+      });
+
+      setItems(updatedItems);
+
+      if (mapModalItem && mapModalItem.plant.id === plantId) {
+        setMapModalItem(prev => prev ? {
+          ...prev,
+          gpsLocation: newGpsLocation
+        } : null);
+      }
+
+      // 1. Immediately persist coordinates to the active order and Firestore
+      if (currentOrder) {
+        const updatedOrder: Order = {
+          ...currentOrder,
+          items: updatedItems
+        };
+        setCurrentOrder(updatedOrder);
+        if (onUpdateOrder) {
+          onUpdateOrder(updatedOrder);
+        }
+        saveOrderToFirestore(updatedOrder);
+      }
+
+      // 2. Also persist to master plant inventory in Firestore
+      const plantItem = inventory?.find(p => p.id === plantId);
+      if (plantItem) {
+        const updatedPlant: PlantItem = {
+          ...plantItem,
+          gpsLocation: newGpsLocation
+        };
+        savePlantToFirestore(updatedPlant);
+      }
+
+      showToast(`📍 Plant GPS logged: ${latitude.toFixed(5)}° N, ${Math.abs(longitude).toFixed(5)}° W`);
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const { latitude, longitude } = position.coords;
+          applyGpsUpdate(latitude, longitude);
+        },
+        (error) => {
+          console.error('Error getting geolocation:', error);
+          // Fallback to nursery yard location
+          const fallbackLat = 43.1482;
+          const fallbackLng = -79.4623;
+          applyGpsUpdate(fallbackLat, fallbackLng);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      const fallbackLat = 43.1482;
+      const fallbackLng = -79.4623;
+      applyGpsUpdate(fallbackLat, fallbackLng);
     }
   };
 
@@ -1108,7 +1182,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           </div>
         </div>
 
-        <div className="flex items-center gap-2 shrink-0">
+        <div className="flex items-center gap-2 shrink-0 flex-wrap">
           <button
             type="button"
             onClick={() => setIsChangingLocationModalOpen(true)}
@@ -1119,12 +1193,25 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           </button>
           <button
             type="button"
-            onClick={() => onNavigate('holding_location')}
-            className="px-3 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-bold transition-all cursor-pointer flex items-center gap-1"
-            title="Open interactive holding map"
+            id="btn-view-order-plant-gps-map"
+            onClick={() => {
+              if (items.length > 0) {
+                setMapModalItem(items[0]);
+              }
+            }}
+            className="px-3.5 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+            title="Open Google Map with pins for all plant GPS locations in this order"
           >
-            <MapPin className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Map</span>
+            <MapPin className="w-3.5 h-3.5 text-[#a0f4c8]" />
+            <span>Plant GPS Map</span>
+            {(() => {
+              const gpsCount = items.filter(it => !!it.gpsLocation).length;
+              return gpsCount > 0 ? (
+                <span className="bg-[#a0f4c8] text-[#002113] text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                  {gpsCount}
+                </span>
+              ) : null;
+            })()}
           </button>
         </div>
       </div>
@@ -1469,35 +1556,57 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             <h2 className="text-lg font-extrabold text-[#1a1c1a]">All Items in Order ({items.length} unique)</h2>
           </div>
 
-          <button
-            type="button"
-            onClick={() => {
-              if (onUpdateOrder && currentOrder) {
-                onUpdateOrder({
-                  ...currentOrder,
-                  customerName: customerName.trim() || currentOrder.customerName,
-                  status: orderStatus,
-                  type: fulfillment,
-                  scheduledTime: scheduledDate,
-                  holdingLocation: holdingLocation,
-                  items: items,
-                  itemsCount: calculatedItemsCount,
-                  total: calculatedTotal,
-                  hasPartialPickup: totalRemainingQty > 0 && totalPickedUpQty > 0,
-                  remainingItemsCount: totalRemainingQty,
-                  pickedUpItemsCount: totalPickedUpQty,
-                  remainingPickupDate: remainingPickupDate,
-                  partialPickupNotes: partialPickupNotes
-                });
-              }
-              onNavigate('scan');
-            }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs sm:text-sm font-extrabold shadow-sm transition-all cursor-pointer active:scale-95"
-            title="Open scan screen to scan barcodes and add plants to this order"
-          >
-            <Barcode className="w-4 h-4" />
-            <span>Scan & Add Plants</span>
-          </button>
+          <div className="flex items-center gap-2 flex-wrap">
+            {items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setMapModalItem(items[0])}
+                className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-[#a0f4c8]/30 hover:bg-[#012d1d] text-[#012d1d] hover:text-[#a0f4c8] border border-[#0e6c4a]/40 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                title="View Google Map with all logged plant pins in this order"
+              >
+                <MapPin className="w-4 h-4 text-[#0e6c4a]" />
+                <span>Plant GPS Map</span>
+                {(() => {
+                  const logged = items.filter(i => !!i.gpsLocation).length;
+                  return logged > 0 ? (
+                    <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                      {logged}
+                    </span>
+                  ) : null;
+                })()}
+              </button>
+            )}
+
+            <button
+              type="button"
+              onClick={() => {
+                if (onUpdateOrder && currentOrder) {
+                  onUpdateOrder({
+                    ...currentOrder,
+                    customerName: customerName.trim() || currentOrder.customerName,
+                    status: orderStatus,
+                    type: fulfillment,
+                    scheduledTime: scheduledDate,
+                    holdingLocation: holdingLocation,
+                    items: items,
+                    itemsCount: calculatedItemsCount,
+                    total: calculatedTotal,
+                    hasPartialPickup: totalRemainingQty > 0 && totalPickedUpQty > 0,
+                    remainingItemsCount: totalRemainingQty,
+                    pickedUpItemsCount: totalPickedUpQty,
+                    remainingPickupDate: remainingPickupDate,
+                    partialPickupNotes: partialPickupNotes
+                  });
+                }
+                onNavigate('scan');
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs sm:text-sm font-extrabold shadow-sm transition-all cursor-pointer active:scale-95"
+              title="Open scan screen to scan barcodes and add plants to this order"
+            >
+              <Barcode className="w-4 h-4" />
+              <span>Scan & Add Plants</span>
+            </button>
+          </div>
         </div>
 
         {items.length === 0 ? (
@@ -2987,6 +3096,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           }
           return acc;
         }, {} as Record<string, string>)}
+        onLogGPS={handleLogGPS}
+        orderId={currentOrder.id}
+        customerName={customerName || currentOrder.customerName}
       />
     </div>
   );

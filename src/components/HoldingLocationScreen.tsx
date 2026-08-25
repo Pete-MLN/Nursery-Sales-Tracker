@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ScreenType, Order, HoldingArea } from '../types';
 import { HOLDING_AREAS } from '../data/mockData';
+import { PlantMapModal } from './PlantMapModal';
+import { saveOrderToFirestore } from '../services/firebaseService';
 import { 
   Warehouse, 
   Sun, 
@@ -26,6 +28,7 @@ interface HoldingLocationScreenProps {
   onNavigate: (screen: ScreenType) => void;
   activeOrder?: Order | null;
   onConfirmLocation: (locationName: string) => void;
+  onUpdateActiveOrder?: (updatedOrder: Order) => void;
   holdingAreas?: HoldingArea[];
   onUpdateHoldingArea?: (area: HoldingArea) => void;
   onAddHoldingArea?: (area: HoldingArea) => void;
@@ -48,6 +51,7 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
   onNavigate,
   activeOrder,
   onConfirmLocation,
+  onUpdateActiveOrder,
   holdingAreas: propHoldingAreas,
   onUpdateHoldingArea,
   onAddHoldingArea,
@@ -85,6 +89,7 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
   const [formIcon, setFormIcon] = useState<string>('warehouse');
   const [formError, setFormError] = useState<string>('');
   const [successToast, setSuccessToast] = useState<string>('');
+  const [isPlantMapOpen, setIsPlantMapOpen] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setSuccessToast(msg);
@@ -285,11 +290,25 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
         </p>
 
         {activeOrder && (
-          <div className="mt-3 p-3 bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl flex justify-between items-center text-xs sm:text-sm">
-            <span className="font-bold text-[#012d1d]">
-              Order: <span className="underline">{activeOrder.id}</span>
-            </span>
-            <span className="font-semibold text-[#414844]">{activeOrder.customerName}</span>
+          <div className="mt-3 p-3 bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl flex justify-between items-center text-xs sm:text-sm gap-2 flex-wrap">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-[#012d1d]">
+                Order: <span className="underline">{activeOrder.id}</span>
+              </span>
+              <span className="font-semibold text-[#414844]">{activeOrder.customerName}</span>
+            </div>
+            
+            {activeOrder.items && activeOrder.items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsPlantMapOpen(true)}
+                className="px-3 py-1 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                title="View Google Map with pins for plant GPS locations"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>View Plant GPS Map</span>
+              </button>
+            )}
           </div>
         )}
 
@@ -646,6 +665,56 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Plant GPS Google Map Modal */}
+      {activeOrder && activeOrder.items && (
+        <PlantMapModal
+          isOpen={isPlantMapOpen}
+          onClose={() => setIsPlantMapOpen(false)}
+          selectedItem={activeOrder.items[0] || null}
+          allItems={activeOrder.items}
+          gpsLoggedMap={activeOrder.items.reduce((acc, it) => {
+            if (it.gpsLocation) {
+              acc[it.plant.id] = `${it.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(it.gpsLocation.longitude).toFixed(4)}° W`;
+            }
+            return acc;
+          }, {} as Record<string, string>)}
+          onLogGPS={(plantId) => {
+            const applyGps = (lat: number, lng: number) => {
+              const timestamp = new Date().toISOString();
+              const updatedItems = (activeOrder.items || []).map(item => {
+                if (item.plant.id === plantId) {
+                  return {
+                    ...item,
+                    gpsLocation: { latitude: lat, longitude: lng, timestamp }
+                  };
+                }
+                return item;
+              });
+              const updatedOrder: Order = {
+                ...activeOrder,
+                items: updatedItems
+              };
+              if (onUpdateActiveOrder) {
+                onUpdateActiveOrder(updatedOrder);
+              }
+              saveOrderToFirestore(updatedOrder);
+            };
+
+            if (navigator.geolocation) {
+              navigator.geolocation.getCurrentPosition(
+                (pos) => applyGps(pos.coords.latitude, pos.coords.longitude),
+                () => applyGps(43.1482, -79.4623),
+                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+              );
+            } else {
+              applyGps(43.1482, -79.4623);
+            }
+          }}
+          orderId={activeOrder.id}
+          customerName={activeOrder.customerName}
+        />
+      )}
     </div>
   );
 };

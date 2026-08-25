@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ScreenType, Order } from '../types';
 import { formatOrderCreatedDate, formatOrderScheduledTime } from '../utils/dateUtils';
+import { PlantMapModal } from './PlantMapModal';
+import { saveOrderToFirestore } from '../services/firebaseService';
 import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Trash2, X, AlertTriangle, CheckCircle, RotateCcw, Archive, Undo2 } from 'lucide-react';
 
 interface OrdersScreenProps {
@@ -26,6 +28,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [orderToDelete, setOrderToDelete] = useState<Order | null>(null);
   const [orderToComplete, setOrderToComplete] = useState<Order | null>(null);
+  const [mapModalOrder, setMapModalOrder] = useState<Order | null>(null);
   const [toastNotification, setToastNotification] = useState<{ text: string; orderToUndo?: Order } | null>(null);
 
   const showToast = (text: string, orderToUndo?: Order) => {
@@ -136,6 +139,50 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       showToast(`Order #${order.id} marked as Cancelled.`);
     }
     setOrderToDelete(null);
+  };
+
+  const handleLogOrderGPS = (plantId: string) => {
+    if (!mapModalOrder || !mapModalOrder.items) return;
+
+    const applyGps = (lat: number, lng: number) => {
+      const timestamp = new Date().toISOString();
+      const updatedItems = (mapModalOrder.items || []).map(item => {
+        if (item.plant.id === plantId) {
+          return {
+            ...item,
+            gpsLocation: { latitude: lat, longitude: lng, timestamp }
+          };
+        }
+        return item;
+      });
+
+      const updatedOrder: Order = {
+        ...mapModalOrder,
+        items: updatedItems
+      };
+
+      setMapModalOrder(updatedOrder);
+      if (onUpdateOrder) {
+        onUpdateOrder(updatedOrder);
+      }
+      saveOrderToFirestore(updatedOrder);
+      showToast(`📍 Plant GPS coordinates saved to Order #${updatedOrder.id}`);
+    };
+
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          applyGps(position.coords.latitude, position.coords.longitude);
+        },
+        (err) => {
+          console.warn('GPS error in OrdersScreen:', err);
+          applyGps(43.1482, -79.4623);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      applyGps(43.1482, -79.4623);
+    }
   };
 
   const formatCompletionDate = (isoStr?: string) => {
@@ -546,6 +593,29 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                       <span>Cancel / Delete</span>
                     </button>
 
+                    {order.items && order.items.length > 0 && (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setMapModalOrder(order);
+                        }}
+                        className="p-1.5 px-2.5 rounded-xl bg-[#a0f4c8]/30 hover:bg-[#012d1d] text-[#012d1d] hover:text-[#a0f4c8] border border-[#0e6c4a]/30 flex items-center gap-1 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                        title="View Google Map with pins for all plant GPS locations in this order"
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                        <span>GPS Map</span>
+                        {(() => {
+                          const gpsCount = (order.items || []).filter(it => !!it.gpsLocation).length;
+                          return gpsCount > 0 ? (
+                            <span className="bg-[#012d1d] text-[#a0f4c8] text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                              {gpsCount}
+                            </span>
+                          ) : null;
+                        })()}
+                      </button>
+                    )}
+
                     <button
                       type="button"
                       onClick={(e) => {
@@ -711,6 +781,25 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
             </button>
           </div>
         </div>
+      )}
+
+      {/* Plant GPS Google Map Modal for Order */}
+      {mapModalOrder && mapModalOrder.items && (
+        <PlantMapModal
+          isOpen={mapModalOrder !== null}
+          onClose={() => setMapModalOrder(null)}
+          selectedItem={mapModalOrder.items[0] || null}
+          allItems={mapModalOrder.items}
+          gpsLoggedMap={mapModalOrder.items.reduce((acc, it) => {
+            if (it.gpsLocation) {
+              acc[it.plant.id] = `${it.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(it.gpsLocation.longitude).toFixed(4)}° W`;
+            }
+            return acc;
+          }, {} as Record<string, string>)}
+          onLogGPS={handleLogOrderGPS}
+          orderId={mapModalOrder.id}
+          customerName={mapModalOrder.customerName}
+        />
       )}
     </div>
   );

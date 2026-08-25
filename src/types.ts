@@ -35,6 +35,11 @@ export interface PlantItem {
   subCategoryCode?: string; // SUBCAT_COD
   statusActive?: boolean; // STAT ('A' = active)
   storeLocId?: string; // LOC_ID (e.g. 101)
+  gpsLocation?: {
+    latitude: number;
+    longitude: number;
+    timestamp: string;
+  };
 }
 
 export interface OrderCartItem {

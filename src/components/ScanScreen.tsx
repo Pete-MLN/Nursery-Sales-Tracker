@@ -1,12 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer, Order } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode, isValidBarcodeString } from '../utils/barcodeUtils';
 import { PricingDropdown } from './PricingDropdown';
 import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
 import { PlantVerificationModal } from './PlantVerificationModal';
+import { PlantMapModal } from './PlantMapModal';
 import { AutoSaveBadge } from './AutoSaveBadge';
 import { 
   autoSaveDraft, 
@@ -73,6 +74,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [itemFulfillmentMap, setItemFulfillmentMap] = useState<Record<string, 'Take Now' | 'Pick-up/Delivery'>>(
     initialDraft?.itemFulfillmentMap || {}
   );
+  const [mapModalItem, setMapModalItem] = useState<OrderCartItem | null>(null);
+  const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(Boolean(initialDraft && initialDraft.cartItems && initialDraft.cartItems.length > 0));
 
   // Sync state when activeOrder changes
   useEffect(() => {
@@ -84,10 +87,13 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           setSelectedCustomer(editDraft.customerName);
           setCustomerSearch(editDraft.customerName);
         }
+        setHasUnsavedChanges(true);
       } else if (activeOrder.items && activeOrder.items.length > 0) {
         setCartItems(activeOrder.items.map(item => ({ ...item })));
+        setHasUnsavedChanges(false);
       } else {
         setCartItems([]);
+        setHasUnsavedChanges(false);
       }
       if (activeOrder.customerName && (!editDraft || !editDraft.customerName)) {
         setSelectedCustomer(activeOrder.customerName);
@@ -102,6 +108,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         setItemFulfillmentMap(activeDraft.itemFulfillmentMap || {});
         setGpsLoggedMap(activeDraft.gpsLoggedMap || {});
         setCustomerType(activeDraft.customerType || 'RETAIL');
+        setHasUnsavedChanges(true);
       } else {
         // Clean blank order
         setCartItems([]);
@@ -110,12 +117,15 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         setItemFulfillmentMap({});
         setGpsLoggedMap({});
         setCustomerType('RETAIL');
+        setHasUnsavedChanges(false);
       }
     }
   }, [activeOrder]);
 
-  // CONTINUOUS AUTO-SAVE: Every single plant added/removed, quantity adjusted, price tier changed, or customer name typed is instantly saved to local disk & queued to cloud
+  // CONTINUOUS AUTO-SAVE: Every single plant added/removed, quantity adjusted, price tier changed, or customer name typed is instantly saved to local disk & queued to cloud ONLY when dirty
   useEffect(() => {
+    if (!hasUnsavedChanges) return;
+
     const hasData = cartItems.length > 0 || (selectedCustomer && selectedCustomer.trim().length > 0) || (customerSearch && customerSearch.trim().length > 0);
     if (hasData || activeOrder) {
       const draft: OrderDraft = {
@@ -136,11 +146,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       };
       autoSaveDraft(draft);
     }
-  }, [cartItems, selectedCustomer, customerSearch, customerType, itemFulfillmentMap, gpsLoggedMap, activeOrder]);
+  }, [hasUnsavedChanges, cartItems, selectedCustomer, customerSearch, customerType, itemFulfillmentMap, gpsLoggedMap, activeOrder]);
 
-  // LIFECYCLE HOOKS: guarantee flush to local storage before browser close, backgrounding, or crash
+  // LIFECYCLE HOOKS: guarantee flush to local storage before browser close, backgrounding, or crash ONLY when there are unsaved changes
   useEffect(() => {
     const cleanup = initAutoSaveLifecycleListeners(() => {
+      if (!hasUnsavedChanges) return null;
       const hasData = cartItems.length > 0 || (selectedCustomer && selectedCustomer.trim().length > 0) || (customerSearch && customerSearch.trim().length > 0);
       if (!hasData && !activeOrder) return null;
       return {
@@ -161,7 +172,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       };
     });
     return cleanup;
-  }, [cartItems, selectedCustomer, customerSearch, customerType, itemFulfillmentMap, gpsLoggedMap, activeOrder]);
+  }, [hasUnsavedChanges, cartItems, selectedCustomer, customerSearch, customerType, itemFulfillmentMap, gpsLoggedMap, activeOrder]);
 
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -329,6 +340,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     unitPrice: number,
     fulfillmentChoice: 'Take Now' | 'Pick-up/Delivery'
   ) => {
+    setHasUnsavedChanges(true);
     setCartItems(prev => {
       const existingIndex = prev.findIndex(i => i.plant.id === plant.id);
       if (existingIndex >= 0) {
@@ -385,6 +397,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   // Helper to switch or set price tier for a specific item in the order
   const updateItemPriceLevel = (plantId: string, levelKey: PriceLevelKey, newPrice: number) => {
+    setHasUnsavedChanges(true);
     setCartItems(prev => prev.map(item => {
       if (item.plant.id === plantId) {
         return {
@@ -700,31 +713,91 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle GPS location logging
+  // Handle GPS location logging with precise coordinates and feedback
   const handleLogGPS = (plantId: string) => {
+    setHasUnsavedChanges(true);
     if (navigator.geolocation) {
       navigator.geolocation.getCurrentPosition(
         (position) => {
-          const lat = position.coords.latitude.toFixed(4);
-          const lng = position.coords.longitude.toFixed(4);
+          const lat = position.coords.latitude;
+          const lng = position.coords.longitude;
+          const coordStr = `${lat.toFixed(5)}° N, ${Math.abs(lng).toFixed(5)}° W`;
+          
           setGpsLoggedMap(prev => ({
             ...prev,
-            [plantId]: `${lat}° N, ${lng}° W`
+            [plantId]: coordStr
           }));
+
+          setCartItems(prev => prev.map(item => {
+            if (item.plant.id === plantId) {
+              return {
+                ...item,
+                gpsLocation: {
+                  latitude: lat,
+                  longitude: lng,
+                  timestamp: new Date().toISOString()
+                }
+              };
+            }
+            return item;
+          }));
+
+          triggerScannedFeedback(`📍 GPS location logged: ${coordStr}`, 'success', 3500);
         },
         () => {
-          // Fallback mock GPS for nursery bay
+          // Fallback mock GPS for nursery yard bay
+          const fallbackLat = 43.1482;
+          const fallbackLng = -79.4623;
+          const coordStr = `${fallbackLat.toFixed(4)}° N, ${Math.abs(fallbackLng).toFixed(4)}° W (Greenhouse Bay 12)`;
+          
           setGpsLoggedMap(prev => ({
             ...prev,
-            [plantId]: `34.0522° N, 118.2437° W (Bay 12)`
+            [plantId]: coordStr
           }));
-        }
+
+          setCartItems(prev => prev.map(item => {
+            if (item.plant.id === plantId) {
+              return {
+                ...item,
+                gpsLocation: {
+                  latitude: fallbackLat,
+                  longitude: fallbackLng,
+                  timestamp: new Date().toISOString()
+                }
+              };
+            }
+            return item;
+          }));
+
+          triggerScannedFeedback(`📍 GPS location logged: ${coordStr}`, 'success', 3500);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
       );
     } else {
+      const fallbackLat = 43.1482;
+      const fallbackLng = -79.4623;
+      const coordStr = `${fallbackLat.toFixed(4)}° N, ${Math.abs(fallbackLng).toFixed(4)}° W (Greenhouse Bay 12)`;
+      
       setGpsLoggedMap(prev => ({
         ...prev,
-        [plantId]: `34.0522° N, 118.2437° W (Bay 12)`
+        [plantId]: coordStr
       }));
+
+      setCartItems(prev => prev.map(item => {
+        if (item.plant.id === plantId) {
+          return {
+            ...item,
+            gpsLocation: {
+              latitude: fallbackLat,
+              longitude: fallbackLng,
+              timestamp: new Date().toISOString()
+            }
+          };
+        }
+        return item;
+      }));
+
+      triggerScannedFeedback(`📍 GPS location recorded for item`, 'success', 3500);
     }
   };
 
@@ -913,6 +986,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   };
 
   const updateQuantity = (plantId: string, delta: number) => {
+    setHasUnsavedChanges(true);
     setCartItems(prev => 
       prev.map(item => {
         if (item.plant.id === plantId) {
@@ -930,6 +1004,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   };
 
   const removeItem = (plantId: string) => {
+    setHasUnsavedChanges(true);
     setCartItems(prev => prev.filter(item => item.plant.id !== plantId));
   };
 
@@ -958,9 +1033,13 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         total: totalAmt
       };
       onUpdateActiveOrder(updated);
+      clearActiveDraft(activeOrder.id);
+      setHasUnsavedChanges(false);
       triggerScannedFeedback(`Saved changes to Order #${activeOrder.id}`, 'success');
     } else {
       onCompleteOrder(cartItems, finalCustomer);
+      clearActiveDraft();
+      setHasUnsavedChanges(false);
       triggerScannedFeedback('Order saved successfully!', 'success');
     }
 
@@ -985,9 +1064,13 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         total: totalAmt
       };
       onUpdateActiveOrder(updated);
+      clearActiveDraft(activeOrder.id);
+      setHasUnsavedChanges(false);
       onNavigate('finalization');
     } else {
       onCompleteOrder(cartItems, finalCustomer);
+      clearActiveDraft();
+      setHasUnsavedChanges(false);
       onNavigate('holding_location');
     }
   };
@@ -1017,6 +1100,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       };
       onUpdateActiveOrder(updated);
       clearActiveDraft(activeOrder.id);
+      setHasUnsavedChanges(false);
     } else {
       onCompleteOrder(itemsTaken, finalCustomer, {
         type: 'Take Now',
@@ -1025,6 +1109,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         items: itemsTaken
       });
       clearActiveDraft();
+      setHasUnsavedChanges(false);
     }
     // Directly navigate to finalization, skipping the holding area page
     onNavigate('finalization');
@@ -1045,8 +1130,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         total: totalAmt
       };
       onUpdateActiveOrder(updated);
+      clearActiveDraft(activeOrder.id);
+      setHasUnsavedChanges(false);
     } else {
       onCompleteOrder(cartItems, finalCustomer);
+      clearActiveDraft();
+      setHasUnsavedChanges(false);
     }
     onNavigate('holding_location');
   };
@@ -1142,6 +1231,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   setCartItems([]);
                   setSelectedCustomer('');
                   setCustomerSearch('');
+                  setHasUnsavedChanges(false);
                 }}
                 className="text-xs font-bold text-[#717973] hover:text-[#ba1a1a] hover:bg-white px-2 py-1.5 rounded-lg transition-colors cursor-pointer"
                 title="Start a blank order"
@@ -1832,11 +1922,45 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
       {/* Current Order Items Section */}
       <section className="flex flex-col gap-3 mt-1">
-        <div className="flex justify-between items-center">
-          <h2 className="font-bold text-lg text-[#012d1d]">Current Order Items</h2>
-          <span className="bg-[#e7e9e5] text-[#414844] text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
-            {cartItems.reduce((acc, item) => acc + item.quantity, 0)} ITEMS
-          </span>
+        <div className="flex justify-between items-center flex-wrap gap-2">
+          <div className="flex items-center gap-2">
+            <h2 className="font-bold text-lg text-[#012d1d]">Current Order Items</h2>
+            {cartItems.length > 0 && (() => {
+              const gpsCount = cartItems.filter(i => !!gpsLoggedMap[i.plant.id] || !!i.gpsLocation).length;
+              return (
+                <span className={`text-xs font-extrabold px-2 py-0.5 rounded-full flex items-center gap-1 border ${
+                  gpsCount > 0 
+                    ? 'bg-[#a0f4c8]/50 text-[#002113] border-[#0e6c4a]/30' 
+                    : 'bg-[#e7e9e5] text-[#717973] border-[#c1c8c2]'
+                }`}>
+                  <MapPin className="w-3 h-3 text-[#0e6c4a]" />
+                  <span>{gpsCount}/{cartItems.length} GPS Logged</span>
+                </span>
+              );
+            })()}
+          </div>
+
+          <div className="flex items-center gap-2">
+            {cartItems.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  if (cartItems.length > 0) {
+                    setMapModalItem(cartItems[0]);
+                  }
+                }}
+                className="text-xs font-bold text-[#012d1d] hover:text-white bg-[#a0f4c8]/40 hover:bg-[#0e6c4a] px-2.5 py-1 rounded-lg border border-[#0e6c4a]/30 transition-all cursor-pointer shadow-2xs flex items-center gap-1.5"
+                title="View full nursery yard map with all scanned plants"
+              >
+                <MapIcon className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                <span>Nursery Yard Map</span>
+              </button>
+            )}
+
+            <span className="bg-[#e7e9e5] text-[#414844] text-xs font-bold px-2.5 py-1 rounded-md uppercase tracking-wider">
+              {cartItems.reduce((acc, item) => acc + item.quantity, 0)} ITEMS
+            </span>
+          </div>
         </div>
 
         {/* Items List */}
@@ -1853,7 +1977,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             </div>
           ) : (
             cartItems.map((item) => {
-              const gpsLocation = gpsLoggedMap[item.plant.id];
+              const gpsLocation = gpsLoggedMap[item.plant.id] || (item.gpsLocation ? `${item.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(item.gpsLocation.longitude).toFixed(4)}° W` : null);
               const unitPrice = getItemEffectiveUnitPrice(item);
               const lineTotal = unitPrice * item.quantity;
 
@@ -1882,7 +2006,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                           </h3>
                         </div>
 
-                        {/* High-Visibility Loading Identifiers: Product # and Size */}
+                        {/* High-Visibility Loading Identifiers: Product #, Size & GPS Status Indicator */}
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#012d1d] shadow-2xs">
                             <Tag className="w-3 h-3 text-[#a0f4c8]" />
@@ -1892,6 +2016,19 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             <Package className="w-3 h-3 text-amber-300" />
                             SIZE: {item.plant.size || 'Standard'}
                           </span>
+
+                          {/* GPS Logged Status Indicator Badge */}
+                          {gpsLocation ? (
+                            <span className="bg-[#0e6c4a] text-[#a0f4c8] text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#0e6c4a] shadow-2xs">
+                              <MapPin className="w-3 h-3 text-[#a0f4c8]" />
+                              <span>GPS Logged</span>
+                            </span>
+                          ) : (
+                            <span className="bg-[#f3f4f0] text-[#717973] text-[11px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#c1c8c2]">
+                              <MapPin className="w-2.5 h-2.5 text-[#717973]" />
+                              <span>No GPS</span>
+                            </span>
+                          )}
                         </div>
                         
                         {(item.plant.botanicalName || item.plant.commonName) && (
@@ -1938,7 +2075,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     </div>
                   </div>
 
-                  {/* Quantity, Pick-up/Delivery & GPS Action Controls */}
+                  {/* Quantity, Pick-up/Delivery, GPS & View on Map Action Controls */}
                   <div className="flex flex-wrap items-center justify-between gap-2 mt-1 pt-2 border-t border-[#f3f4f0]">
                     {/* Stepper Quantity */}
                     <div className="flex items-center bg-[#f3f4f0] rounded-lg border border-[#c1c8c2]">
@@ -1975,18 +2112,34 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       <span>Pick-up/Delivery</span>
                     </button>
 
-                    {/* Log GPS Button */}
-                    <button
-                      onClick={() => handleLogGPS(item.plant.id)}
-                      className={`flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-colors cursor-pointer ${
-                        gpsLocation
-                          ? 'bg-[#a0f4c8] border-[#0e6c4a] text-[#19724f]'
-                          : 'bg-[#f3f4f0] border-[#c1c8c2] text-[#414844] hover:bg-[#e2e3df]'
-                      }`}
-                    >
-                      <MapPin className="w-3.5 h-3.5" />
-                      {gpsLocation ? 'GPS Logged' : 'Log GPS'}
-                    </button>
+                    {/* GPS Action Controls */}
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {/* Log / Update GPS Button */}
+                      <button
+                        type="button"
+                        onClick={() => handleLogGPS(item.plant.id)}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer active:scale-95 ${
+                          gpsLocation
+                            ? 'bg-[#a0f4c8] border-[#0e6c4a] text-[#002113]'
+                            : 'bg-[#f3f4f0] border-[#c1c8c2] text-[#414844] hover:bg-[#e2e3df]'
+                        }`}
+                        title={gpsLocation ? "Re-log / update current GPS coordinates" : "Log GPS coordinates for this plant in nursery"}
+                      >
+                        <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                        <span>{gpsLocation ? 'Update GPS' : 'Log GPS'}</span>
+                      </button>
+
+                      {/* View on Map Button */}
+                      <button
+                        type="button"
+                        onClick={() => setMapModalItem(item)}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white border border-[#012d1d] transition-all cursor-pointer shadow-2xs active:scale-95"
+                        title="View plant location on Yard Map"
+                      >
+                        <MapIcon className="w-3.5 h-3.5" />
+                        <span>View on Map</span>
+                      </button>
+                    </div>
                   </div>
 
                   {itemFulfillmentMap[item.plant.id] === 'Pick-up/Delivery' && (
@@ -1996,9 +2149,32 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     </div>
                   )}
 
+                  {/* GPS Details Card with View on Map Button */}
                   {gpsLocation && (
-                    <div className="text-[11px] text-[#0e6c4a] font-mono bg-[#a0f4c8]/30 px-2 py-1 rounded border border-[#a0f4c8]">
-                      📍 {gpsLocation}
+                    <div className="flex items-center justify-between gap-2 bg-[#e8f5e9] text-[#012d1d] px-3 py-2 rounded-xl border border-[#a0f4c8] shadow-2xs flex-wrap">
+                      <div className="flex items-center gap-2 min-w-0">
+                        <div className="w-6 h-6 rounded-full bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shrink-0">
+                          <MapPin className="w-3.5 h-3.5" />
+                        </div>
+                        <div className="min-w-0">
+                          <div className="text-xs font-bold text-[#012d1d] flex items-center gap-1.5 flex-wrap">
+                            <span className="text-[#0e6c4a] font-black">GPS Logged:</span>
+                            <span className="font-mono text-xs text-[#002113] bg-white/80 px-1.5 py-0.5 rounded border border-[#a0f4c8]/60">
+                              {gpsLocation}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => setMapModalItem(item)}
+                        className="px-2.5 py-1 bg-[#0e6c4a] hover:bg-[#0b5338] text-white text-xs font-extrabold rounded-lg flex items-center gap-1.5 shrink-0 cursor-pointer shadow-2xs transition-all active:scale-95"
+                        title="Open interactive yard map"
+                      >
+                        <MapIcon className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                        <span>View on Map</span>
+                      </button>
                     </div>
                   )}
                 </div>
@@ -2232,6 +2408,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     type="button"
                     onClick={() => {
                       clearActiveDraft(activeOrder.id);
+                      setHasUnsavedChanges(false);
                       setIsCancelModalOpen(false);
                       onNavigate('orders');
                     }}
@@ -2248,6 +2425,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     setCartItems([]);
                     setSelectedCustomer('');
                     setCustomerSearch('');
+                    setHasUnsavedChanges(false);
                     setIsCancelModalOpen(false);
                     if (onStartNewOrder) onStartNewOrder();
                     onNavigate('orders');
@@ -2305,6 +2483,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   type="button"
                   onClick={() => {
                     plant.barcode = unrecognizedCode;
+                    setHasUnsavedChanges(true);
                     setCartItems(prev => {
                       const existing = prev.find(i => i.plant.id === plant.id);
                       if (existing) {
@@ -2551,6 +2730,16 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         customerType={customerType}
         onConfirm={handleConfirmPlantVerification}
         onClose={() => setVerifyingPlant(null)}
+      />
+
+      {/* Plant Yard & GPS Map Modal */}
+      <PlantMapModal
+        isOpen={mapModalItem !== null}
+        onClose={() => setMapModalItem(null)}
+        selectedItem={mapModalItem}
+        allItems={cartItems}
+        gpsLoggedMap={gpsLoggedMap}
+        onLogGPS={handleLogGPS}
       />
     </div>
   );

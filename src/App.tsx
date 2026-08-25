@@ -324,6 +324,7 @@ export default function App() {
       };
       setActiveOrder(updatedOrder);
       setOrders(prev => prev.map(o => o.id === activeOrder.id ? updatedOrder : o));
+      clearActiveDraft(updatedOrder.id);
       saveOrderToFirestore(updatedOrder);
     }
   };
@@ -334,6 +335,7 @@ export default function App() {
     if (activeOrder && activeOrder.id === updatedOrder.id) {
       setActiveOrder(updatedOrder);
     }
+    clearActiveDraft(updatedOrder.id);
     saveOrderToFirestore(updatedOrder);
   };
 
@@ -343,6 +345,7 @@ export default function App() {
     if (activeOrder && activeOrder.id === orderId) {
       setActiveOrder(null);
     }
+    clearActiveDraft(orderId);
     deleteOrderFromFirestore(orderId);
   };
 

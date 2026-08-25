@@ -1,11 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Sparkles, ArrowRight, Trash2, X, Clock, ShoppingCart, Check } from 'lucide-react';
 import { getActiveDraft, clearActiveDraft, OrderDraft } from '../services/orderAutoSaveService';
+import { Order } from '../types';
 
 interface DraftRecoveryBannerProps {
   onResumeDraft: (draft: OrderDraft) => void;
   onSaveDraft?: (draft: OrderDraft) => void;
   onDiscardDraft?: () => void;
+  orders?: Order[];
   className?: string;
 }
 
@@ -13,6 +15,7 @@ export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
   onResumeDraft,
   onSaveDraft,
   onDiscardDraft,
+  orders = [],
   className = ''
 }) => {
   const [draft, setDraft] = useState<OrderDraft | null>(null);
@@ -20,7 +23,7 @@ export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
 
   useEffect(() => {
     const checkDraft = () => {
-      const active = getActiveDraft();
+      const active = getActiveDraft(orders);
       if (active && (active.cartItems.length > 0 || (active.customerName && active.customerName.trim().length > 0))) {
         setDraft(active);
       } else {
@@ -31,7 +34,7 @@ export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
     checkDraft();
     window.addEventListener('nursery_autosave_event', checkDraft);
     return () => window.removeEventListener('nursery_autosave_event', checkDraft);
-  }, []);
+  }, [orders]);
 
   if (!draft || isDismissed) return null;
 

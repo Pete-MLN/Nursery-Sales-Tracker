@@ -159,24 +159,89 @@ export function autoSaveDraft(draft: OrderDraft, immediateCloudSync: boolean = f
 }
 
 /**
- * Retrieve active in-progress order draft from localStorage
+ * Compares an OrderDraft with an existing saved Order to determine if there are real unsaved changes.
+ * Returns false if the draft has identical data to what is already committed in the database.
  */
-export function getActiveDraft(): OrderDraft | null {
+export function doesDraftDifferFromSavedOrder(draft: OrderDraft, savedOrder: Order): boolean {
+  if (!draft || !savedOrder) return false;
+
+  // Check customer name
+  const draftCustomer = (draft.customerName || '').trim();
+  const orderCustomer = (savedOrder.customerName || '').trim();
+  if (draftCustomer && orderCustomer && draftCustomer !== orderCustomer) return true;
+
+  // Check items count and content
+  const draftItems = draft.cartItems || [];
+  const orderItems = savedOrder.items || [];
+  if (draftItems.length !== orderItems.length) return true;
+
+  for (const dItem of draftItems) {
+    const matched = orderItems.find(oItem => oItem.plant.id === dItem.plant.id);
+    if (!matched) return true;
+    if (matched.quantity !== dItem.quantity) return true;
+    const dPrice = dItem.selectedPrice ?? dItem.plant.price;
+    const oPrice = matched.selectedPrice ?? matched.plant.price;
+    if (Math.abs(dPrice - oPrice) > 0.001) return true;
+    if (dItem.selectedPriceLevel && matched.selectedPriceLevel && dItem.selectedPriceLevel !== matched.selectedPriceLevel) return true;
+  }
+
+  // Check notes
+  if ((draft.notes || '').trim() !== (savedOrder.notes || '').trim()) return true;
+
+  // Check fulfillment & status
+  if (draft.fulfillmentType && savedOrder.type && draft.fulfillmentType !== savedOrder.type) return true;
+  if (draft.orderStatus && savedOrder.status && draft.orderStatus !== savedOrder.status) return true;
+  if (draft.holdingLocation && savedOrder.holdingLocation && draft.holdingLocation !== savedOrder.holdingLocation) return true;
+
+  return false;
+}
+
+/**
+ * Retrieve active in-progress order draft from localStorage.
+ * If existingOrders is provided, automatically ignores and cleans up drafts that are already committed to the database.
+ */
+export function getActiveDraft(existingOrders?: Order[]): OrderDraft | null {
   try {
     const raw = localStorage.getItem(ACTIVE_DRAFT_KEY);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
     if (!parsed || typeof parsed !== 'object') return null;
 
-    // Check if the draft actually has meaningful data
-    const hasItems = Array.isArray(parsed.cartItems) && parsed.cartItems.length > 0;
-    const hasCustomer = typeof parsed.customerName === 'string' && parsed.customerName.trim().length > 0;
-    const hasNotes = typeof parsed.notes === 'string' && parsed.notes.trim().length > 0;
+    const draft = parsed as OrderDraft;
 
-    if (hasItems || hasCustomer || hasNotes || parsed.orderId) {
-      return parsed as OrderDraft;
+    // Check if the draft actually has meaningful data
+    const hasItems = Array.isArray(draft.cartItems) && draft.cartItems.length > 0;
+    const hasCustomer = typeof draft.customerName === 'string' && draft.customerName.trim().length > 0;
+    const hasNotes = typeof draft.notes === 'string' && draft.notes.trim().length > 0;
+
+    if (!hasItems && !hasCustomer && !hasNotes && !draft.orderId) {
+      clearActiveDraft();
+      return null;
     }
-    return null;
+
+    // If existingOrders is supplied, check if this draft is already fully saved in the database
+    if (existingOrders && existingOrders.length > 0) {
+      if (draft.orderId && !draft.orderId.startsWith('ORD-DRAFT-')) {
+        const savedOrder = existingOrders.find(o => o.id === draft.orderId);
+        if (savedOrder && !doesDraftDifferFromSavedOrder(draft, savedOrder)) {
+          // The order in the database already has the exact same content -> this draft is already saved!
+          clearActiveDraft(draft.orderId);
+          return null;
+        }
+      } else if (!draft.orderId && hasItems) {
+        // Check if there is an existing order created in the last 2 minutes that has the exact same items & customer
+        const matchingCommittedOrder = existingOrders.find(o => {
+          if (!o || !o.items) return false;
+          return !doesDraftDifferFromSavedOrder(draft, o);
+        });
+        if (matchingCommittedOrder) {
+          clearActiveDraft();
+          return null;
+        }
+      }
+    }
+
+    return draft;
   } catch (e) {
     console.error('Failed to retrieve active draft:', e);
     return null;

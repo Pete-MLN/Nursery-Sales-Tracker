@@ -55,6 +55,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
 
       {/* Draft Recovery Banner if uncommitted draft exists */}
       <DraftRecoveryBanner 
+        orders={orders}
         onResumeDraft={(draft) => {
           if (onResumeDraft) {
             onResumeDraft(draft);

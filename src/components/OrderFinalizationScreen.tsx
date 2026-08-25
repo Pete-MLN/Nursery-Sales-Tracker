@@ -42,11 +42,13 @@ import {
   Star,
   Check,
   Tag,
-  Send
+  Send,
+  Map as MapIcon
 } from 'lucide-react';
 import { PricingDropdown } from './PricingDropdown';
 import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
 import { formatOrderCreatedDate, formatOrderScheduledTime, extractDateForInput, getTodayDateInputValue, formatRawDateString } from '../utils/dateUtils';
+import { PlantMapModal } from './PlantMapModal';
 import { AutoSaveBadge } from './AutoSaveBadge';
 import { 
   autoSaveDraft, 
@@ -140,6 +142,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [holdingLocation, setHoldingLocation] = useState<string>(currentOrder.holdingLocation || 'Holding Area B - North Greenhouse');
   const [orderNotes, setOrderNotes] = useState<string>(currentOrder.notes || '');
   const [items, setItems] = useState<OrderCartItem[]>(currentOrder.items || []);
+  const [mapModalItem, setMapModalItem] = useState<OrderCartItem | null>(null);
 
   // Partial Pickup State
   const [hasPartialPickupToggle, setHasPartialPickupToggle] = useState<boolean>(() => {
@@ -272,6 +275,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   // Emergency lifecycle listeners: flush changes before tab closes or page is hidden
   useEffect(() => {
     const cleanup = initAutoSaveLifecycleListeners(() => {
+      if (!hasUnsavedChanges) return null;
       const hasData = items.length > 0 || customerName.trim().length > 0 || orderNotes.trim().length > 0;
       if (!hasData && !currentOrder.id) return null;
       return {
@@ -291,7 +295,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       };
     });
     return cleanup;
-  }, [customerName, fulfillment, scheduledDate, scheduledTime, orderStatus, holdingLocation, orderNotes, items, remainingPickupDate, partialPickupNotes, currentOrder.id]);
+  }, [hasUnsavedChanges, customerName, fulfillment, scheduledDate, scheduledTime, orderStatus, holdingLocation, orderNotes, items, remainingPickupDate, partialPickupNotes, currentOrder.id]);
 
   // Computed Totals
   const calculatedTotal = items.reduce((sum, item) => sum + (getItemEffectiveUnitPrice(item) * item.quantity), 0);
@@ -1579,7 +1583,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           </span>
                         </div>
 
-                        {/* High-Visibility Loading Identifiers: Product # and Size */}
+                        {/* High-Visibility Loading Identifiers: Product # and Size & GPS Badge */}
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#012d1d] shadow-2xs">
                             <Tag className="w-3 h-3 text-[#a0f4c8]" />
@@ -1589,6 +1593,19 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                             <Package className="w-3 h-3 text-amber-300" />
                             SIZE: {item.plant.size || 'Standard'}
                           </span>
+
+                          {/* GPS Logged Badge */}
+                          {item.gpsLocation ? (
+                            <span className="bg-[#0e6c4a] text-[#a0f4c8] text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#0e6c4a] shadow-2xs">
+                              <MapPin className="w-3 h-3 text-[#a0f4c8]" />
+                              <span>GPS Logged</span>
+                            </span>
+                          ) : (
+                            <span className="bg-[#f3f4f0] text-[#717973] text-[11px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#c1c8c2]">
+                              <MapPin className="w-2.5 h-2.5 text-[#717973]" />
+                              <span>No GPS</span>
+                            </span>
+                          )}
                         </div>
 
                         {item.plant.botanicalName && (
@@ -1672,6 +1689,17 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           ${lineTotal.toFixed(2)}
                         </span>
                       </div>
+
+                      {/* View on Map Button */}
+                      <button
+                        type="button"
+                        onClick={() => setMapModalItem(item)}
+                        className="p-1.5 text-[#0e6c4a] hover:bg-[#a0f4c8]/30 rounded-xl transition-colors cursor-pointer border border-[#c1c8c2] hover:border-[#0e6c4a] flex items-center gap-1 text-xs font-bold"
+                        title="View plant on Yard Map"
+                      >
+                        <MapIcon className="w-4 h-4" />
+                        <span className="hidden sm:inline">Map</span>
+                      </button>
 
                       <button
                         type="button"
@@ -2946,6 +2974,20 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           </div>
         </div>
       )}
+
+      {/* Plant Yard & GPS Map Modal */}
+      <PlantMapModal
+        isOpen={mapModalItem !== null}
+        onClose={() => setMapModalItem(null)}
+        selectedItem={mapModalItem}
+        allItems={items}
+        gpsLoggedMap={items.reduce((acc, it) => {
+          if (it.gpsLocation) {
+            acc[it.plant.id] = `${it.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(it.gpsLocation.longitude).toFixed(4)}° W`;
+          }
+          return acc;
+        }, {} as Record<string, string>)}
+      />
     </div>
   );
 };

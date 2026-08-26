@@ -77,6 +77,27 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
     if (gardenCenterPrice !== undefined) pricesObj.gardenCenter = gardenCenterPrice;
     if (elitePrice !== undefined) pricesObj.elite = elitePrice;
 
+    // GPS Coordinates if present in spreadsheet
+    const rawLat = normalizedRow['LATITUDE'] || normalizedRow['LAT'] || normalizedRow['GPS_LAT'] || normalizedRow['GPS_LATITUDE'];
+    const rawLng = normalizedRow['LONGITUDE'] || normalizedRow['LNG'] || normalizedRow['LON'] || normalizedRow['GPS_LNG'] || normalizedRow['GPS_LONGITUDE'];
+    const rawGps = normalizedRow['GPS'] || normalizedRow['COORDINATES'] || normalizedRow['GPS_LOCATION'] || normalizedRow['YARD_COORDINATES'];
+
+    let parsedGps: { latitude: number; longitude: number; timestamp: string } | undefined = undefined;
+    if (rawLat !== undefined && rawLng !== undefined && String(rawLat).trim() !== '' && String(rawLng).trim() !== '') {
+      const latNum = parseFloat(String(rawLat));
+      const lngNum = parseFloat(String(rawLng));
+      if (!isNaN(latNum) && !isNaN(lngNum)) {
+        parsedGps = { latitude: latNum, longitude: lngNum, timestamp: new Date().toISOString() };
+      }
+    } else if (rawGps && typeof rawGps === 'string' && rawGps.includes(',')) {
+      const parts = rawGps.split(',');
+      const latNum = parseFloat(parts[0].trim());
+      const lngNum = parseFloat(parts[1].trim());
+      if (!isNaN(latNum) && !isNaN(lngNum)) {
+        parsedGps = { latitude: latNum, longitude: lngNum, timestamp: new Date().toISOString() };
+      }
+    }
+
     const plantItem: PlantItem = {
       id: `p-${itemNo}-${idx}`,
       itemNo: String(itemNo),
@@ -92,6 +113,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
       storeLocId: String(locId)
     };
 
+    if (parsedGps) plantItem.gpsLocation = parsedGps;
     if (commonName) plantItem.commonName = commonName;
     if (botanicalName) plantItem.botanicalName = botanicalName;
     if (stkUnit) plantItem.size = stkUnit;

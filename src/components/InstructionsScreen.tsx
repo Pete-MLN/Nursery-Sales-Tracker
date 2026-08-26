@@ -34,19 +34,24 @@ import {
   Sliders,
   CheckCircle,
   Building,
-  MessageSquare
+  MessageSquare,
+  Navigation,
+  Compass,
+  Archive,
+  Eye,
+  Globe
 } from 'lucide-react';
 
 interface InstructionsScreenProps {
   onNavigate: (screen: ScreenType) => void;
 }
 
-type GuideTopic = 'all' | 'new_order' | 'editing_order' | 'completing_order' | 'partial_pickup' | 'scanning' | 'data_sync';
+type GuideTopic = 'all' | 'new_order' | 'gps_mapping' | 'editing_order' | 'completing_order' | 'partial_pickup' | 'scanning' | 'data_sync';
 
 export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNavigate }) => {
   const [activeTopic, setActiveTopic] = useState<GuideTopic>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [expandedFaq, setExpandedFaq] = useState<string | null>('faq_new_customer');
+  const [expandedFaq, setExpandedFaq] = useState<string | null>('faq_gps_mapping');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   const toggleFaq = (id: string) => {
@@ -62,11 +67,12 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
   const topics: { id: GuideTopic; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'all', label: 'All Instructions', icon: <BookOpen className="w-4 h-4" /> },
     { id: 'new_order', label: '1. New Order & Customers', icon: <UserPlus className="w-4 h-4" />, badge: 'Essential' },
-    { id: 'editing_order', label: '2. Edit & Modify Orders', icon: <Edit3 className="w-4 h-4" /> },
-    { id: 'completing_order', label: '3. Complete & Fulfill', icon: <CheckCircle2 className="w-4 h-4" /> },
-    { id: 'partial_pickup', label: '4. Partial Pickup & Staff Email', icon: <Mail className="w-4 h-4" />, badge: 'Updated' },
-    { id: 'scanning', label: '5. Barcode & Scanning', icon: <Barcode className="w-4 h-4" /> },
-    { id: 'data_sync', label: '6. Customers & Inventory Sync', icon: <FileSpreadsheet className="w-4 h-4" /> },
+    { id: 'gps_mapping', label: '2. GPS Yard Mapping & Pins', icon: <Navigation className="w-4 h-4" />, badge: 'Updated' },
+    { id: 'editing_order', label: '3. Edit & Modify Orders', icon: <Edit3 className="w-4 h-4" /> },
+    { id: 'completing_order', label: '4. Complete & Archive', icon: <CheckCircle2 className="w-4 h-4" /> },
+    { id: 'partial_pickup', label: '5. Partial Pickup & Staff Email', icon: <Mail className="w-4 h-4" /> },
+    { id: 'scanning', label: '6. Barcode & Scanning', icon: <Barcode className="w-4 h-4" /> },
+    { id: 'data_sync', label: '7. Customers & Cloud Sync', icon: <FileSpreadsheet className="w-4 h-4" /> },
   ];
 
   const matchesSearch = (text: string) => {
@@ -179,8 +185,8 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
           <div className="w-7 h-7 rounded-lg bg-[#a0f4c8] text-[#002113] flex items-center justify-center text-xs font-bold">
             <ShoppingBag className="w-4 h-4" />
           </div>
-          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">2. View Orders</span>
-          <span className="text-[11px] text-[#717973]">Manage & edit loads</span>
+          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">2. View Orders & GPS</span>
+          <span className="text-[11px] text-[#717973]">Manage & map loads</span>
         </button>
 
         <button
@@ -380,13 +386,137 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 2: HOW TO EDIT & MODIFY EXISTING ORDERS */}
+      {/* SECTION 2: INTERACTIVE GPS YARD MAPPING & HIGH-RESOLUTION SATELLITE PINS */}
+      {/* ========================================================================= */}
+      {(activeTopic === 'all' || activeTopic === 'gps_mapping') && matchesSearch('gps map satellite coordinates pin location yard navigation') && (
+        <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
+          <div className="border-b border-[#f3f4f0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#004d40] text-[#a0f4c8] flex items-center justify-center font-bold">
+                2
+              </div>
+              <div>
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#004d40]">
+                  Yard Location Intelligence
+                </span>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-[#012d1d]">
+                  Interactive GPS Yard Mapping & Satellite Pins
+                </h2>
+              </div>
+            </div>
+            <span className="text-xs font-bold px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-full shrink-0 w-fit">
+              Sub-Meter Yard Accuracy
+            </span>
+          </div>
+
+          <p className="text-xs sm:text-sm text-[#414844] leading-relaxed">
+            The nursery application features built-in <strong>sub-meter GPS location logging</strong> and an <strong>interactive high-resolution Satellite Hybrid Map</strong>. Crew members can log the exact field, block, or greenhouse coordinates of any plant when scanning or reviewing orders, view color-coded pins for all items in a customer's load, and open turn-by-turn walking routes in Google Maps.
+          </p>
+
+          {/* GPS Visual Simulation */}
+          <div className="bg-[#f9faf6] border-2 border-dashed border-[#c1c8c2] rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                <Navigation className="w-4 h-4 text-[#004d40]" />
+                <span>Where You Can Tag & View GPS Locations</span>
+              </span>
+              <span className="text-[10px] font-bold bg-[#004d40] text-[#a0f4c8] px-2 py-0.5 rounded">
+                Real-Time Cloud Sync
+              </span>
+            </div>
+
+            {/* Mockup Item with GPS Pin */}
+            <div className="bg-white p-4 rounded-2xl border border-[#c1c8c2] shadow-sm flex flex-col gap-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#f3f4f0] pb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-[#004d40] text-[#a0f4c8] flex items-center justify-center font-bold text-xs">
+                    10x
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-[#1a1c1a]">Hydrangea macrophylla 'Endless Summer'</h4>
+                    <span className="text-xs text-[#717973]">3 Gal Pot • SKU #1088</span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 bg-emerald-50 text-emerald-800 border border-emerald-200 rounded-lg text-xs font-mono font-bold flex items-center gap-1">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>43.14820° N, 79.46230° W</span>
+                  </span>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                <div className="flex items-center gap-2">
+                  <span className="px-3 py-1.5 bg-[#004d40] text-[#a0f4c8] rounded-xl font-extrabold text-xs flex items-center gap-1.5 shadow-2xs">
+                    <MapPin className="w-3.5 h-3.5" />
+                    <span>View on Map</span>
+                  </span>
+                  <span className="px-3 py-1.5 bg-[#f3f4f0] text-[#012d1d] rounded-xl font-bold text-xs flex items-center gap-1.5 border border-[#c1c8c2]">
+                    <RefreshCw className="w-3.5 h-3.5 text-[#004d40]" />
+                    <span>Update GPS</span>
+                  </span>
+                </div>
+                <span className="text-[11px] text-[#717973] font-semibold">
+                  Saved to order & permanent plant catalog in Firestore
+                </span>
+              </div>
+            </div>
+
+            {/* 4 Pillars of GPS System */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+              <div className="p-3.5 bg-white rounded-xl border border-[#e2e3df] flex flex-col gap-1.5">
+                <strong className="text-[#012d1d] font-extrabold flex items-center gap-1.5">
+                  <Navigation className="w-4 h-4 text-[#004d40]" />
+                  <span>1. On Initial Add / Scan</span>
+                </strong>
+                <p className="text-[#414844]">
+                  When scanning or verifying a plant, tap <strong>"📍 Tag Yard GPS"</strong> directly inside the quantity confirmation pop-up to record coordinates right at the bench.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-xl border border-[#e2e3df] flex flex-col gap-1.5">
+                <strong className="text-[#012d1d] font-extrabold flex items-center gap-1.5">
+                  <Edit3 className="w-4 h-4 text-[#004d40]" />
+                  <span>2. In Order Review</span>
+                </strong>
+                <p className="text-[#414844]">
+                  When pulling up an order later, every plant item has a dedicated <strong>"Log GPS"</strong> or <strong>"Update GPS"</strong> button and coordinate pill on its card.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-xl border border-[#e2e3df] flex flex-col gap-1.5">
+                <strong className="text-[#012d1d] font-extrabold flex items-center gap-1.5">
+                  <Globe className="w-4 h-4 text-[#004d40]" />
+                  <span>3. Satellite Map Modal</span>
+                </strong>
+                <p className="text-[#414844]">
+                  Tap <strong>"GPS Map"</strong> from any order to see all plants pinned on Google Satellite imagery, with one-tap walking routes in Google Maps.
+                </p>
+              </div>
+
+              <div className="p-3.5 bg-white rounded-xl border border-[#e2e3df] flex flex-col gap-1.5">
+                <strong className="text-[#012d1d] font-extrabold flex items-center gap-1.5">
+                  <Zap className="w-4 h-4 text-[#004d40]" />
+                  <span>4. Inventory Safe</span>
+                </strong>
+                <p className="text-[#414844]">
+                  Uploading updated inventory spreadsheets (CSV/Excel) <strong>never erases your GPS data</strong>. The app merges and retains all existing plant coordinates automatically.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION 3: HOW TO EDIT & MODIFY EXISTING ORDERS */}
       {/* ========================================================================= */}
       {(activeTopic === 'all' || activeTopic === 'editing_order') && matchesSearch('edit order modify quantity customer name price change') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
           <div className="border-b border-[#f3f4f0] pb-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold">
-              2
+              3
             </div>
             <div>
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a]">
@@ -508,14 +638,14 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 3: PARTIAL PICKUP & EMAIL STAFF INSTRUCTIONS (NEW FEATURE) */}
+      {/* SECTION 4: PARTIAL PICKUP & EMAIL STAFF INSTRUCTIONS */}
       {/* ========================================================================= */}
       {(activeTopic === 'all' || activeTopic === 'partial_pickup') && matchesSearch('partial pickup email staff hold ticket remaining plants yard crew') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
           <div className="border-b border-[#f3f4f0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center font-bold">
-                3
+                4
               </div>
               <div>
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-800">
@@ -642,20 +772,20 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 4: COMPLETING & FULFILLING ORDERS */}
+      {/* SECTION 5: COMPLETING, ARCHIVING & NATIVE PHONE DISPATCH */}
       {/* ========================================================================= */}
-      {(activeTopic === 'all' || activeTopic === 'completing_order') && matchesSearch('complete order fulfill ready for pickup status save') && (
+      {(activeTopic === 'all' || activeTopic === 'completing_order') && matchesSearch('complete order fulfill ready for pickup status save archive restore dispatch email sms') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
           <div className="border-b border-[#f3f4f0] pb-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#0e6c4a] text-white flex items-center justify-center font-bold">
-              4
+              5
             </div>
             <div>
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a]">
-                Fulfillment Workflow
+                Fulfillment & Archiving Workflow
               </span>
               <h2 className="text-xl sm:text-2xl font-extrabold text-[#012d1d]">
-                Completing & Finalizing Orders
+                Completing, Archiving & Native Phone Dispatch
               </h2>
             </div>
           </div>
@@ -683,31 +813,13 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
 
             <div className="p-4 bg-[#f3f4f0] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2">
               <span className="px-2 py-0.5 bg-emerald-100 text-emerald-900 border border-emerald-300 font-extrabold rounded w-fit text-[10px]">
-                Completed / Archived
+                Completed (Archived)
               </span>
-              <strong className="text-sm font-extrabold text-[#012d1d]">Customer Picked Up & Archived</strong>
+              <strong className="text-sm font-extrabold text-[#012d1d]">Permanent Archive</strong>
               <p className="text-[#414844]">
-                Tap the green <strong>"Completed"</strong> button on the order card when the customer picks up their items. The order is automatically archived from the active queue into the <strong>Completed (Archived)</strong> tab for permanent sales records (never permanently deleted).
+                Tap <strong>"Completed"</strong> on the order card to archive it into the <strong>Completed (Archived)</strong> tab. Completed orders are kept permanently for accounting and audit records and can be unarchived at any time with the "Restore to Active" button.
               </p>
             </div>
-          </div>
-
-          <div className="p-4 bg-[#e7f8ef] border border-[#a0f4c8] rounded-2xl flex items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2.5 text-[#012d1d]">
-              <CheckCircle className="w-5 h-5 text-[#0e6c4a] shrink-0" />
-              <div>
-                <span className="font-extrabold block text-sm">Save Changes Button</span>
-                <span className="text-[#414844]">
-                  Always tap the big green <strong>"Save Changes"</strong> button at the bottom of the Order Finalization screen to sync updates across all devices.
-                </span>
-              </div>
-            </div>
-            <button
-              onClick={() => onNavigate('orders')}
-              className="px-3 py-1.5 bg-[#012d1d] text-[#a0f4c8] rounded-xl font-bold shrink-0 cursor-pointer"
-            >
-              Go to Orders
-            </button>
           </div>
 
           {/* Native Phone Apps Integration Guide */}
@@ -715,7 +827,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
             <div className="flex items-center gap-2">
               <Smartphone className="w-4 h-4 text-[#012d1d]" />
               <h3 className="font-extrabold text-sm text-[#012d1d] uppercase tracking-wider">
-                Dispatch Buttons (Default Phone Apps)
+                Native Phone Dispatch Integration
               </h3>
             </div>
             <p className="text-xs text-[#414844]">
@@ -725,7 +837,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
               <div className="bg-white p-3.5 rounded-xl border border-[#c1c8c2] flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-[#012d1d]">
                   <Mail className="w-4 h-4 text-[#0e6c4a]" />
-                  <span>Email Receipt</span>
+                  <span>1. Email Receipt</span>
                 </div>
                 <p className="text-[#414844] text-[11px]">
                   Opens your phone's default mail app (Apple Mail, Gmail, Outlook) with the complete customer receipt, itemized pricing, and thank you message.
@@ -735,7 +847,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
               <div className="bg-white p-3.5 rounded-xl border border-[#c1c8c2] flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-[#461702]">
                   <Building className="w-4 h-4 text-[#461702]" />
-                  <span>Email Office</span>
+                  <span>2. Email Office</span>
                 </div>
                 <p className="text-[#414844] text-[11px]">
                   Dispatches internal order log and staging bay assignment directly to <code>pete@maplelanenursery.com</code> for accounting records.
@@ -745,7 +857,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
               <div className="bg-white p-3.5 rounded-xl border border-[#c1c8c2] flex flex-col gap-1.5">
                 <div className="flex items-center gap-1.5 font-bold text-[#012d1d]">
                   <MessageSquare className="w-4 h-4 text-[#012d1d]" />
-                  <span>Text Employee (SMS)</span>
+                  <span>3. Text Employee (SMS)</span>
                 </div>
                 <p className="text-[#414844] text-[11px]">
                   Opens your device's Messages / SMS app addressed directly to nursery employees (defaulting to Pete at <code>518-227-1235</code>) with order staging details and plants to load pre-filled.
@@ -757,9 +869,9 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 5: FREQUENTLY ASKED QUESTIONS & TROUBLESHOOTING */}
+      {/* SECTION 6: FREQUENTLY ASKED QUESTIONS & TROUBLESHOOTING */}
       {/* ========================================================================= */}
-      {(activeTopic === 'all' || activeTopic === 'data_sync' || activeTopic === 'scanning') && (
+      {(activeTopic === 'all' || activeTopic === 'data_sync' || activeTopic === 'scanning' || activeTopic === 'gps_mapping') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-5">
           <div className="border-b border-[#f3f4f0] pb-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold">
@@ -776,7 +888,73 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
           </div>
 
           <div className="flex flex-col gap-2.5">
-            {/* FAQ 1 */}
+            {/* FAQ: GPS Mapping */}
+            <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleFaq('faq_gps_mapping')}
+                className="w-full p-4 text-left font-extrabold text-sm text-[#012d1d] bg-[#f9faf6] hover:bg-[#f3f4f0] flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <span>Q: How does the GPS plant pinning and Satellite Map work?</span>
+                {expandedFaq === 'faq_gps_mapping' ? <ChevronUp className="w-4 h-4 text-[#012d1d]" /> : <ChevronDown className="w-4 h-4 text-[#717973]" />}
+              </button>
+              {expandedFaq === 'faq_gps_mapping' && (
+                <div className="p-4 bg-white text-xs text-[#414844] border-t border-[#c1c8c2] flex flex-col gap-2 leading-relaxed">
+                  <p>
+                    <strong>Answer:</strong> When you tap <strong>"Log GPS"</strong> next to any plant, the app uses your device's built-in GPS to record precise sub-meter latitude and longitude coordinates.
+                  </p>
+                  <p>
+                    The coordinates are <strong>immediately saved to the cloud (Firestore)</strong> and saved to both the customer order and the master plant inventory record. Tapping <strong>"GPS Map"</strong> opens a high-resolution satellite hybrid view showing all plants pinned with colored markers, with a direct link to navigate using Google Maps. No Google Maps API key or cloud account configuration is required.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* FAQ: Completed Orders */}
+            <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleFaq('faq_completed_orders')}
+                className="w-full p-4 text-left font-extrabold text-sm text-[#012d1d] bg-[#f9faf6] hover:bg-[#f3f4f0] flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <span>Q: What happens when an order is marked as "Completed"?</span>
+                {expandedFaq === 'faq_completed_orders' ? <ChevronUp className="w-4 h-4 text-[#012d1d]" /> : <ChevronDown className="w-4 h-4 text-[#717973]" />}
+              </button>
+              {expandedFaq === 'faq_completed_orders' && (
+                <div className="p-4 bg-white text-xs text-[#414844] border-t border-[#c1c8c2] flex flex-col gap-2 leading-relaxed">
+                  <p>
+                    <strong>Answer:</strong> Completed orders are automatically archived from your active queue into the <strong>"Completed (Archived)"</strong> tab at the top of the Orders Screen.
+                  </p>
+                  <p>
+                    Completed orders are preserved permanently in Firestore for sales history and tax records. If an order was marked completed by mistake, simply switch to the Completed tab and tap <strong>"Restore to Active"</strong> to bring it back.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* FAQ: Auto-Save */}
+            <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleFaq('faq_autosave')}
+                className="w-full p-4 text-left font-extrabold text-sm text-[#012d1d] bg-[#f9faf6] hover:bg-[#f3f4f0] flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <span>Q: What happens if my phone dies or browser refreshes while scanning an order?</span>
+                {expandedFaq === 'faq_autosave' ? <ChevronUp className="w-4 h-4 text-[#012d1d]" /> : <ChevronDown className="w-4 h-4 text-[#717973]" />}
+              </button>
+              {expandedFaq === 'faq_autosave' && (
+                <div className="p-4 bg-white text-xs text-[#414844] border-t border-[#c1c8c2] flex flex-col gap-2 leading-relaxed">
+                  <p>
+                    <strong>Answer:</strong> The app features a background <strong>Draft Auto-Save & Crash Protection Engine</strong>. Every scanned plant, customer name, and GPS coordinate is continuously saved in local storage and synced.
+                  </p>
+                  <p>
+                    When you reopen the app, your active cart and order state are automatically restored exactly where you left off.
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* FAQ 1: Walk-in / New Customer */}
             <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
               <button
                 type="button"
@@ -801,7 +979,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
               )}
             </div>
 
-            {/* FAQ 2 */}
+            {/* FAQ 2: Wet / Damaged barcode */}
             <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
               <button
                 type="button"
@@ -823,7 +1001,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
               )}
             </div>
 
-            {/* FAQ 3 */}
+            {/* FAQ 3: Multi device sync */}
             <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
               <button
                 type="button"

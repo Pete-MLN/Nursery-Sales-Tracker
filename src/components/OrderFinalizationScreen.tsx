@@ -43,6 +43,7 @@ import {
   Check,
   Tag,
   Send,
+  RefreshCw,
   Map as MapIcon
 } from 'lucide-react';
 import { PricingDropdown } from './PricingDropdown';
@@ -187,6 +188,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(false);
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
+  const [isLoggingGpsId, setIsLoggingGpsId] = useState<string | null>(null);
 
   // Robust customer matching helper
   const findMatchingCustomer = (name: string, customerList: Customer[]): Customer | undefined => {
@@ -386,6 +388,9 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
 
   // GPS logging handler for plants in finalization
   const handleLogGPS = (plantId: string) => {
+    setIsLoggingGpsId(plantId);
+    setHasUnsavedChanges(true);
+
     const applyGpsUpdate = (latitude: number, longitude: number) => {
       const timestamp = new Date().toISOString();
       const newGpsLocation = { latitude, longitude, timestamp };
@@ -401,6 +406,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       });
 
       setItems(updatedItems);
+      setIsLoggingGpsId(null);
 
       if (mapModalItem && mapModalItem.plant.id === plantId) {
         setMapModalItem(prev => prev ? {
@@ -432,7 +438,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
         savePlantToFirestore(updatedPlant);
       }
 
-      showToast(`📍 Plant GPS logged: ${latitude.toFixed(5)}° N, ${Math.abs(longitude).toFixed(5)}° W`);
+      showToast(`📍 Plant GPS saved: ${latitude.toFixed(5)}° N, ${Math.abs(longitude).toFixed(5)}° W`);
     };
 
     if (navigator.geolocation) {
@@ -442,7 +448,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
           applyGpsUpdate(latitude, longitude);
         },
         (error) => {
-          console.error('Error getting geolocation:', error);
+          console.warn('Error getting geolocation in order review, using yard position:', error);
           // Fallback to nursery yard location
           const fallbackLat = 43.1482;
           const fallbackLng = -79.4623;
@@ -1692,7 +1698,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           </span>
                         </div>
 
-                        {/* High-Visibility Loading Identifiers: Product # and Size & GPS Badge */}
+                        {/* High-Visibility Loading Identifiers: Product # and Size */}
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
                           <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#012d1d] shadow-2xs">
                             <Tag className="w-3 h-3 text-[#a0f4c8]" />
@@ -1702,23 +1708,64 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                             <Package className="w-3 h-3 text-amber-300" />
                             SIZE: {item.plant.size || 'Standard'}
                           </span>
+                        </div>
 
-                          {/* GPS Logged Badge */}
+                        {/* Plant GPS Location Controls & Badges */}
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
                           {item.gpsLocation ? (
-                            <span className="bg-[#0e6c4a] text-[#a0f4c8] text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#0e6c4a] shadow-2xs">
-                              <MapPin className="w-3 h-3 text-[#a0f4c8]" />
-                              <span>GPS Logged</span>
-                            </span>
+                            <div className="flex items-center gap-1.5 bg-[#e8f5e9] text-[#012d1d] px-2.5 py-1 rounded-lg border border-[#a0f4c8] text-xs font-bold shadow-2xs">
+                              <div className="w-5 h-5 rounded-full bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shrink-0">
+                                <MapPin className="w-3 h-3 text-[#a0f4c8]" />
+                              </div>
+                              <span className="font-mono text-[11px] text-[#002113]">
+                                {item.gpsLocation.latitude.toFixed(5)}° N, {Math.abs(item.gpsLocation.longitude).toFixed(5)}° W
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => handleLogGPS(item.plant.id)}
+                                disabled={isLoggingGpsId === item.plant.id}
+                                className="ml-1 text-[10px] font-black uppercase text-[#0e6c4a] hover:text-[#012d1d] hover:underline cursor-pointer flex items-center gap-0.5"
+                                title="Re-tag current GPS location in nursery"
+                              >
+                                {isLoggingGpsId === item.plant.id ? (
+                                  <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                                ) : (
+                                  <RefreshCw className="w-2.5 h-2.5" />
+                                )}
+                                <span>{isLoggingGpsId === item.plant.id ? 'Saving...' : 'Update GPS'}</span>
+                              </button>
+                            </div>
                           ) : (
-                            <span className="bg-[#f3f4f0] text-[#717973] text-[11px] font-semibold px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#c1c8c2]">
-                              <MapPin className="w-2.5 h-2.5 text-[#717973]" />
-                              <span>No GPS</span>
-                            </span>
+                            <button
+                              type="button"
+                              onClick={() => handleLogGPS(item.plant.id)}
+                              disabled={isLoggingGpsId === item.plant.id}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white border border-[#a0f4c8]/40 text-xs font-black transition-all cursor-pointer shadow-xs active:scale-95"
+                              title="Capture and save exact GPS coordinates for this plant in nursery"
+                            >
+                              {isLoggingGpsId === item.plant.id ? (
+                                <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#a0f4c8]" />
+                              ) : (
+                                <MapPin className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                              )}
+                              <span>{isLoggingGpsId === item.plant.id ? 'Recording GPS...' : '📍 Log GPS Location'}</span>
+                            </button>
                           )}
+
+                          {/* View on Map Button */}
+                          <button
+                            type="button"
+                            onClick={() => setMapModalItem(item)}
+                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                            title="View plant location on Yard Satellite Map"
+                          >
+                            <MapIcon className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                            <span>View Map</span>
+                          </button>
                         </div>
 
                         {item.plant.botanicalName && (
-                          <span className="text-xs italic text-[#414844] block truncate mt-1">
+                          <span className="text-xs italic text-[#414844] block truncate mt-1.5">
                             {item.plant.botanicalName}
                           </span>
                         )}
@@ -1798,17 +1845,6 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           ${lineTotal.toFixed(2)}
                         </span>
                       </div>
-
-                      {/* View on Map Button */}
-                      <button
-                        type="button"
-                        onClick={() => setMapModalItem(item)}
-                        className="p-1.5 text-[#0e6c4a] hover:bg-[#a0f4c8]/30 rounded-xl transition-colors cursor-pointer border border-[#c1c8c2] hover:border-[#0e6c4a] flex items-center gap-1 text-xs font-bold"
-                        title="View plant on Yard Map"
-                      >
-                        <MapIcon className="w-4 h-4" />
-                        <span className="hidden sm:inline">Map</span>
-                      </button>
 
                       <button
                         type="button"

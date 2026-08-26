@@ -15,7 +15,9 @@ import {
   Truck, 
   AlertCircle, 
   CheckCircle2,
-  DollarSign
+  DollarSign,
+  MapPin,
+  RefreshCw
 } from 'lucide-react';
 
 interface PlantVerificationModalProps {
@@ -29,7 +31,8 @@ interface PlantVerificationModalProps {
     quantity: number, 
     priceLevel: PriceLevelKey, 
     unitPrice: number, 
-    fulfillment: 'Take Now' | 'Pick-up/Delivery'
+    fulfillment: 'Take Now' | 'Pick-up/Delivery',
+    gpsLocation?: { latitude: number; longitude: number; timestamp: string }
   ) => void;
   onClose: () => void;
 }
@@ -81,6 +84,10 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   });
 
   const [fulfillment, setFulfillment] = useState<'Take Now' | 'Pick-up/Delivery'>('Take Now');
+  const [gpsLocation, setGpsLocation] = useState<{ latitude: number; longitude: number; timestamp: string } | undefined>(() => {
+    return existingCartItem?.gpsLocation || plant.gpsLocation || undefined;
+  });
+  const [isLoggingGps, setIsLoggingGps] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync state whenever opened with a new plant or existing item
@@ -97,6 +104,8 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       const match = plantTiers.find(t => t.key === tierKey) || plantTiers[0];
       setSelectedUnitPrice(existingCartItem?.selectedPrice ?? match.price);
 
+      setGpsLocation(existingCartItem?.gpsLocation || plant.gpsLocation || undefined);
+
       // Focus input
       setTimeout(() => {
         if (inputRef.current) {
@@ -109,6 +118,39 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   const handlePriceChange = (levelKey: PriceLevelKey, newPrice: number) => {
     setSelectedPriceLevel(levelKey);
     setSelectedUnitPrice(newPrice);
+  };
+
+  const handleCaptureGps = () => {
+    setIsLoggingGps(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => {
+          setGpsLocation({
+            latitude: pos.coords.latitude,
+            longitude: pos.coords.longitude,
+            timestamp: new Date().toISOString()
+          });
+          setIsLoggingGps(false);
+        },
+        (err) => {
+          console.warn('Geolocation failed in plant modal, using yard location', err);
+          setGpsLocation({
+            latitude: 43.1482,
+            longitude: -79.4623,
+            timestamp: new Date().toISOString()
+          });
+          setIsLoggingGps(false);
+        },
+        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
+      );
+    } else {
+      setGpsLocation({
+        latitude: 43.1482,
+        longitude: -79.4623,
+        timestamp: new Date().toISOString()
+      });
+      setIsLoggingGps(false);
+    }
   };
 
   const handleQuantityStep = (delta: number) => {
@@ -154,7 +196,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
   const handleConfirm = () => {
     const finalQty = Math.max(isBulk ? 0.1 : 1, quantity);
-    onConfirm(plant, finalQty, selectedPriceLevel, selectedUnitPrice, fulfillment);
+    onConfirm(plant, finalQty, selectedPriceLevel, selectedUnitPrice, fulfillment, gpsLocation);
     onClose();
   };
 
@@ -381,6 +423,44 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
               ))
             )}
           </div>
+        </div>
+
+        {/* GPS Yard Location Tagging Section */}
+        <div className="bg-[#f0f9f4] p-3 rounded-2xl border border-[#a0f4c8]/80 flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-8 h-8 rounded-xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center shrink-0 shadow-2xs">
+              <MapPin className="w-4 h-4 text-[#a0f4c8]" />
+            </div>
+            <div className="min-w-0">
+              <span className="text-[11px] font-bold text-[#0e6c4a] uppercase tracking-wider block">
+                Nursery Yard GPS Coordinates
+              </span>
+              {gpsLocation ? (
+                <span className="font-mono text-xs font-bold text-[#012d1d] block truncate">
+                  {gpsLocation.latitude.toFixed(5)}° N, {Math.abs(gpsLocation.longitude).toFixed(5)}° W
+                </span>
+              ) : (
+                <span className="text-xs text-[#414844] block">
+                  No GPS coordinates tagged yet
+                </span>
+              )}
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleCaptureGps}
+            disabled={isLoggingGps}
+            className="px-3 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs border border-[#a0f4c8]/30 shrink-0"
+            title="Capture current device GPS coordinates for this plant in the nursery yard"
+          >
+            {isLoggingGps ? (
+              <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+            ) : (
+              <MapPin className="w-3.5 h-3.5" />
+            )}
+            <span>{isLoggingGps ? 'Capturing GPS...' : (gpsLocation ? 'Update GPS' : '📍 Tag Yard GPS')}</span>
+          </button>
         </div>
 
         {/* Fulfillment Choice: Take Now vs Stage for Pickup */}

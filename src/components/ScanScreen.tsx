@@ -339,9 +339,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     quantity: number,
     priceLevel: PriceLevelKey,
     unitPrice: number,
-    fulfillmentChoice: 'Take Now' | 'Pick-up/Delivery'
+    fulfillmentChoice: 'Take Now' | 'Pick-up/Delivery',
+    gpsLoc?: { latitude: number; longitude: number; timestamp: string }
   ) => {
     setHasUnsavedChanges(true);
+    const resolvedGps = gpsLoc || plant.gpsLocation || undefined;
+
     setCartItems(prev => {
       const existingIndex = prev.findIndex(i => i.plant.id === plant.id);
       if (existingIndex >= 0) {
@@ -350,7 +353,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           ...updated[existingIndex],
           quantity: quantity,
           selectedPriceLevel: priceLevel,
-          selectedPrice: unitPrice
+          selectedPrice: unitPrice,
+          gpsLocation: resolvedGps || updated[existingIndex].gpsLocation
         };
         return updated;
       } else {
@@ -360,11 +364,30 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             plant,
             quantity,
             selectedPriceLevel: priceLevel,
-            selectedPrice: unitPrice
+            selectedPrice: unitPrice,
+            gpsLocation: resolvedGps
           }
         ];
       }
     });
+
+    if (resolvedGps) {
+      const coordStr = `${resolvedGps.latitude.toFixed(5)}, ${resolvedGps.longitude.toFixed(5)}`;
+      setGpsLoggedMap(prev => ({
+        ...prev,
+        [plant.id]: coordStr
+      }));
+
+      // Also persist to master plant inventory in Firestore
+      const targetPlant = inventory.find(p => p.id === plant.id);
+      if (targetPlant) {
+        const updatedMasterPlant = {
+          ...targetPlant,
+          gpsLocation: resolvedGps
+        };
+        savePlantToFirestore(updatedMasterPlant);
+      }
+    }
 
     setItemFulfillmentMap(prev => ({
       ...prev,

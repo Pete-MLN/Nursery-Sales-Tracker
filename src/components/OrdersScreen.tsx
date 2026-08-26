@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScreenType, Order } from '../types';
 import { formatOrderCreatedDate, formatOrderScheduledTime } from '../utils/dateUtils';
 import { PlantMapModal } from './PlantMapModal';
-import { saveOrderToFirestore } from '../services/firebaseService';
+import { saveOrderToFirestore, savePlantToFirestore } from '../services/firebaseService';
 import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Trash2, X, AlertTriangle, CheckCircle, RotateCcw, Archive, Undo2 } from 'lucide-react';
 
 interface OrdersScreenProps {
@@ -160,6 +160,14 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         ...mapModalOrder,
         items: updatedItems
       };
+
+      const targetItem = (mapModalOrder.items || []).find(item => item.plant.id === plantId);
+      if (targetItem) {
+        savePlantToFirestore({
+          ...targetItem.plant,
+          gpsLocation: { latitude: lat, longitude: lng, timestamp }
+        });
+      }
 
       setMapModalOrder(updatedOrder);
       if (onUpdateOrder) {

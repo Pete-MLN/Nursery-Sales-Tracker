@@ -490,8 +490,30 @@ export default function App() {
   };
 
   const handleImportInventoryPlants = (newPlants: PlantItem[]) => {
-    setInventory(newPlants);
-    batchSavePlantsToFirestore(newPlants);
+    // Preserve existing plant GPS coordinates and holding locations across inventory updates
+    const mergedPlants = newPlants.map(newPlant => {
+      // Find matching existing plant by itemNo, barcode, id, or normalized name
+      const existingMatch = inventory.find(existing => 
+        (newPlant.itemNo && existing.itemNo && newPlant.itemNo.trim() === existing.itemNo.trim()) ||
+        (newPlant.barcode && existing.barcode && newPlant.barcode.trim() === existing.barcode.trim()) ||
+        (newPlant.id && existing.id && newPlant.id === existing.id) ||
+        (newPlant.name && existing.name && newPlant.name.toLowerCase().trim() === existing.name.toLowerCase().trim())
+      );
+
+      if (existingMatch) {
+        return {
+          ...newPlant,
+          // If the uploaded file didn't supply new GPS coordinates, preserve existing logged GPS
+          gpsLocation: newPlant.gpsLocation || existingMatch.gpsLocation || undefined,
+          // Preserve holding location if existing has one and uploaded is empty
+          holdingLocation: newPlant.holdingLocation || existingMatch.holdingLocation || undefined
+        };
+      }
+      return newPlant;
+    });
+
+    setInventory(mergedPlants);
+    batchSavePlantsToFirestore(mergedPlants);
   };
 
   const handleImportCustomers = (newCustomers: Customer[]) => {

@@ -18,6 +18,7 @@ import {
   getDraftForOrderId 
 } from '../services/orderAutoSaveService';
 import { savePlantToFirestore, saveOrderToFirestore } from '../services/firebaseService';
+import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
 
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -76,6 +77,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     initialDraft?.itemFulfillmentMap || {}
   );
   const [mapModalItem, setMapModalItem] = useState<OrderCartItem | null>(null);
+  const [isLoggingGpsId, setIsLoggingGpsId] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(Boolean(initialDraft && initialDraft.cartItems && initialDraft.cartItems.length > 0));
 
   // Sync state when activeOrder changes
@@ -737,17 +739,31 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  // Handle GPS location logging with precise coordinates and feedback
-  const handleLogGPS = (plantId: string) => {
+  // Handle GPS location logging with high-precision satellite acquisition and feedback
+  const handleLogGPS = async (plantId: string) => {
+    setIsLoggingGpsId(plantId);
     setHasUnsavedChanges(true);
 
-    const applyGpsUpdate = (lat: number, lng: number, coordStr: string) => {
+    try {
+      const fix = await acquireHighPrecisionGps({
+        maxWaitMs: 4500,
+        targetAccuracyMeters: 4.5,
+        onProgress: (status) => {
+          if (status.phase === 'waking_gps' || status.phase === 'locking_satellites') {
+            triggerScannedFeedback(status.message, 'warning', 3000);
+          }
+        }
+      });
+
       const nowIso = new Date().toISOString();
       const newGpsLocation = {
-        latitude: lat,
-        longitude: lng,
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracy: fix.accuracy,
         timestamp: nowIso
       };
+
+      const coordStr = formatGpsCoordinates(fix.latitude, fix.longitude, fix.accuracy);
 
       setGpsLoggedMap(prev => ({
         ...prev,
@@ -788,31 +804,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         savePlantToFirestore(updatedPlant);
       }
 
-      triggerScannedFeedback(`📍 GPS location logged: ${coordStr}`, 'success', 3500);
-    };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const lat = position.coords.latitude;
-          const lng = position.coords.longitude;
-          const coordStr = `${lat.toFixed(5)}° N, ${Math.abs(lng).toFixed(5)}° W`;
-          applyGpsUpdate(lat, lng, coordStr);
-        },
-        () => {
-          // Fallback mock GPS for nursery yard bay
-          const fallbackLat = 43.1482;
-          const fallbackLng = -79.4623;
-          const coordStr = `${fallbackLat.toFixed(4)}° N, ${Math.abs(fallbackLng).toFixed(4)}° W (Greenhouse Bay 12)`;
-          applyGpsUpdate(fallbackLat, fallbackLng, coordStr);
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      );
-    } else {
-      const fallbackLat = 43.1482;
-      const fallbackLng = -79.4623;
-      const coordStr = `${fallbackLat.toFixed(4)}° N, ${Math.abs(fallbackLng).toFixed(4)}° W (Greenhouse Bay 12)`;
-      applyGpsUpdate(fallbackLat, fallbackLng, coordStr);
+      triggerScannedFeedback(`📍 GPS locked (${fix.isFallback ? 'Yard Reference' : `±${fix.accuracyFeet} ft`}): ${coordStr}`, 'success', 4500);
+    } catch (err) {
+      console.warn('High-precision GPS acquisition error:', err);
+    } finally {
+      setIsLoggingGpsId(null);
     }
   };
 
@@ -2141,15 +2137,26 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       <button
                         type="button"
                         onClick={() => handleLogGPS(item.plant.id)}
-                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer active:scale-95 ${
-                          gpsLocation
+                        disabled={isLoggingGpsId === item.plant.id}
+                        className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-bold border transition-colors cursor-pointer active:scale-95 disabled:opacity-70 ${
+                          isLoggingGpsId === item.plant.id
+                            ? 'bg-amber-100 border-amber-400 text-amber-900 animate-pulse'
+                            : gpsLocation
                             ? 'bg-[#a0f4c8] border-[#0e6c4a] text-[#002113]'
                             : 'bg-[#f3f4f0] border-[#c1c8c2] text-[#414844] hover:bg-[#e2e3df]'
                         }`}
                         title={gpsLocation ? "Re-log / update current GPS coordinates" : "Log GPS coordinates for this plant in nursery"}
                       >
-                        <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                        <span>{gpsLocation ? 'Update GPS' : 'Log GPS'}</span>
+                        {isLoggingGpsId === item.plant.id ? (
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin text-amber-800" />
+                        ) : (
+                          <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                        )}
+                        <span>
+                          {isLoggingGpsId === item.plant.id 
+                            ? 'Locking GPS...' 
+                            : (gpsLocation ? 'Update GPS' : 'Log GPS')}
+                        </span>
                       </button>
 
                       {/* View on Map Button */}

@@ -2,6 +2,14 @@ import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { OrderCartItem } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { 
+  generateGoogleMapsPinUrl, 
+  generateGoogleMapsWalkingUrl, 
+  acquireHighPrecisionGps, 
+  formatGpsCoordinates, 
+  getGpsAccuracyRating,
+  DEFAULT_NURSERY_COORDS 
+} from '../utils/gpsUtils';
+import { 
   X, 
   MapPin, 
   Navigation, 
@@ -19,7 +27,8 @@ import {
   CheckCircle2,
   AlertCircle,
   Plus,
-  Minus
+  Minus,
+  Footprints
 } from 'lucide-react';
 
 interface PlantMapModalProps {
@@ -37,13 +46,14 @@ export interface ParsedPlantLocation {
   item: OrderCartItem;
   lat: number;
   lng: number;
+  accuracy?: number;
   formattedCoords: string;
   hasExplicitGps: boolean;
   timestamp?: string;
 }
 
 // Fallback Maple Lane Nursery coordinates
-const DEFAULT_NURSERY_CENTER = { lat: 43.1482, lng: -79.4623 };
+const DEFAULT_NURSERY_CENTER = { lat: DEFAULT_NURSERY_COORDS.latitude, lng: DEFAULT_NURSERY_COORDS.longitude };
 
 // Web Mercator projection mathematical helpers for interactive satellite tile viewer
 function projectMercator(lat: number, lng: number, zoom: number) {
@@ -74,7 +84,8 @@ const InteractiveTileMap: React.FC<{
   onLogGPS?: (plantId: string) => void;
   onCopyCoords: (coords: string, id: string) => void;
   copiedCoords: string | null;
-  onOpenGoogleMaps: (lat: number, lng: number) => void;
+  onOpenGoogleMapsPin: (lat: number, lng: number, label?: string) => void;
+  onOpenGoogleMapsWalking: (lat: number, lng: number) => void;
 }> = ({
   locations,
   activeLocation,
@@ -85,7 +96,8 @@ const InteractiveTileMap: React.FC<{
   onLogGPS,
   onCopyCoords,
   copiedCoords,
-  onOpenGoogleMaps
+  onOpenGoogleMapsPin,
+  onOpenGoogleMapsWalking
 }) => {
   const containerRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState<{ width: number; height: number }>({ width: 600, height: 400 });
@@ -446,25 +458,38 @@ const InteractiveTileMap: React.FC<{
             </div>
 
             {/* Action Buttons */}
-            <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => onOpenGoogleMaps(activeLocation.lat, activeLocation.lng)}
-                className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
-              >
-                <Navigation className="w-3 h-3" />
-                <span>Navigate</span>
-              </button>
+            <div className="flex flex-col gap-1.5 mt-1">
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => onOpenGoogleMapsPin(activeLocation.lat, activeLocation.lng, `${activeLocation.item.plant.name} (Qty: ${activeLocation.item.quantity})`)}
+                  className="flex-1 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white py-1.5 px-2 rounded-lg text-xs font-extrabold transition-all flex items-center justify-center gap-1 cursor-pointer shadow-2xs"
+                  title="Drop exact red pin in Google Maps Satellite view"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>Drop Pin in Google Maps</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => onOpenGoogleMapsWalking(activeLocation.lat, activeLocation.lng)}
+                  className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border border-[#c1c8c2]"
+                  title="Open walking directions from current position"
+                >
+                  <Footprints className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                  <span>Walk</span>
+                </button>
+              </div>
 
               {onLogGPS && (
                 <button
                   type="button"
                   onClick={() => onLogGPS(activeLocation.item.plant.id)}
-                  className="bg-[#e8f5e9] hover:bg-[#c8e6c9] text-[#012d1d] py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border border-[#0e6c4a]/30"
-                  title="Update coordinates with my current position"
+                  className="w-full bg-[#e8f5e9] hover:bg-[#c8e6c9] text-[#012d1d] py-1.5 px-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1 cursor-pointer border border-[#0e6c4a]/30"
+                  title="Update coordinates with high-precision satellite GPS"
                 >
                   <RefreshCw className="w-3 h-3 text-[#0e6c4a]" />
-                  <span>Re-log</span>
+                  <span>Re-log GPS (Satellite Lock)</span>
                 </button>
               )}
             </div>
@@ -540,6 +565,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
     return effectiveItems.map((item, index) => {
       let lat = DEFAULT_NURSERY_CENTER.lat;
       let lng = DEFAULT_NURSERY_CENTER.lng;
+      let accuracy = item.gpsLocation?.accuracy || item.plant.gpsLocation?.accuracy;
       let hasExplicitGps = false;
       let timestamp = item.gpsLocation?.timestamp;
 
@@ -576,12 +602,13 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
         lng = DEFAULT_NURSERY_CENTER.lng + offsetLng;
       }
 
-      const formattedCoords = `${lat.toFixed(5)}° N, ${Math.abs(lng).toFixed(5)}° W`;
+      const formattedCoords = formatGpsCoordinates(lat, lng, accuracy);
 
       return {
         item,
         lat,
         lng,
+        accuracy,
         formattedCoords,
         hasExplicitGps,
         timestamp
@@ -620,55 +647,44 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
     setTimeout(() => setCopiedCoords(null), 2000);
   };
 
-  const handleOpenGoogleMapsApp = (lat: number, lng: number) => {
-    const url = `https://www.google.com/maps/search/?api=1&query=${lat},${lng}`;
+  const handleOpenGoogleMapsPin = (lat: number, lng: number, plantLabel?: string) => {
+    const url = generateGoogleMapsPinUrl(lat, lng, plantLabel);
     window.open(url, '_blank', 'noopener,noreferrer');
   };
 
-  const handleOpenAllInGoogleMaps = () => {
-    if (parsedLocations.length === 0) return;
-    const coordsList = parsedLocations
-      .filter(l => l.hasExplicitGps)
-      .map(l => `${l.lat},${l.lng}`);
-    
-    if (coordsList.length === 0) {
-      handleOpenGoogleMapsApp(DEFAULT_NURSERY_CENTER.lat, DEFAULT_NURSERY_CENTER.lng);
-      return;
-    }
+  const handleOpenGoogleMapsWalking = (lat: number, lng: number) => {
+    const url = generateGoogleMapsWalkingUrl(lat, lng);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
 
-    if (coordsList.length === 1) {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${coordsList[0]}`, '_blank', 'noopener,noreferrer');
+  const handleOpenActiveInGoogleMaps = () => {
+    if (currentActiveLocation) {
+      handleOpenGoogleMapsPin(
+        currentActiveLocation.lat, 
+        currentActiveLocation.lng, 
+        `${currentActiveLocation.item.plant.name} (Qty: ${currentActiveLocation.item.quantity}) - Maple Lane Nursery`
+      );
     } else {
-      const origin = coordsList[0];
-      const destination = coordsList[coordsList.length - 1];
-      const waypoints = coordsList.slice(1, -1).join('|');
-      const url = waypoints 
-        ? `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&waypoints=${waypoints}&travelmode=walking`
-        : `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
-      window.open(url, '_blank', 'noopener,noreferrer');
+      handleOpenGoogleMapsPin(DEFAULT_NURSERY_CENTER.lat, DEFAULT_NURSERY_CENTER.lng, 'Maple Lane Nursery');
     }
   };
 
-  const handleGetLiveUserLocation = () => {
-    if (!navigator.geolocation) {
-      alert('Geolocation is not supported on this browser.');
-      return;
-    }
+  const handleGetLiveUserLocation = async () => {
     setIsLocatingUser(true);
-    navigator.geolocation.getCurrentPosition(
-      (pos) => {
-        setIsLocatingUser(false);
-        setUserLocation({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude
-        });
-      },
-      (err) => {
-        setIsLocatingUser(false);
-        console.warn('Geolocation failed:', err.message);
-      },
-      { enableHighAccuracy: true, timeout: 10000 }
-    );
+    try {
+      const fix = await acquireHighPrecisionGps({
+        maxWaitMs: 4500,
+        targetAccuracyMeters: 4.5
+      });
+      setUserLocation({
+        lat: fix.latitude,
+        lng: fix.longitude
+      });
+    } catch (err) {
+      console.warn('Geolocation acquisition error:', err);
+    } finally {
+      setIsLocatingUser(false);
+    }
   };
 
   const handleLogPlantGpsOnTheSpot = (plantId: string) => {
@@ -697,7 +713,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-extrabold text-base sm:text-lg text-white truncate">
-                  Google Map • Plant GPS Coordinates
+                  Google Map • High-Precision Plant GPS
                 </h3>
                 <span className="bg-[#a0f4c8] text-[#002113] text-[10px] font-black px-2 py-0.5 rounded-full uppercase tracking-wider shrink-0 flex items-center gap-1 shadow-2xs">
                   <Radio className="w-2.5 h-2.5 text-[#0e6c4a] animate-pulse" />
@@ -707,7 +723,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
               <p className="text-xs text-white/80 truncate">
                 {customerName ? `${customerName} • ` : ''}
                 {orderId ? `Order #${orderId} • ` : ''}
-                Live Satellite & GPS Navigation Pins
+                High-Resolution Satellite Pins & Sub-Meter Accuracy
               </p>
             </div>
           </div>
@@ -715,12 +731,12 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
           <div className="flex items-center gap-2 shrink-0">
             <button
               type="button"
-              onClick={handleOpenAllInGoogleMaps}
+              onClick={handleOpenActiveInGoogleMaps}
               className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#a0f4c8]/20 hover:bg-[#a0f4c8] text-[#a0f4c8] hover:text-[#002113] border border-[#a0f4c8]/40 text-xs font-bold transition-all cursor-pointer shadow-2xs"
-              title="Open all coordinates in Google Maps app"
+              title="Drop exact red pin for selected plant in Google Maps Satellite view"
             >
-              <ExternalLink className="w-3.5 h-3.5" />
-              <span>Google Maps App</span>
+              <MapPin className="w-3.5 h-3.5" />
+              <span>Drop Pin in Google Maps</span>
             </button>
             <button
               type="button"
@@ -791,10 +807,10 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
                   className={`px-2.5 py-1.5 bg-black/80 hover:bg-[#0e6c4a] backdrop-blur-md text-[#a0f4c8] hover:text-white rounded-xl border border-white/20 text-xs font-bold flex items-center gap-1 shadow-lg transition-all cursor-pointer ${
                     isLocatingUser ? 'animate-pulse text-amber-300' : ''
                   }`}
-                  title="Center on my current GPS location"
+                  title="Lock onto high-precision satellite GPS location"
                 >
                   <LocateFixed className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">My Location</span>
+                  <span className="hidden sm:inline">{isLocatingUser ? 'Locking GPS...' : 'My Location'}</span>
                 </button>
               </div>
             </div>
@@ -818,7 +834,8 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
                 onLogGPS={onLogGPS ? (id) => handleLogPlantGpsOnTheSpot(id) : undefined}
                 onCopyCoords={handleCopyCoords}
                 copiedCoords={copiedCoords}
-                onOpenGoogleMaps={handleOpenGoogleMapsApp}
+                onOpenGoogleMapsPin={handleOpenGoogleMapsPin}
+                onOpenGoogleMapsWalking={handleOpenGoogleMapsWalking}
               />
             </div>
 
@@ -894,6 +911,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
                   const isSelected = activeItem?.plant.id === loc.item.plant.id;
                   const isExplicit = loc.hasExplicitGps;
                   const justLogged = gpsLogSuccess === loc.item.plant.id;
+                  const accuracyRating = getGpsAccuracyRating(loc.accuracy);
 
                   return (
                     <div
@@ -959,10 +977,10 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
                               }}
                               className={`px-2 py-0.5 rounded text-[10px] font-bold border transition-colors cursor-pointer flex items-center gap-1 ${
                                 justLogged
-                                  ? 'bg-[#0e6c4a] text-white border-[#0e6c4a]'
+                                   ? 'bg-[#0e6c4a] text-white border-[#0e6c4a]'
                                   : 'bg-[#e8f5e9] hover:bg-[#c8e6c9] text-[#012d1d] border-[#0e6c4a]/30'
                               }`}
-                              title="Log current phone/tablet GPS location for this plant"
+                              title="Log high-precision satellite GPS location for this plant"
                             >
                               <Crosshair className="w-2.5 h-2.5" />
                               <span>{justLogged ? 'Saved!' : isExplicit ? 'Re-log' : 'Log GPS'}</span>
@@ -973,12 +991,12 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleOpenGoogleMapsApp(loc.lat, loc.lng);
+                              handleOpenGoogleMapsPin(loc.lat, loc.lng, `${loc.item.plant.name} (Qty: ${loc.item.quantity})`);
                             }}
-                            className="p-1 text-[#717973] hover:text-[#012d1d] rounded hover:bg-[#e7e9e5] transition-colors cursor-pointer"
-                            title="Open pin in Google Maps app"
+                            className="p-1 text-[#0e6c4a] hover:text-[#012d1d] rounded hover:bg-[#e7e9e5] transition-colors cursor-pointer"
+                            title="Drop exact red pin in Google Maps Satellite view"
                           >
-                            <ExternalLink className="w-3 h-3" />
+                            <MapPin className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </div>
@@ -988,16 +1006,27 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
               )}
             </div>
 
-            {/* Quick Bulk Action Footer */}
-            <div className="p-3 bg-white border-t border-[#c1c8c2] flex flex-col gap-2 shrink-0">
+            {/* Quick Actions Footer */}
+            <div className="p-3 bg-white border-t border-[#c1c8c2] flex flex-col gap-1.5 shrink-0">
               <button
                 type="button"
-                onClick={handleOpenAllInGoogleMaps}
+                onClick={handleOpenActiveInGoogleMaps}
                 className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white font-extrabold py-2.5 px-3 rounded-xl shadow-2xs transition-all flex items-center justify-center gap-2 text-xs cursor-pointer border border-[#a0f4c8]/30"
               >
-                <Navigation className="w-3.5 h-3.5" />
-                <span>Open Full Route in Google Maps</span>
+                <MapPin className="w-3.5 h-3.5" />
+                <span>Drop Active Plant Pin in Google Maps</span>
               </button>
+
+              {currentActiveLocation && (
+                <button
+                  type="button"
+                  onClick={() => handleOpenGoogleMapsWalking(currentActiveLocation.lat, currentActiveLocation.lng)}
+                  className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] font-bold py-2 px-3 rounded-xl transition-all flex items-center justify-center gap-1.5 text-xs cursor-pointer border border-[#c1c8c2]"
+                >
+                  <Footprints className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                  <span>Walking Directions from My Location</span>
+                </button>
+              )}
             </div>
           </div>
         </div>
@@ -1006,7 +1035,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
         <div className="bg-[#f3f4f0] p-3 sm:p-3.5 border-t border-[#c1c8c2] flex justify-between items-center shrink-0">
           <div className="flex items-center gap-2 text-xs text-[#414844]">
             <Building className="w-4 h-4 text-[#0e6c4a]" />
-            <span className="hidden sm:inline">Maple Lane Nursery • GPS Plant Locator & Yard Fleet Routing</span>
+            <span className="hidden sm:inline">Maple Lane Nursery • High-Precision GPS Plant Locator (Sub-Meter Satellite Accuracy)</span>
             <span className="sm:hidden">GPS Plant Locator</span>
           </div>
 

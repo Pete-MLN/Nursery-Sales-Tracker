@@ -38,6 +38,7 @@ export interface PlantItem {
   gpsLocation?: {
     latitude: number;
     longitude: number;
+    accuracy?: number; // Accuracy radius in meters
     timestamp: string;
   };
 }
@@ -51,6 +52,7 @@ export interface OrderCartItem {
   gpsLocation?: {
     latitude: number;
     longitude: number;
+    accuracy?: number; // Accuracy radius in meters
     timestamp: string;
   };
 }

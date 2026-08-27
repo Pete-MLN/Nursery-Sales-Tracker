@@ -3,6 +3,7 @@ import { ScreenType, Order } from '../types';
 import { formatOrderCreatedDate, formatOrderScheduledTime } from '../utils/dateUtils';
 import { PlantMapModal } from './PlantMapModal';
 import { saveOrderToFirestore, savePlantToFirestore } from '../services/firebaseService';
+import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
 import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Trash2, X, AlertTriangle, CheckCircle, RotateCcw, Archive, Undo2 } from 'lucide-react';
 
 interface OrdersScreenProps {
@@ -141,16 +142,29 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
     setOrderToDelete(null);
   };
 
-  const handleLogOrderGPS = (plantId: string) => {
+  const handleLogOrderGPS = async (plantId: string) => {
     if (!mapModalOrder || !mapModalOrder.items) return;
 
-    const applyGps = (lat: number, lng: number) => {
+    try {
+      showToast('Acquiring high-precision GPS satellite lock...');
+      const fix = await acquireHighPrecisionGps({
+        maxWaitMs: 4500,
+        targetAccuracyMeters: 4.5
+      });
+
       const timestamp = new Date().toISOString();
+      const newGpsLocation = {
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracy: fix.accuracy,
+        timestamp
+      };
+
       const updatedItems = (mapModalOrder.items || []).map(item => {
         if (item.plant.id === plantId) {
           return {
             ...item,
-            gpsLocation: { latitude: lat, longitude: lng, timestamp }
+            gpsLocation: newGpsLocation
           };
         }
         return item;
@@ -165,7 +179,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       if (targetItem) {
         savePlantToFirestore({
           ...targetItem.plant,
-          gpsLocation: { latitude: lat, longitude: lng, timestamp }
+          gpsLocation: newGpsLocation
         });
       }
 
@@ -174,22 +188,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         onUpdateOrder(updatedOrder);
       }
       saveOrderToFirestore(updatedOrder);
-      showToast(`📍 Plant GPS coordinates saved to Order #${updatedOrder.id}`);
-    };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          applyGps(position.coords.latitude, position.coords.longitude);
-        },
-        (err) => {
-          console.warn('GPS error in OrdersScreen:', err);
-          applyGps(43.1482, -79.4623);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
-      applyGps(43.1482, -79.4623);
+      const formatted = formatGpsCoordinates(fix.latitude, fix.longitude, fix.accuracy);
+      showToast(`📍 Plant GPS locked (${fix.isFallback ? 'Yard Reference' : `±${fix.accuracyFeet} ft`}): ${formatted}`);
+    } catch (err) {
+      console.warn('GPS error in OrdersScreen:', err);
     }
   };
 

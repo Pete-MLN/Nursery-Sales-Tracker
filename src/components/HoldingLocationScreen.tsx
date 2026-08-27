@@ -3,6 +3,7 @@ import { ScreenType, Order, HoldingArea } from '../types';
 import { HOLDING_AREAS } from '../data/mockData';
 import { PlantMapModal } from './PlantMapModal';
 import { saveOrderToFirestore } from '../services/firebaseService';
+import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
 import { 
   Warehouse, 
   Sun, 
@@ -679,14 +680,18 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
             }
             return acc;
           }, {} as Record<string, string>)}
-          onLogGPS={(plantId) => {
-            const applyGps = (lat: number, lng: number) => {
+          onLogGPS={async (plantId) => {
+            try {
+              const fix = await acquireHighPrecisionGps({
+                maxWaitMs: 4500,
+                targetAccuracyMeters: 4.5
+              });
               const timestamp = new Date().toISOString();
               const updatedItems = (activeOrder.items || []).map(item => {
                 if (item.plant.id === plantId) {
                   return {
                     ...item,
-                    gpsLocation: { latitude: lat, longitude: lng, timestamp }
+                    gpsLocation: { latitude: fix.latitude, longitude: fix.longitude, accuracy: fix.accuracy, timestamp }
                   };
                 }
                 return item;
@@ -699,16 +704,8 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
                 onUpdateActiveOrder(updatedOrder);
               }
               saveOrderToFirestore(updatedOrder);
-            };
-
-            if (navigator.geolocation) {
-              navigator.geolocation.getCurrentPosition(
-                (pos) => applyGps(pos.coords.latitude, pos.coords.longitude),
-                () => applyGps(43.1482, -79.4623),
-                { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-              );
-            } else {
-              applyGps(43.1482, -79.4623);
+            } catch (err) {
+              console.warn('GPS error in HoldingLocationScreen:', err);
             }
           }}
           orderId={activeOrder.id}

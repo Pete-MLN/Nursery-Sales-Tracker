@@ -59,6 +59,7 @@ import {
   getDraftForOrderId 
 } from '../services/orderAutoSaveService';
 import { savePlantToFirestore, saveOrderToFirestore } from '../services/firebaseService';
+import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
 
 interface OrderFinalizationScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -387,13 +388,28 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   };
 
   // GPS logging handler for plants in finalization
-  const handleLogGPS = (plantId: string) => {
+  const handleLogGPS = async (plantId: string) => {
     setIsLoggingGpsId(plantId);
     setHasUnsavedChanges(true);
 
-    const applyGpsUpdate = (latitude: number, longitude: number) => {
+    try {
+      const fix = await acquireHighPrecisionGps({
+        maxWaitMs: 4500,
+        targetAccuracyMeters: 4.5,
+        onProgress: (status) => {
+          if (status.phase === 'waking_gps' || status.phase === 'locking_satellites') {
+            showToast(status.message);
+          }
+        }
+      });
+
       const timestamp = new Date().toISOString();
-      const newGpsLocation = { latitude, longitude, timestamp };
+      const newGpsLocation = {
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracy: fix.accuracy,
+        timestamp
+      };
 
       const updatedItems = items.map(item => {
         if (item.plant.id === plantId) {
@@ -406,7 +422,6 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       });
 
       setItems(updatedItems);
-      setIsLoggingGpsId(null);
 
       if (mapModalItem && mapModalItem.plant.id === plantId) {
         setMapModalItem(prev => prev ? {
@@ -438,28 +453,12 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
         savePlantToFirestore(updatedPlant);
       }
 
-      showToast(`📍 Plant GPS saved: ${latitude.toFixed(5)}° N, ${Math.abs(longitude).toFixed(5)}° W`);
-    };
-
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const { latitude, longitude } = position.coords;
-          applyGpsUpdate(latitude, longitude);
-        },
-        (error) => {
-          console.warn('Error getting geolocation in order review, using yard position:', error);
-          // Fallback to nursery yard location
-          const fallbackLat = 43.1482;
-          const fallbackLng = -79.4623;
-          applyGpsUpdate(fallbackLat, fallbackLng);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
-      const fallbackLat = 43.1482;
-      const fallbackLng = -79.4623;
-      applyGpsUpdate(fallbackLat, fallbackLng);
+      const formattedStr = formatGpsCoordinates(fix.latitude, fix.longitude, fix.accuracy);
+      showToast(`📍 Plant GPS locked (${fix.isFallback ? 'Yard Reference' : `±${fix.accuracyFeet} ft`}): ${formattedStr}`);
+    } catch (err) {
+      console.warn('High-precision GPS error in order finalization:', err);
+    } finally {
+      setIsLoggingGpsId(null);
     }
   };
 

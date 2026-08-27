@@ -4,6 +4,11 @@ import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
 import { PricingDropdown } from './PricingDropdown';
 import { 
+  acquireHighPrecisionGps, 
+  formatGpsCoordinates, 
+  getGpsAccuracyRating 
+} from '../utils/gpsUtils';
+import { 
   Check, 
   X, 
   Plus, 
@@ -17,7 +22,8 @@ import {
   CheckCircle2,
   DollarSign,
   MapPin,
-  RefreshCw
+  RefreshCw,
+  Radio
 } from 'lucide-react';
 
 interface PlantVerificationModalProps {
@@ -32,7 +38,7 @@ interface PlantVerificationModalProps {
     priceLevel: PriceLevelKey, 
     unitPrice: number, 
     fulfillment: 'Take Now' | 'Pick-up/Delivery',
-    gpsLocation?: { latitude: number; longitude: number; timestamp: string }
+    gpsLocation?: { latitude: number; longitude: number; accuracy?: number; timestamp: string }
   ) => void;
   onClose: () => void;
 }
@@ -84,10 +90,11 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   });
 
   const [fulfillment, setFulfillment] = useState<'Take Now' | 'Pick-up/Delivery'>('Take Now');
-  const [gpsLocation, setGpsLocation] = useState<{ latitude: number; longitude: number; timestamp: string } | undefined>(() => {
+  const [gpsLocation, setGpsLocation] = useState<{ latitude: number; longitude: number; accuracy?: number; timestamp: string } | undefined>(() => {
     return existingCartItem?.gpsLocation || plant.gpsLocation || undefined;
   });
   const [isLoggingGps, setIsLoggingGps] = useState<boolean>(false);
+  const [gpsStatusText, setGpsStatusText] = useState<string>('');
   const inputRef = useRef<HTMLInputElement | null>(null);
 
   // Sync state whenever opened with a new plant or existing item
@@ -120,36 +127,26 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
     setSelectedUnitPrice(newPrice);
   };
 
-  const handleCaptureGps = () => {
+  const handleCaptureGps = async () => {
     setIsLoggingGps(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (pos) => {
-          setGpsLocation({
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            timestamp: new Date().toISOString()
-          });
-          setIsLoggingGps(false);
-        },
-        (err) => {
-          console.warn('Geolocation failed in plant modal, using yard location', err);
-          setGpsLocation({
-            latitude: 43.1482,
-            longitude: -79.4623,
-            timestamp: new Date().toISOString()
-          });
-          setIsLoggingGps(false);
-        },
-        { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
-      );
-    } else {
-      setGpsLocation({
-        latitude: 43.1482,
-        longitude: -79.4623,
-        timestamp: new Date().toISOString()
+    setGpsStatusText('Acquiring satellite lock...');
+    try {
+      const fix = await acquireHighPrecisionGps({
+        maxWaitMs: 4500,
+        targetAccuracyMeters: 4.5,
+        onProgress: (status) => setGpsStatusText(status)
       });
+      setGpsLocation({
+        latitude: fix.latitude,
+        longitude: fix.longitude,
+        accuracy: fix.accuracy,
+        timestamp: fix.timestamp
+      });
+    } catch (err) {
+      console.warn('GPS acquisition failed:', err);
+    } finally {
       setIsLoggingGps(false);
+      setGpsStatusText('');
     }
   };
 
@@ -432,16 +429,23 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
               <MapPin className="w-4 h-4 text-[#a0f4c8]" />
             </div>
             <div className="min-w-0">
-              <span className="text-[11px] font-bold text-[#0e6c4a] uppercase tracking-wider block">
-                Nursery Yard GPS Coordinates
-              </span>
+              <div className="flex items-center gap-1.5">
+                <span className="text-[11px] font-bold text-[#0e6c4a] uppercase tracking-wider block">
+                  High-Precision Nursery GPS
+                </span>
+                {gpsLocation?.accuracy !== undefined && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.2 rounded-full border ${getGpsAccuracyRating(gpsLocation.accuracy).colorClass}`}>
+                    {getGpsAccuracyRating(gpsLocation.accuracy).label} (±{gpsLocation.accuracy.toFixed(1)}m)
+                  </span>
+                )}
+              </div>
               {gpsLocation ? (
                 <span className="font-mono text-xs font-bold text-[#012d1d] block truncate">
-                  {gpsLocation.latitude.toFixed(5)}° N, {Math.abs(gpsLocation.longitude).toFixed(5)}° W
+                  {formatGpsCoordinates(gpsLocation.latitude, gpsLocation.longitude, gpsLocation.accuracy)}
                 </span>
               ) : (
                 <span className="text-xs text-[#414844] block">
-                  No GPS coordinates tagged yet
+                  {gpsStatusText || 'No GPS coordinates tagged yet'}
                 </span>
               )}
             </div>
@@ -452,14 +456,14 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
             onClick={handleCaptureGps}
             disabled={isLoggingGps}
             className="px-3 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white rounded-xl text-xs font-extrabold flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-xs border border-[#a0f4c8]/30 shrink-0"
-            title="Capture current device GPS coordinates for this plant in the nursery yard"
+            title="Lock onto current high-precision satellite GPS coordinates for this plant"
           >
             {isLoggingGps ? (
               <RefreshCw className="w-3.5 h-3.5 animate-spin" />
             ) : (
               <MapPin className="w-3.5 h-3.5" />
             )}
-            <span>{isLoggingGps ? 'Capturing GPS...' : (gpsLocation ? 'Update GPS' : '📍 Tag Yard GPS')}</span>
+            <span>{isLoggingGps ? (gpsStatusText || 'Locking GPS...') : (gpsLocation ? 'Update GPS' : '📍 Tag Yard GPS')}</span>
           </button>
         </div>
 

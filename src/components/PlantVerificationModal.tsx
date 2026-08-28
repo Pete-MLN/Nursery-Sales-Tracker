@@ -96,10 +96,15 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   const [isLoggingGps, setIsLoggingGps] = useState<boolean>(false);
   const [gpsStatusText, setGpsStatusText] = useState<string>('');
   const inputRef = useRef<HTMLInputElement | null>(null);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const modalCardRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync state whenever opened with a new plant or existing item
+  // Sync state whenever opened with a new plant or existing item & lock background scroll
   useEffect(() => {
     if (isOpen && plant) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
       const startingQty = existingCartItem ? existingCartItem.quantity : (initialQuantity > 0 ? initialQuantity : (isBulk ? 1.0 : 1));
       setQuantity(startingQty);
       setQuantityInput(startingQty.toString());
@@ -113,12 +118,28 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
       setGpsLocation(existingCartItem?.gpsLocation || plant.gpsLocation || undefined);
 
-      // Focus input
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.select();
+      // Ensure modal scroll starts right at the top of the viewport
+      if (scrollContainerRef.current) {
+        scrollContainerRef.current.scrollTop = 0;
+      }
+
+      // Immediately focus quantity input and select text for rapid entry without page jumps
+      const focusTimer = setTimeout(() => {
+        if (scrollContainerRef.current) {
+          scrollContainerRef.current.scrollTop = 0;
         }
-      }, 50);
+        if (inputRef.current) {
+          inputRef.current.focus({ preventScroll: true });
+          inputRef.current.select();
+        } else if (modalCardRef.current) {
+          modalCardRef.current.focus({ preventScroll: true });
+        }
+      }, 30);
+
+      return () => {
+        clearTimeout(focusTimer);
+        document.body.style.overflow = originalOverflow;
+      };
     }
   }, [isOpen, plant, existingCartItem, initialQuantity, customerType]);
 
@@ -134,7 +155,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       const fix = await acquireHighPrecisionGps({
         maxWaitMs: 4500,
         targetAccuracyMeters: 4.5,
-        onProgress: (status) => setGpsStatusText(status)
+        onProgress: (status) => setGpsStatusText(status.message)
       });
       setGpsLocation({
         latitude: fix.latitude,
@@ -197,13 +218,34 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
     onClose();
   };
 
+  const handleModalKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Escape') {
+      e.stopPropagation();
+      onClose();
+    } else if (e.key === 'Enter') {
+      const target = e.target as HTMLElement;
+      if (target?.tagName !== 'BUTTON') {
+        e.preventDefault();
+        e.stopPropagation();
+        handleConfirm();
+      }
+    }
+  };
+
   return (
     <div 
-      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+      ref={scrollContainerRef}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="confirm-plant-heading"
+      onKeyDown={handleModalKeyDown}
+      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
       onClick={onClose}
     >
       <div 
-        className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-5 my-auto overflow-hidden animate-scale-up"
+        ref={modalCardRef}
+        tabIndex={-1}
+        className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-5 my-3 sm:my-auto overflow-hidden animate-scale-up outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with Title and Close Button */}
@@ -223,7 +265,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
                   </span>
                 )}
               </div>
-              <h2 className="text-lg sm:text-xl font-extrabold text-[#012d1d] truncate mt-0.5">
+              <h2 id="confirm-plant-heading" className="text-lg sm:text-xl font-extrabold text-[#012d1d] truncate mt-0.5">
                 Confirm Plant Selection
               </h2>
             </div>
@@ -368,6 +410,19 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
                 value={quantityInput}
                 onChange={(e) => handleQuantityInputChange(e.target.value)}
                 onBlur={handleQuantityInputBlur}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleConfirm();
+                  } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    handleQuantityStep(1);
+                  } else if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    handleQuantityStep(-1);
+                  }
+                }}
                 className="w-full text-center text-2xl sm:text-3xl font-extrabold text-[#012d1d] bg-white border-2 border-[#012d1d] rounded-2xl py-2 px-2 focus:outline-none focus:ring-4 focus:ring-[#a0f4c8]/50 shadow-inner"
               />
               <span className="absolute -bottom-5 left-1/2 -translate-x-1/2 text-[10px] font-bold text-[#717973] uppercase tracking-wider whitespace-nowrap">

@@ -310,10 +310,31 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   }, [verifyingPlant]);
 
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const scannerSectionRef = useRef<HTMLElement | null>(null);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const lastScanTimeRef = useRef<number>(0);
   const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // Focus and center the camera scanner viewport when returning from verification
+  const focusCameraScanner = () => {
+    if (cameraActive) {
+      resetCameraTimer();
+    }
+    setTimeout(() => {
+      if (scannerSectionRef.current) {
+        scannerSectionRef.current.scrollIntoView({
+          behavior: 'smooth',
+          block: 'center'
+        });
+      }
+    }, 60);
+  };
+
+  const handleCloseVerificationModal = () => {
+    setVerifyingPlant(null);
+    focusCameraScanner();
+  };
 
   const toggleItemFulfillment = (plantId: string) => {
     setItemFulfillmentMap(prev => ({
@@ -414,6 +435,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       'success',
       10500
     );
+
+    focusCameraScanner();
   };
 
   // Helper to add a plant directly to the cart with customizable increment and price tier
@@ -1503,6 +1526,60 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
       {/* Manual Barcode Search & Preset Chips */}
       <section className="bg-white p-3.5 rounded-2xl border border-[#c1c8c2] shadow-2xs flex flex-col gap-2.5">
+        {/* Top Quick Finish Sale / Save Bar */}
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-2.5 p-2.5 sm:p-3 bg-[#f3f4f0] rounded-xl border border-[#c1c8c2]">
+          <div className="flex items-center justify-between sm:justify-start gap-3">
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-black uppercase tracking-wider text-[#717973]">Order:</span>
+              <span className="font-extrabold text-lg sm:text-xl text-[#012d1d]">
+                ${calculateTotal().toFixed(2)}
+              </span>
+            </div>
+            <span className="bg-white border border-[#c1c8c2] text-[#414844] text-xs font-bold px-2.5 py-0.5 rounded-full shadow-2xs">
+              {cartItems.reduce((acc, item) => acc + item.quantity, 0)} item{cartItems.reduce((acc, item) => acc + item.quantity, 0) === 1 ? '' : 's'}
+            </span>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              id="btn-top-save-in-place"
+              onClick={handleSaveInPlace}
+              disabled={cartItems.length === 0}
+              className={`px-3 py-2 rounded-xl font-extrabold text-xs sm:text-sm flex items-center justify-center gap-1.5 transition-all cursor-pointer border shadow-2xs active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed ${
+                isSavedInPlace 
+                  ? 'bg-[#0e6c4a] text-white border-[#0e6c4a]' 
+                  : 'bg-white hover:bg-[#e7e9e5] text-[#012d1d] border-[#c1c8c2]'
+              }`}
+              title="Save order changes right now without leaving this screen"
+            >
+              {isSavedInPlace ? (
+                <>
+                  <Check className="w-4 h-4 text-[#a0f4c8]" />
+                  <span>Saved!</span>
+                </>
+              ) : (
+                <>
+                  <Save className="w-4 h-4 text-[#0e6c4a]" />
+                  <span>Quick Save</span>
+                </>
+              )}
+            </button>
+
+            <button
+              type="button"
+              id="btn-top-finish-sale"
+              onClick={handleComplete}
+              disabled={cartItems.length === 0}
+              className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-[#a0f4c8] hover:text-white font-extrabold text-xs sm:text-sm py-2 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer border border-[#a0f4c8]/30"
+              title="Finish sale and proceed to order review/finalization"
+            >
+              <CheckCircle className="w-4 h-4 text-[#a0f4c8]" />
+              <span>Finish Sale</span>
+            </button>
+          </div>
+        </div>
+
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -1704,7 +1781,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       )}
 
       {/* Barcode Scanner Viewfinder Area */}
-      <section className="relative rounded-2xl overflow-hidden shadow-sm border border-[#c1c8c2] bg-[#1a1c1a] aspect-16/10 flex items-center justify-center">
+      <section 
+        ref={scannerSectionRef}
+        id="camera-scanner-viewfinder"
+        tabIndex={-1}
+        className="relative rounded-2xl overflow-hidden shadow-sm border border-[#c1c8c2] bg-[#1a1c1a] aspect-16/10 flex items-center justify-center outline-none scroll-mt-6"
+      >
         {cameraActive ? (
           <video
             ref={(el) => {
@@ -2758,8 +2840,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         initialQuantity={verifyingPlant?.initialQty}
         existingCartItem={verifyingPlant?.existingCartItem}
         customerType={customerType}
-        onConfirm={handleConfirmPlantVerification}
-        onClose={() => setVerifyingPlant(null)}
+        onConfirm={(plant, qty, priceLevel, unitPrice, fulfillment, gps) => {
+          handleConfirmPlantVerification(plant, qty, priceLevel, unitPrice, fulfillment, gps);
+          setVerifyingPlant(null);
+        }}
+        onClose={handleCloseVerificationModal}
       />
 
       {/* Plant Yard & GPS Map Modal */}

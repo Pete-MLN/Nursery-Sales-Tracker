@@ -52,13 +52,11 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   onConfirm,
   onClose
 }) => {
-  if (!isOpen || !plant) return null;
-
-  const isBulk = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
+  const isBulk = Boolean(plant && ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
     (plant.category || '').toUpperCase().includes(cat) || plant.name.toUpperCase().includes(cat)
-  );
-  const isStone = (plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE');
-  const unitLabel = plant.size && plant.size.length < 10 
+  ));
+  const isStone = Boolean(plant && ((plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE')));
+  const unitLabel = plant?.size && plant.size.length < 10 
     ? plant.size 
     : (isStone ? 'Ton' : (isBulk ? 'Yard' : 'Plant'));
 
@@ -66,8 +64,8 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   const defaultTier: PriceLevelKey = existingCartItem?.selectedPriceLevel 
     || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
   
-  const tiers = getPlantPriceTiers(plant);
-  const matchedTier = tiers.find(t => t.key === defaultTier) || tiers[0];
+  const tiers = plant ? getPlantPriceTiers(plant) : [];
+  const matchedTier = tiers.find(t => t.key === defaultTier) || tiers[0] || { price: 0 };
 
   const [quantity, setQuantity] = useState<number>(() => {
     if (existingCartItem) return existingCartItem.quantity;
@@ -91,7 +89,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
   const [fulfillment, setFulfillment] = useState<'Take Now' | 'Pick-up/Delivery'>('Take Now');
   const [gpsLocation, setGpsLocation] = useState<{ latitude: number; longitude: number; accuracy?: number; timestamp: string } | undefined>(() => {
-    return existingCartItem?.gpsLocation || plant.gpsLocation || undefined;
+    return existingCartItem?.gpsLocation || plant?.gpsLocation || undefined;
   });
   const [isLoggingGps, setIsLoggingGps] = useState<boolean>(false);
   const [gpsStatusText, setGpsStatusText] = useState<string>('');
@@ -99,12 +97,9 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
   const modalCardRef = useRef<HTMLDivElement | null>(null);
 
-  // Sync state whenever opened with a new plant or existing item & lock background scroll
+  // Sync state whenever opened with a new plant or existing item
   useEffect(() => {
     if (isOpen && plant) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-
       const startingQty = existingCartItem ? existingCartItem.quantity : (initialQuantity > 0 ? initialQuantity : (isBulk ? 1.0 : 1));
       setQuantity(startingQty);
       setQuantityInput(startingQty.toString());
@@ -118,36 +113,20 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
       setGpsLocation(existingCartItem?.gpsLocation || plant.gpsLocation || undefined);
 
-      // Ensure modal scroll starts right at the top of the viewport
+      // Ensure window and modal start cleanly at the very top
+      window.scrollTo(0, 0);
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = 0;
       }
       if (modalCardRef.current) {
         modalCardRef.current.scrollTop = 0;
       }
-
-      // Immediately focus quantity input and select text for rapid entry without page jumps
-      const focusTimer = setTimeout(() => {
-        if (scrollContainerRef.current) {
-          scrollContainerRef.current.scrollTop = 0;
-        }
-        if (modalCardRef.current) {
-          modalCardRef.current.scrollTop = 0;
-        }
-        if (inputRef.current) {
-          inputRef.current.focus({ preventScroll: true });
-          inputRef.current.select();
-        } else if (modalCardRef.current) {
-          modalCardRef.current.focus({ preventScroll: true });
-        }
-      }, 30);
-
-      return () => {
-        clearTimeout(focusTimer);
-        document.body.style.overflow = originalOverflow;
-      };
     }
   }, [isOpen, plant, existingCartItem, initialQuantity, customerType]);
+
+  if (!isOpen || !plant) {
+    return null;
+  }
 
   const handlePriceChange = (levelKey: PriceLevelKey, newPrice: number) => {
     setSelectedPriceLevel(levelKey);
@@ -245,16 +224,15 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       aria-modal="true"
       aria-labelledby="confirm-plant-heading"
       onKeyDown={handleModalKeyDown}
-      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs overflow-y-auto overscroll-contain p-3 sm:p-4 animate-fade-in"
+      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-2 sm:pt-4 overflow-y-auto animate-fade-in"
       onClick={onClose}
     >
-      <div className="min-h-full flex items-start justify-center pt-2 sm:pt-4 pb-12 sm:pb-16">
-        <div 
-          ref={modalCardRef}
-          tabIndex={-1}
-          className="bg-white rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 sm:gap-5 animate-scale-up outline-none"
-          onClick={(e) => e.stopPropagation()}
-        >
+      <div 
+        ref={modalCardRef}
+        tabIndex={-1}
+        className="bg-white rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 sm:gap-5 my-2 mb-36 sm:mb-44 animate-scale-up outline-none"
+        onClick={(e) => e.stopPropagation()}
+      >
         {/* Header with Title and Close Button */}
         <div className="flex items-start justify-between gap-3 border-b border-[#f3f4f0] pb-3.5">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -604,6 +582,5 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
         </div>
       </div>
     </div>
-  </div>
-);
+  );
 };

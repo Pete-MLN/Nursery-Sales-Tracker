@@ -122,11 +122,17 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = 0;
       }
+      if (modalCardRef.current) {
+        modalCardRef.current.scrollTop = 0;
+      }
 
       // Immediately focus quantity input and select text for rapid entry without page jumps
       const focusTimer = setTimeout(() => {
         if (scrollContainerRef.current) {
           scrollContainerRef.current.scrollTop = 0;
+        }
+        if (modalCardRef.current) {
+          modalCardRef.current.scrollTop = 0;
         }
         if (inputRef.current) {
           inputRef.current.focus({ preventScroll: true });
@@ -239,15 +245,16 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       aria-modal="true"
       aria-labelledby="confirm-plant-heading"
       onKeyDown={handleModalKeyDown}
-      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-start sm:items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs overflow-y-auto overscroll-contain p-3 sm:p-4 animate-fade-in"
       onClick={onClose}
     >
-      <div 
-        ref={modalCardRef}
-        tabIndex={-1}
-        className="bg-white rounded-3xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-5 my-3 sm:my-auto overflow-hidden animate-scale-up outline-none"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="min-h-full flex items-center justify-center py-2 sm:py-4">
+        <div 
+          ref={modalCardRef}
+          tabIndex={-1}
+          className="bg-white rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 sm:gap-5 my-auto max-h-[88dvh] overflow-y-auto overscroll-contain animate-scale-up outline-none"
+          onClick={(e) => e.stopPropagation()}
+        >
         {/* Header with Title and Close Button */}
         <div className="flex items-start justify-between gap-3 border-b border-[#f3f4f0] pb-3.5">
           <div className="flex items-center gap-2.5 min-w-0">
@@ -597,5 +604,6 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };

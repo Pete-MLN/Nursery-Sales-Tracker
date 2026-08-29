@@ -27,6 +27,14 @@ const ORDERS_COL = 'orders';
 const UPLOADS_COL = 'uploads';
 const HOLDING_LOCATIONS_COL = 'holding_locations';
 
+const handleSnapshotError = (colName: string, err: any) => {
+  if (err?.code === 'unavailable' || err?.message?.includes('offline') || err?.message?.includes('unavailable') || err?.message?.includes('Could not reach Cloud Firestore')) {
+    console.warn(`Firestore [${colName}] operating with offline/local cache:`, err?.message || err);
+  } else {
+    console.error(`Firestore [${colName}] snapshot error:`, err);
+  }
+};
+
 /**
  * Helper to recursively strip undefined properties from an object prior to Firestore operations
  */
@@ -125,8 +133,12 @@ export async function seedInitialFirestoreData() {
       await batch.commit();
       console.log('Firestore: Orders initialized');
     }
-  } catch (err) {
-    console.error('Error seeding Firestore data:', err);
+  } catch (err: any) {
+    if (err?.code === 'unavailable' || err?.message?.includes('offline') || err?.message?.includes('Could not reach Cloud Firestore')) {
+      console.warn('Firestore offline during initial seed check, working with local cache.');
+    } else {
+      console.error('Error seeding Firestore data:', err);
+    }
   }
 }
 
@@ -139,7 +151,7 @@ export function subscribeToPlants(callback: (plants: PlantItem[]) => void) {
       items.push(doc.data() as PlantItem);
     });
     callback(items);
-  }, (err) => console.error('Plants snapshot error:', err));
+  }, (err) => handleSnapshotError(PLANTS_COL, err));
 }
 
 export function subscribeToCustomers(callback: (customers: Customer[]) => void) {
@@ -149,7 +161,7 @@ export function subscribeToCustomers(callback: (customers: Customer[]) => void) 
       items.push(doc.data() as Customer);
     });
     callback(items);
-  }, (err) => console.error('Customers snapshot error:', err));
+  }, (err) => handleSnapshotError(CUSTOMERS_COL, err));
 }
 
 export function subscribeToEmployees(callback: (employees: Employee[]) => void) {
@@ -159,7 +171,7 @@ export function subscribeToEmployees(callback: (employees: Employee[]) => void) 
       items.push(doc.data() as Employee);
     });
     callback(items);
-  }, (err) => console.error('Employees snapshot error:', err));
+  }, (err) => handleSnapshotError(EMPLOYEES_COL, err));
 }
 
 export function subscribeToOrders(callback: (orders: Order[]) => void) {
@@ -172,7 +184,7 @@ export function subscribeToOrders(callback: (orders: Order[]) => void) {
       }
     });
     callback(items);
-  }, (err) => console.error('Orders snapshot error:', err));
+  }, (err) => handleSnapshotError(ORDERS_COL, err));
 }
 
 export function subscribeToUploads(callback: (uploads: RecentUpload[]) => void) {
@@ -182,7 +194,7 @@ export function subscribeToUploads(callback: (uploads: RecentUpload[]) => void) 
       items.push(doc.data() as RecentUpload);
     });
     callback(items);
-  }, (err) => console.error('Uploads snapshot error:', err));
+  }, (err) => handleSnapshotError(UPLOADS_COL, err));
 }
 
 export function subscribeToHoldingLocations(callback: (areas: HoldingArea[]) => void) {
@@ -192,7 +204,7 @@ export function subscribeToHoldingLocations(callback: (areas: HoldingArea[]) => 
       items.push(doc.data() as HoldingArea);
     });
     callback(items);
-  }, (err) => console.error('Holding locations snapshot error:', err));
+  }, (err) => handleSnapshotError(HOLDING_LOCATIONS_COL, err));
 }
 
 /* --- CRUD Helpers --- */

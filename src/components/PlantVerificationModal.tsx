@@ -248,11 +248,11 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs overflow-y-auto overscroll-contain p-3 sm:p-4 animate-fade-in"
       onClick={onClose}
     >
-      <div className="min-h-full flex items-center justify-center py-2 sm:py-4">
+      <div className="min-h-full flex items-start justify-center pt-2 sm:pt-4 pb-12 sm:pb-16">
         <div 
           ref={modalCardRef}
           tabIndex={-1}
-          className="bg-white rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 sm:gap-5 my-auto max-h-[88dvh] overflow-y-auto overscroll-contain animate-scale-up outline-none"
+          className="bg-white rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 sm:gap-5 animate-scale-up outline-none"
           onClick={(e) => e.stopPropagation()}
         >
         {/* Header with Title and Close Button */}

@@ -1277,13 +1277,35 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         </div>
       )}
 
-      {/* Customer Search Bar */}
-      <section className="flex flex-col gap-2">
+      {/* Customer & Account Selector */}
+      <section className="bg-white p-3 sm:p-3.5 rounded-2xl border-[5px] border-[#012d1d] shadow-md flex flex-col gap-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <div className="w-7 h-7 rounded-lg bg-[#012d1d]/15 text-[#012d1d] flex items-center justify-center font-bold">
+              <User className="w-4 h-4 text-[#012d1d]" />
+            </div>
+            <span className="text-xs font-black uppercase tracking-wider text-[#012d1d]">
+              Customer & Account
+            </span>
+          </div>
+
+          {selectedCustomer ? (
+            <div className="flex items-center gap-1.5 bg-[#e7f8ef] text-[#012d1d] border border-[#a0f4c8] px-2.5 py-0.5 rounded-lg text-xs font-bold truncate max-w-[200px] sm:max-w-[280px]">
+              <Check className="w-3.5 h-3.5 shrink-0 text-[#0e6c4a]" />
+              <span className="truncate">{selectedCustomer}</span>
+            </div>
+          ) : (
+            <span className="text-xs text-[#717973] font-medium hidden sm:inline">
+              Select account or enter name
+            </span>
+          )}
+        </div>
+
         <div className="flex items-center gap-2">
           {/* Searchable Dropdown Container */}
           <div className="relative flex-1" ref={dropdownRef}>
             <div className="relative">
-              <Search className="w-5 h-5 text-[#717973] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <User className="w-5 h-5 text-[#012d1d] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
                 value={customerSearch}
@@ -1293,8 +1315,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   setSelectedCustomer(e.target.value);
                   setIsDropdownOpen(true);
                 }}
-                placeholder="Customer Name (e.g. Retail Walk-in, John Smith)..."
-                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-11 pr-16 py-3 text-lg font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white transition-all shadow-2xs placeholder:text-base placeholder:font-normal"
+                placeholder="Select or type customer name (e.g. Retail Walk-in, Smith)..."
+                className="w-full bg-[#f9faf6] border-2 border-[#012d1d] focus:border-[#012d1d] focus:bg-white focus:ring-4 focus:ring-[#012d1d]/15 rounded-xl pl-11 pr-16 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] transition-all shadow-sm placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
               />
               <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
                 {customerSearch && (
@@ -1305,16 +1327,16 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       setSelectedCustomer('');
                       setIsDropdownOpen(true);
                     }}
-                    className="p-1.5 text-[#717973] hover:text-[#1a1c1a] rounded cursor-pointer"
-                    title="Clear search"
+                    className="p-1.5 text-[#717973] hover:text-[#ba1a1a] hover:bg-[#f3f4f0] rounded-lg cursor-pointer transition-colors"
+                    title="Clear customer"
                   >
-                    <X className="w-5 h-5" />
+                    <X className="w-4 h-4" />
                   </button>
                 )}
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(prev => !prev)}
-                  className="p-1.5 text-[#717973] hover:text-[#012d1d] rounded cursor-pointer"
+                  className="p-1.5 text-[#717973] hover:text-[#012d1d] hover:bg-[#f3f4f0] rounded-lg cursor-pointer transition-colors"
                   title="Toggle customer list"
                 >
                   {isDropdownOpen ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
@@ -1405,11 +1427,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           </div>
 
           <button
+            type="button"
             onClick={() => setCustomerType(prev => prev === 'RETAIL' ? 'WHOLESALE' : 'RETAIL')}
-            className="border border-[#012d1d] px-4 py-3 rounded-xl text-base font-extrabold text-[#012d1d] hover:bg-[#e7e9e5] transition-colors shrink-0 cursor-pointer shadow-2xs"
-            title="Toggle customer rate classification"
+            className={`px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all shrink-0 cursor-pointer shadow-2xs flex flex-col items-center justify-center leading-tight border ${
+              customerType === 'WHOLESALE'
+                ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
+                : 'bg-white text-[#012d1d] border-[#012d1d] hover:bg-[#f3f4f0]'
+            }`}
+            title="Toggle customer rate classification between Retail and Wholesale"
           >
-            {customerType}
+            <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Rate</span>
+            <span>{customerType}</span>
           </button>
         </div>
 
@@ -1580,142 +1608,175 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           </div>
         </div>
 
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            if (manualBarcodeInput.trim()) {
-              handleScannedBarcode(manualBarcodeInput, true);
-              setManualBarcodeInput('');
-              setShowPlantSuggestions(false);
-            }
-          }}
-          className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
-        >
-          <div className="relative flex-1" ref={searchContainerRef}>
-            <Search className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
-            <input
-              type="text"
-              value={manualBarcodeInput}
-              onChange={(e) => {
-                setManualBarcodeInput(e.target.value);
-                setShowPlantSuggestions(true);
-              }}
-              onFocus={() => setShowPlantSuggestions(true)}
-              placeholder="Search plant name, SKU, or barcode..."
-              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-10 pr-3 py-3 text-base text-[#1a1c1a] outline-none focus:border-[#012d1d] font-sans font-medium"
-            />
-
-            {/* Live Autocomplete Suggestions Popover */}
-            {showPlantSuggestions && manualBarcodeInput.trim().length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#c1c8c2] rounded-2xl shadow-2xl z-40 max-h-80 overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
-                {(() => {
-                  const q = manualBarcodeInput.trim().toLowerCase();
-                  const searchTerms = q.split(/\s+/).filter(Boolean);
-                  const matches = inventory.filter(p => {
-                    const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
-                    return searchTerms.every(term => searchable.includes(term));
-                  }).slice(0, 8);
-
-                  if (matches.length === 0) {
-                    return (
-                      <div className="p-4 text-center text-xs text-[#717973]">
-                        No exact plant matches for "{manualBarcodeInput}". Press Enter or Browse Catalog to search all inventory.
-                      </div>
-                    );
-                  }
-
-                  return matches.map((plant) => (
-                    <button
-                      key={plant.id}
-                      type="button"
-                      onClick={() => {
-                        addPlantToCart(plant);
-                        setManualBarcodeInput('');
-                        setShowPlantSuggestions(false);
-                      }}
-                      className="w-full p-3 hover:bg-[#a0f4c8]/20 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer group"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={plant.image || DEFAULT_PLANT_IMAGE}
-                          alt={plant.name}
-                          className="w-12 h-12 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                        />
-                        <div className="min-w-0">
-                          <p className="text-sm sm:text-base font-extrabold text-[#012d1d] truncate group-hover:text-[#0e6c4a]">
-                            {plant.name}
-                          </p>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                              <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
-                              #{plant.itemNo || plant.barcode || 'N/A'}
-                            </span>
-                            <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                              <Package className="w-2.5 h-2.5 text-amber-300" />
-                              SIZE: {plant.size || 'Standard'}
-                            </span>
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
-                              plant.stock < 0
-                                ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                : plant.stock === 0
-                                ? 'bg-red-100 text-red-700 border border-red-200'
-                                : plant.stock < 5
-                                ? 'bg-amber-100 text-amber-800'
-                                : 'bg-[#f3f4f0] text-[#414844]'
-                            }`}>
-                              Avail: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
-                              {plant.stock < 0 ? <span className="text-[10px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[10px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
-                            </span>
-                          </div>
-                          {(plant.botanicalName || plant.commonName) && (
-                            <p className="text-xs text-[#414844] truncate italic mt-0.5">
-                              {plant.botanicalName || plant.commonName}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="flex items-center gap-2.5 shrink-0">
-                        <span className="text-base font-extrabold text-[#012d1d]">
-                          ${plant.price.toFixed(2)}
-                        </span>
-                        <span className="bg-[#012d1d] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 group-hover:bg-[#0e6c4a] shadow-2xs">
-                          <Plus className="w-4 h-4" />
-                          <span>Add</span>
-                        </span>
-                      </div>
-                    </button>
-                  ));
-                })()}
+        {/* Plant Search Header & Input */}
+        <div className="flex flex-col gap-2 pt-1">
+          <div className="flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2">
+              <div className="w-7 h-7 rounded-lg bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold shadow-2xs">
+                <Leaf className="w-4 h-4" />
               </div>
-            )}
+              <span className="text-xs font-black uppercase tracking-wider text-[#012d1d]">
+                Plant & Barcode Search
+              </span>
+            </div>
+            <span className="text-xs text-[#717973] font-medium hidden xs:inline">
+              Search name, botanical, SKU, or scan barcode
+            </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            <button
-              type="submit"
-              className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-bold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
-            >
-              <Search className="w-4 h-4" />
-              <span>Add / Scan</span>
-            </button>
+          <form
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (manualBarcodeInput.trim()) {
+                handleScannedBarcode(manualBarcodeInput, true);
+                setManualBarcodeInput('');
+                setShowPlantSuggestions(false);
+              }
+            }}
+            className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+          >
+            <div className="relative flex-1" ref={searchContainerRef}>
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[#0e6c4a] pointer-events-none">
+                <Leaf className="w-4 h-4" />
+              </div>
+              <input
+                type="text"
+                value={manualBarcodeInput}
+                onChange={(e) => {
+                  setManualBarcodeInput(e.target.value);
+                  setShowPlantSuggestions(true);
+                }}
+                onFocus={() => setShowPlantSuggestions(true)}
+                placeholder="Type plant name, variety, SKU #, or barcode..."
+                className="w-full bg-[#f9faf6] border-2 border-[#0e6c4a]/35 hover:border-[#0e6c4a]/60 focus:border-[#012d1d] focus:bg-white focus:ring-2 focus:ring-[#a0f4c8]/60 rounded-xl pl-10 pr-10 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] outline-none transition-all shadow-2xs placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
+              />
 
-            <button
-              type="button"
-              onClick={() => {
-                setCatalogSearchQuery(manualBarcodeInput);
-                setIsCatalogModalOpen(true);
-              }}
-              className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] text-sm font-bold px-3.5 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
-              title="Search plant catalog by name when barcode is missing"
-            >
-              <BookOpen className="w-4 h-4 text-[#0e6c4a]" />
-              <span className="hidden xs:inline">Browse Catalog</span>
-            </button>
-          </div>
-        </form>
+              {manualBarcodeInput && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setManualBarcodeInput('');
+                    setShowPlantSuggestions(false);
+                  }}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#717973] hover:text-[#ba1a1a] hover:bg-[#f3f4f0] rounded-md cursor-pointer transition-colors"
+                  title="Clear plant search"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+
+              {/* Live Autocomplete Suggestions Popover */}
+              {showPlantSuggestions && manualBarcodeInput.trim().length > 0 && (
+                <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#c1c8c2] rounded-2xl shadow-2xl z-40 max-h-80 overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
+                  {(() => {
+                    const q = manualBarcodeInput.trim().toLowerCase();
+                    const searchTerms = q.split(/\s+/).filter(Boolean);
+                    const matches = inventory.filter(p => {
+                      const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
+                      return searchTerms.every(term => searchable.includes(term));
+                    }).slice(0, 8);
+
+                    if (matches.length === 0) {
+                      return (
+                        <div className="p-4 text-center text-xs text-[#717973]">
+                          No exact plant matches for "{manualBarcodeInput}". Press Enter or Browse Catalog to search all inventory.
+                        </div>
+                      );
+                    }
+
+                    return matches.map((plant) => (
+                      <button
+                        key={plant.id}
+                        type="button"
+                        onClick={() => {
+                          addPlantToCart(plant);
+                          setManualBarcodeInput('');
+                          setShowPlantSuggestions(false);
+                        }}
+                        className="w-full p-3 hover:bg-[#a0f4c8]/20 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer group"
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <img
+                            src={plant.image || DEFAULT_PLANT_IMAGE}
+                            alt={plant.name}
+                            className="w-12 h-12 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
+                            referrerPolicy="no-referrer"
+                            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                          />
+                          <div className="min-w-0">
+                            <p className="text-sm sm:text-base font-extrabold text-[#012d1d] truncate group-hover:text-[#0e6c4a]">
+                              {plant.name}
+                            </p>
+                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                              <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
+                                #{plant.itemNo || plant.barcode || 'N/A'}
+                              </span>
+                              <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <Package className="w-2.5 h-2.5 text-amber-300" />
+                                SIZE: {plant.size || 'Standard'}
+                              </span>
+                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                                plant.stock < 0
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  : plant.stock === 0
+                                  ? 'bg-red-100 text-red-700 border border-red-200'
+                                  : plant.stock < 5
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-[#f3f4f0] text-[#414844]'
+                              }`}>
+                                Avail: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
+                                {plant.stock < 0 ? <span className="text-[10px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[10px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
+                              </span>
+                            </div>
+                            {(plant.botanicalName || plant.commonName) && (
+                              <p className="text-xs text-[#414844] truncate italic mt-0.5">
+                                {plant.botanicalName || plant.commonName}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+
+                        <div className="flex items-center gap-2.5 shrink-0">
+                          <span className="text-base font-extrabold text-[#012d1d]">
+                            ${plant.price.toFixed(2)}
+                          </span>
+                          <span className="bg-[#012d1d] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 group-hover:bg-[#0e6c4a] shadow-2xs">
+                            <Plus className="w-4 h-4" />
+                            <span>Add</span>
+                          </span>
+                        </div>
+                      </button>
+                    ));
+                  })()}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center gap-2">
+              <button
+                type="submit"
+                className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-extrabold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+              >
+                <Plus className="w-4 h-4 text-[#a0f4c8]" />
+                <span>Add / Scan</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setCatalogSearchQuery(manualBarcodeInput);
+                  setIsCatalogModalOpen(true);
+                }}
+                className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] text-sm font-bold px-3.5 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer"
+                title="Search plant catalog by name when barcode is missing"
+              >
+                <BookOpen className="w-4 h-4 text-[#0e6c4a]" />
+                <span className="hidden xs:inline">Browse Catalog</span>
+              </button>
+            </div>
+          </form>
+        </div>
 
         {/* Quick Test Barcode Presets */}
         <div className="flex items-center gap-1.5 overflow-x-auto text-[11px]">

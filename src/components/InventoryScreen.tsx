@@ -17,7 +17,8 @@ import {
   X,
   Layers,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  ClipboardList
 } from 'lucide-react';
 
 interface InventoryScreenProps {
@@ -156,13 +157,23 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             </p>
           </div>
 
-          <button
-            onClick={() => onNavigate('scan')}
-            className="self-start sm:self-auto bg-[#461702] hover:bg-[#622c13] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
-          >
-            <Barcode className="w-4 h-4" />
-            <span>Scan Barcode</span>
-          </button>
+          <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              onClick={() => onNavigate('inventory_audit')}
+              className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer border border-[#19724f]/50"
+            >
+              <ClipboardList className="w-4 h-4 text-[#a0f4c8]" />
+              <span>Physical Inventory Count</span>
+            </button>
+
+            <button
+              onClick={() => onNavigate('scan')}
+              className="bg-[#461702] hover:bg-[#622c13] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
+            >
+              <Barcode className="w-4 h-4" />
+              <span>Scan Barcode</span>
+            </button>
+          </div>
         </div>
 
         {/* Search & Status Pills */}

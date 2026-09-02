@@ -1,11 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings, HoldingArea } from './types';
+import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings, HoldingArea, InventoryAuditSession } from './types';
 import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, INITIAL_EMPLOYEES, HOLDING_AREAS } from './data/mockData';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './components/HomeScreen';
 import { ScanScreen } from './components/ScanScreen';
 import { InventoryScreen } from './components/InventoryScreen';
+import { InventoryAuditScreen } from './components/InventoryAuditScreen';
 import { HoldingLocationScreen } from './components/HoldingLocationScreen';
 import { OrderFinalizationScreen } from './components/OrderFinalizationScreen';
 import { DataManagementScreen } from './components/DataManagementScreen';
@@ -23,6 +24,7 @@ import {
   subscribeToOrders,
   subscribeToUploads,
   subscribeToHoldingLocations,
+  subscribeToAuditSessions,
   savePlantToFirestore,
   batchSavePlantsToFirestore,
   saveCustomerToFirestore,
@@ -35,7 +37,8 @@ import {
   saveUploadToFirestore,
   saveHoldingLocationToFirestore,
   batchSaveHoldingLocationsToFirestore,
-  deleteHoldingLocationFromFirestore
+  deleteHoldingLocationFromFirestore,
+  saveAuditSessionToFirestore
 } from './services/firebaseService';
 import { sanitizeCustomerName } from './utils/customerNameCleaner';
 import { flushOfflineSyncQueue, clearActiveDraft, OrderDraft } from './services/orderAutoSaveService';
@@ -86,13 +89,14 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 100) return parsed;
       } catch (e) {
         // Fallback to default
       }
     }
     return HOLDING_AREAS;
   });
+  const [auditSessions, setAuditSessions] = useState<InventoryAuditSession[]>([]);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [screenHistory, setScreenHistory] = useState<ScreenType[]>(['home']);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
@@ -186,9 +190,19 @@ export default function App() {
       if (data && data.length > 0) setUploads(data);
     });
     const unsubHoldingLocations = subscribeToHoldingLocations((data) => {
-      if (data && data.length > 0) {
+      if (data && data.length >= 100) {
         setHoldingAreas(data);
         localStorage.setItem('nursery_holding_areas', JSON.stringify(data));
+      } else {
+        // Upgrade legacy/empty list to official 195 locations
+        setHoldingAreas(HOLDING_AREAS);
+        localStorage.setItem('nursery_holding_areas', JSON.stringify(HOLDING_AREAS));
+        batchSaveHoldingLocationsToFirestore(HOLDING_AREAS);
+      }
+    });
+    const unsubAudits = subscribeToAuditSessions((data) => {
+      if (data && data.length > 0) {
+        setAuditSessions(data);
       }
     });
 
@@ -199,6 +213,7 @@ export default function App() {
       unsubOrders();
       unsubUploads();
       unsubHoldingLocations();
+      unsubAudits();
     };
   }, []);
 
@@ -233,6 +248,21 @@ export default function App() {
     setHoldingAreas(HOLDING_AREAS);
     localStorage.setItem('nursery_holding_areas', JSON.stringify(HOLDING_AREAS));
     batchSaveHoldingLocationsToFirestore(HOLDING_AREAS);
+  };
+
+  const handleSaveAuditSession = (session: InventoryAuditSession) => {
+    setAuditSessions(prev => {
+      const idx = prev.findIndex(s => s.id === session.id);
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = session;
+        return next;
+      }
+      return [session, ...prev];
+    });
+    saveAuditSessionToFirestore(session).catch(err => {
+      console.warn('Error saving audit session to Firestore:', err);
+    });
   };
 
   const handleAddEmployee = (empData: Omit<Employee, 'id'>) => {
@@ -590,6 +620,17 @@ export default function App() {
             inventory={inventory}
             onUpdateStock={handleUpdateStock}
             stockAlertSettings={stockAlertSettings}
+          />
+        )}
+
+        {currentScreen === 'inventory_audit' && (
+          <InventoryAuditScreen
+            onNavigate={navigateTo}
+            inventory={inventory}
+            holdingAreas={holdingAreas}
+            currentUser={user}
+            auditSessions={auditSessions}
+            onSaveAuditSession={handleSaveAuditSession}
           />
         )}
 

@@ -23,6 +23,10 @@
     "holding_locations": {
       "title": "Holding Locations",
       "description": "Nursery holding zones and custom staging area definitions."
+    },
+    "inventory_audits": {
+      "title": "Physical Inventory Audits",
+      "description": "Physical stock count sessions with independent plant details, GPS yard logging, multi-location cycle counting, and variance audit reports."
     }
   }
 }

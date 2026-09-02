@@ -452,29 +452,6 @@ export const INITIAL_UPLOADS: RecentUpload[] = [
   }
 ];
 
-export const HOLDING_AREAS: HoldingArea[] = [
-  {
-    id: 'area_a',
-    title: 'Holding Area A',
-    subtitle: 'North Greenhouse, Aisles 1-5',
-    icon: 'warehouse',
-  },
-  {
-    id: 'area_b',
-    title: 'Holding Area B',
-    subtitle: 'Outdoor Shade Structure',
-    icon: 'deck',
-  },
-  {
-    id: 'area_c',
-    title: 'Holding Area C',
-    subtitle: 'Staging for Outbound Freight',
-    icon: 'local_shipping',
-  },
-  {
-    id: 'left_in_place',
-    title: 'Left in Place',
-    subtitle: 'Keep in current physical location',
-    icon: 'pin_drop',
-  }
-];
+import { OFFICIAL_YARD_LOCATIONS } from './yardLocations';
+
+export const HOLDING_AREAS: HoldingArea[] = OFFICIAL_YARD_LOCATIONS;

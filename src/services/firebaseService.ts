@@ -10,7 +10,7 @@ import {
   writeBatch 
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { PlantItem, Customer, Employee, Order, RecentUpload, HoldingArea } from '../types';
+import { PlantItem, Customer, Employee, Order, RecentUpload, HoldingArea, InventoryAuditSession } from '../types';
 import { 
   INITIAL_PLANTS, 
   INITIAL_CUSTOMERS, 
@@ -26,6 +26,7 @@ const EMPLOYEES_COL = 'employees';
 const ORDERS_COL = 'orders';
 const UPLOADS_COL = 'uploads';
 const HOLDING_LOCATIONS_COL = 'holding_locations';
+const INVENTORY_AUDITS_COL = 'inventory_audits';
 
 const handleSnapshotError = (colName: string, err: any) => {
   if (err?.code === 'unavailable' || err?.message?.includes('offline') || err?.message?.includes('unavailable') || err?.message?.includes('Could not reach Cloud Firestore')) {
@@ -207,6 +208,16 @@ export function subscribeToHoldingLocations(callback: (areas: HoldingArea[]) => 
   }, (err) => handleSnapshotError(HOLDING_LOCATIONS_COL, err));
 }
 
+export function subscribeToAuditSessions(callback: (audits: InventoryAuditSession[]) => void) {
+  return onSnapshot(collection(db, INVENTORY_AUDITS_COL), (snapshot) => {
+    const items: InventoryAuditSession[] = [];
+    snapshot.forEach((doc) => {
+      items.push(doc.data() as InventoryAuditSession);
+    });
+    callback(items);
+  }, (err) => handleSnapshotError(INVENTORY_AUDITS_COL, err));
+}
+
 /* --- CRUD Helpers --- */
 
 export async function savePlantToFirestore(plant: PlantItem) {
@@ -282,12 +293,16 @@ export async function saveHoldingLocationToFirestore(area: HoldingArea) {
 
 export async function batchSaveHoldingLocationsToFirestore(areas: HoldingArea[]) {
   try {
-    const batch = writeBatch(db);
-    areas.forEach((area) => {
-      const ref = doc(db, HOLDING_LOCATIONS_COL, area.id);
-      batch.set(ref, cleanForFirestore(area), { merge: true });
-    });
-    await batch.commit();
+    const chunkSize = 400;
+    for (let i = 0; i < areas.length; i += chunkSize) {
+      const chunk = areas.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((area) => {
+        const ref = doc(db, HOLDING_LOCATIONS_COL, area.id);
+        batch.set(ref, cleanForFirestore(area), { merge: true });
+      });
+      await batch.commit();
+    }
   } catch (err) {
     console.error('Error batch saving holding locations to Firestore:', err);
   }
@@ -295,4 +310,12 @@ export async function batchSaveHoldingLocationsToFirestore(areas: HoldingArea[])
 
 export async function deleteHoldingLocationFromFirestore(id: string) {
   await deleteDoc(doc(db, HOLDING_LOCATIONS_COL, id));
+}
+
+export async function saveAuditSessionToFirestore(audit: InventoryAuditSession) {
+  await setDoc(doc(db, INVENTORY_AUDITS_COL, audit.id), cleanForFirestore(audit), { merge: true });
+}
+
+export async function deleteAuditSessionFromFirestore(id: string) {
+  await deleteDoc(doc(db, INVENTORY_AUDITS_COL, id));
 }

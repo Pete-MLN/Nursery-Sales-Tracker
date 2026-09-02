@@ -78,19 +78,35 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
 
   const [selectedAreaId, setSelectedAreaId] = useState<string>(() => {
     if (areas.length > 0) return areas[0].id;
-    return 'area_b';
+    return 'loc-h1-a';
   });
   const [customRowInput, setCustomRowInput] = useState<string>('Row 12, Sec B');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [selectedCategory, setSelectedCategory] = useState<string>('All');
 
   // Edit / Add Modal state
   const [editingArea, setEditingArea] = useState<HoldingArea | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
   const [formTitle, setFormTitle] = useState<string>('');
   const [formSubtitle, setFormSubtitle] = useState<string>('');
+  const [formCategory, setFormCategory] = useState<string>('Retail');
   const [formIcon, setFormIcon] = useState<string>('warehouse');
   const [formError, setFormError] = useState<string>('');
   const [successToast, setSuccessToast] = useState<string>('');
   const [isPlantMapOpen, setIsPlantMapOpen] = useState<boolean>(false);
+
+  const CATEGORIES = ['All', 'Retail', 'B&B', 'Barn Area', 'Greenhouses', 'Loading/Staging'];
+
+  const filteredAreas = areas.filter(area => {
+    const matchesCategory = selectedCategory === 'All' || area.category === selectedCategory;
+    if (!matchesCategory) return false;
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const titleMatch = (area.title || '').toLowerCase().includes(q);
+    const subtitleMatch = (area.subtitle || '').toLowerCase().includes(q);
+    const catMatch = (area.category || '').toLowerCase().includes(q);
+    return titleMatch || subtitleMatch || catMatch;
+  });
 
   const showToast = (msg: string) => {
     setSuccessToast(msg);
@@ -125,6 +141,7 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
     setIsCreatingNew(false);
     setFormTitle(area.title);
     setFormSubtitle(area.subtitle);
+    setFormCategory(area.category || 'Retail');
     setFormIcon(area.icon || 'warehouse');
     setFormError('');
   };
@@ -134,6 +151,7 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
     setIsCreatingNew(true);
     setFormTitle('');
     setFormSubtitle('');
+    setFormCategory(selectedCategory !== 'All' ? selectedCategory : 'Retail');
     setFormIcon('warehouse');
     setFormError('');
   };
@@ -156,6 +174,7 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
         id: `area_custom_${Date.now()}`,
         title: formTitle.trim(),
         subtitle: formSubtitle.trim() || 'Custom holding area',
+        category: formCategory,
         icon: formIcon,
         isCustom: true
       };
@@ -176,6 +195,7 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
         ...editingArea,
         title: formTitle.trim(),
         subtitle: formSubtitle.trim(),
+        category: formCategory,
         icon: formIcon
       };
 
@@ -338,116 +358,205 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
         </div>
       </div>
 
-      {/* Holding Locations Selection List */}
-      <div className="flex flex-col gap-3" id="location-selector">
-        {areas.map((area) => {
-          const isSelected = selectedAreaId === area.id;
-
-          return (
-            <div
-              key={area.id}
-              onClick={() => setSelectedAreaId(area.id)}
-              className={`group relative flex items-center p-4 rounded-xl border cursor-pointer transition-all duration-200 shadow-2xs ${
-                isSelected
-                  ? 'bg-[#1b4332] border-[#012d1d] text-white shadow-md ring-2 ring-[#a0f4c8]/30'
-                  : 'bg-white border-[#717973]/30 hover:border-[#012d1d] text-[#1a1c1a]'
-              }`}
+      {/* Search & Category Filter Controls */}
+      <div className="bg-white p-3.5 sm:p-4 rounded-2xl border border-[#c1c8c2] shadow-xs flex flex-col gap-3">
+        {/* Search Bar */}
+        <div className="relative flex items-center">
+          <Search className="w-4 h-4 absolute left-3.5 text-[#717973] pointer-events-none" />
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search 195 locations by code or description (e.g. F2, Hannaford, Barn)..."
+            className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-10 pr-9 py-2.5 text-sm font-bold text-[#1a1c1a] placeholder:text-[#717973] placeholder:font-normal focus:outline-none focus:border-[#012d1d] focus:bg-white transition-all shadow-2xs"
+          />
+          {searchQuery && (
+            <button
+              onClick={() => setSearchQuery('')}
+              className="absolute right-3 p-1 text-[#717973] hover:text-[#1a1c1a] rounded-full hover:bg-black/5"
             >
-              <input
-                type="radio"
-                name="location_type"
-                value={area.id}
-                checked={isSelected}
-                onChange={() => setSelectedAreaId(area.id)}
-                className="sr-only"
-              />
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
 
-              {/* Icon Container */}
-              <div
-                className={`w-12 h-12 rounded-xl flex items-center justify-center mr-3.5 shrink-0 transition-colors ${
-                  isSelected
-                    ? 'bg-[#012d1d] text-[#a0f4c8]'
-                    : 'bg-[#f3f4f0] text-[#012d1d]'
+        {/* Category Tabs */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+          {CATEGORIES.map(cat => {
+            const isCatActive = selectedCategory === cat;
+            const count = cat === 'All' 
+              ? areas.length 
+              : areas.filter(a => a.category === cat).length;
+
+            return (
+              <button
+                key={cat}
+                type="button"
+                onClick={() => setSelectedCategory(cat)}
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap transition-all flex items-center gap-1.5 cursor-pointer shrink-0 ${
+                  isCatActive
+                    ? 'bg-[#012d1d] text-[#a0f4c8] shadow-xs'
+                    : 'bg-[#f3f4f0] text-[#414844] hover:bg-[#e2e3df] hover:text-[#1a1c1a]'
                 }`}
               >
-                {getAreaIcon(area.icon)}
-              </div>
+                <span>{cat}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                  isCatActive ? 'bg-[#a0f4c8] text-[#002113]' : 'bg-[#e2e3df] text-[#555]'
+                }`}>
+                  {count}
+                </span>
+              </button>
+            );
+          })}
+        </div>
 
-              {/* Name (Title) & Description (Subtitle) */}
-              <div className="flex-1 min-w-0 pr-2">
-                <div className="flex items-center gap-2">
+        {/* Results summary bar */}
+        <div className="flex items-center justify-between text-xs text-[#717973] px-1 pt-1 border-t border-[#f0f2ee]">
+          <span>
+            Showing <strong className="text-[#012d1d]">{filteredAreas.length}</strong> of {areas.length} locations
+          </span>
+          {searchQuery && (
+            <button 
+              onClick={() => setSearchQuery('')}
+              className="text-[#012d1d] font-bold hover:underline"
+            >
+              Clear search
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Holding Locations Selection List */}
+      <div className="flex flex-col gap-2.5 max-h-[520px] overflow-y-auto pr-1" id="location-selector">
+        {filteredAreas.length === 0 ? (
+          <div className="p-8 text-center bg-white rounded-2xl border border-dashed border-[#c1c8c2]">
+            <MapPin className="w-8 h-8 text-[#717973] mx-auto mb-2 opacity-50" />
+            <p className="font-bold text-sm text-[#1a1c1a]">No locations found</p>
+            <p className="text-xs text-[#717973] mt-1">Try adjusting your search query or switching category tab.</p>
+            <button
+              onClick={() => { setSearchQuery(''); setSelectedCategory('All'); }}
+              className="mt-3 px-3 py-1.5 bg-[#012d1d] text-[#a0f4c8] text-xs font-bold rounded-lg cursor-pointer"
+            >
+              Show All 195 Locations
+            </button>
+          </div>
+        ) : (
+          filteredAreas.map((area) => {
+            const isSelected = selectedAreaId === area.id;
+
+            return (
+              <div
+                key={area.id}
+                onClick={() => setSelectedAreaId(area.id)}
+                className={`group relative flex items-center p-3.5 sm:p-4 rounded-xl border cursor-pointer transition-all duration-200 shadow-2xs ${
+                  isSelected
+                    ? 'bg-[#1b4332] border-[#012d1d] text-white shadow-md ring-2 ring-[#a0f4c8]/30'
+                    : 'bg-white border-[#717973]/30 hover:border-[#012d1d] text-[#1a1c1a]'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="location_type"
+                  value={area.id}
+                  checked={isSelected}
+                  onChange={() => setSelectedAreaId(area.id)}
+                  className="sr-only"
+                />
+
+                {/* Icon Container */}
+                <div
+                  className={`w-11 h-11 rounded-xl flex items-center justify-center mr-3 shrink-0 transition-colors ${
+                    isSelected
+                      ? 'bg-[#012d1d] text-[#a0f4c8]'
+                      : 'bg-[#f3f4f0] text-[#012d1d]'
+                  }`}
+                >
+                  {getAreaIcon(area.icon, "w-5 h-5")}
+                </div>
+
+                {/* Name (Title) & Description (Subtitle) */}
+                <div className="flex-1 min-w-0 pr-2">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span
+                      className={`block font-bold text-base sm:text-lg leading-tight truncate ${
+                        isSelected ? 'text-white' : 'text-[#1a1c1a]'
+                      }`}
+                    >
+                      {area.title}
+                    </span>
+                    {area.category && (
+                      <span className={`text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded ${
+                        isSelected ? 'bg-[#a0f4c8] text-[#002113]' : 'bg-[#e2e3df] text-[#414844]'
+                      }`}>
+                        {area.category}
+                      </span>
+                    )}
+                    {area.isCustom && (
+                      <span className={`text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded ${
+                        isSelected ? 'bg-[#a0f4c8] text-[#002113]' : 'bg-[#d8e2dc] text-[#1b4332]'
+                      }`}>
+                        Custom
+                      </span>
+                    )}
+                  </div>
                   <span
-                    className={`block font-bold text-base sm:text-lg leading-tight truncate ${
-                      isSelected ? 'text-white' : 'text-[#1a1c1a]'
+                    className={`block text-xs sm:text-sm mt-0.5 ${
+                      isSelected ? 'text-[#a0f4c8]' : 'text-[#414844]'
                     }`}
                   >
-                    {area.title}
+                    {area.subtitle}
                   </span>
-                  {area.isCustom && (
-                    <span className={`text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded ${
-                      isSelected ? 'bg-[#a0f4c8] text-[#002113]' : 'bg-[#e2e3df] text-[#414844]'
-                    }`}>
-                      Custom
-                    </span>
-                  )}
                 </div>
-                <span
-                  className={`block text-xs sm:text-sm mt-0.5 ${
-                    isSelected ? 'text-[#a0f4c8]' : 'text-[#414844]'
-                  }`}
-                >
-                  {area.subtitle}
-                </span>
-              </div>
 
-              {/* Actions on Card */}
-              <div className="flex items-center gap-1.5 shrink-0 ml-2">
-                {/* Edit Name and Description Button */}
-                <button
-                  type="button"
-                  onClick={(e) => handleOpenEdit(e, area)}
-                  className={`p-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
-                    isSelected
-                      ? 'bg-white/15 hover:bg-white/30 text-white border border-white/20'
-                      : 'bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2]'
-                  }`}
-                  title="Edit name and description for this location"
-                  aria-label={`Edit ${area.title}`}
-                >
-                  <Pencil className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Edit</span>
-                </button>
-
-                {/* Delete button (for custom or additional areas) */}
-                {area.isCustom && (
+                {/* Actions on Card */}
+                <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                  {/* Edit Name and Description Button */}
                   <button
                     type="button"
-                    onClick={(e) => handleDelete(e, area.id, area.title)}
-                    className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                    onClick={(e) => handleOpenEdit(e, area)}
+                    className={`p-2 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
                       isSelected
-                        ? 'text-red-300 hover:text-red-100 hover:bg-red-900/40'
-                        : 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                        ? 'bg-white/15 hover:bg-white/30 text-white border border-white/20'
+                        : 'bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2]'
                     }`}
-                    title="Delete custom location"
+                    title="Edit name and description for this location"
+                    aria-label={`Edit ${area.title}`}
                   >
-                    <Trash2 className="w-3.5 h-3.5" />
+                    <Pencil className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">Edit</span>
                   </button>
-                )}
 
-                {/* Selected Checkmark */}
-                <div className="ml-1">
-                  <CheckCircle
-                    className={`w-6 h-6 transition-all duration-200 ${
-                      isSelected
-                        ? 'opacity-100 text-[#a0f4c8] scale-100'
-                        : 'opacity-0 scale-50'
-                    }`}
-                  />
+                  {/* Delete button (for custom or additional areas) */}
+                  {area.isCustom && (
+                    <button
+                      type="button"
+                      onClick={(e) => handleDelete(e, area.id, area.title)}
+                      className={`p-2 rounded-lg transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'text-red-300 hover:text-red-100 hover:bg-red-900/40'
+                          : 'text-red-600 hover:text-red-800 hover:bg-red-50'
+                      }`}
+                      title="Delete custom location"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+
+                  {/* Selected Checkmark */}
+                  <div className="ml-1">
+                    <CheckCircle
+                      className={`w-6 h-6 transition-all duration-200 ${
+                        isSelected
+                          ? 'opacity-100 text-[#a0f4c8] scale-100'
+                          : 'opacity-0 scale-50'
+                      }`}
+                    />
+                  </div>
                 </div>
               </div>
-            </div>
-          );
-        })}
+            );
+          })
+        )}
       </div>
 
       {/* Conditional Input Area (Expands when 'Left in Place' is selected) */}
@@ -562,6 +671,24 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
                 <span className="text-[11px] text-[#717973] mt-1 block">
                   Primary name printed on pick-lists and order tickets.
                 </span>
+              </div>
+
+              {/* Category Field */}
+              <div>
+                <label className="block text-xs font-extrabold text-[#012d1d] uppercase tracking-wider mb-1.5">
+                  Category
+                </label>
+                <select
+                  value={formCategory}
+                  onChange={(e) => setFormCategory(e.target.value)}
+                  className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-sm font-bold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:bg-white transition-all shadow-2xs"
+                >
+                  <option value="Retail">Retail</option>
+                  <option value="B&B">B&B</option>
+                  <option value="Barn Area">Barn Area</option>
+                  <option value="Greenhouses">Greenhouses</option>
+                  <option value="Loading/Staging">Loading/Staging</option>
+                </select>
               </div>
 
               {/* Description / Subtitle Field */}

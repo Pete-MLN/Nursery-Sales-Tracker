@@ -1207,56 +1207,45 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                 </div>
               </div>
 
-              {/* Count Mode Toggle (Total Inventory Count vs Cycle Count Multi-Location) */}
-              <div className="flex flex-col gap-2 bg-[#f3f4f0] p-3.5 rounded-xl border border-[#c1c8c2]">
-                <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center justify-between">
-                  <span>4. Count Mode & Multi-Location Strategy</span>
-                  <span className="text-[10px] text-[#525a55] font-normal">Choose how this count affects SKU total</span>
+              {/* Count Mode Toggle (Side-by-Side Compact) */}
+              <div className="flex flex-col gap-1.5 bg-[#f3f4f0] p-2.5 rounded-xl border border-[#c1c8c2]">
+                <label className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
+                  4. Count Mode
                 </label>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+                <div className="grid grid-cols-2 gap-2">
                   <button
                     type="button"
                     onClick={() => setCountMode('total')}
-                    className={`flex flex-col items-start text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-extrabold transition-all cursor-pointer ${
                       countMode === 'total'
-                        ? 'bg-white border-2 border-[#012d1d] shadow-xs ring-2 ring-[#012d1d]/10'
-                        : 'bg-white/60 border-[#c1c8c2] hover:bg-white'
+                        ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-2xs'
+                        : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#e2e3df] hover:text-[#012d1d]'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        countMode === 'total' ? 'border-[#012d1d] bg-[#012d1d]' : 'border-gray-400'
-                      }`}>
-                        {countMode === 'total' && <div className="w-1.5 h-1.5 rounded-full bg-[#a0f4c8]" />}
-                      </div>
-                      <span className="font-extrabold text-xs text-[#012d1d]">Total Inventory Count</span>
+                    <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
+                      countMode === 'total' ? 'border-[#a0f4c8] bg-[#a0f4c8]' : 'border-gray-400'
+                    }`}>
+                      {countMode === 'total' && <div className="w-1 h-1 rounded-full bg-[#012d1d]" />}
                     </div>
-                    <p className="text-[11px] text-[#525a55] mt-1 pl-6">
-                      This counted quantity represents the <strong>total inventory</strong> across the entire nursery.
-                    </p>
+                    <span>Total Count</span>
                   </button>
 
                   <button
                     type="button"
                     onClick={() => setCountMode('cycle_additive')}
-                    className={`flex flex-col items-start text-left p-3 rounded-xl border transition-all cursor-pointer ${
+                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-extrabold transition-all cursor-pointer ${
                       countMode === 'cycle_additive'
-                        ? 'bg-white border-2 border-[#012d1d] shadow-xs ring-2 ring-[#012d1d]/10'
-                        : 'bg-white/60 border-[#c1c8c2] hover:bg-white'
+                        ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-2xs'
+                        : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#e2e3df] hover:text-[#012d1d]'
                     }`}
                   >
-                    <div className="flex items-center gap-2">
-                      <div className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
-                        countMode === 'cycle_additive' ? 'border-[#012d1d] bg-[#012d1d]' : 'border-gray-400'
-                      }`}>
-                        {countMode === 'cycle_additive' && <div className="w-1.5 h-1.5 rounded-full bg-[#a0f4c8]" />}
-                      </div>
-                      <span className="font-extrabold text-xs text-[#012d1d]">Cycle Count (Additive)</span>
+                    <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
+                      countMode === 'cycle_additive' ? 'border-[#a0f4c8] bg-[#a0f4c8]' : 'border-gray-400'
+                    }`}>
+                      {countMode === 'cycle_additive' && <div className="w-1 h-1 rounded-full bg-[#012d1d]" />}
                     </div>
-                    <p className="text-[11px] text-[#525a55] mt-1 pl-6">
-                      Plants exist in <strong>multiple locations</strong>. This quantity adds to other bay counts for this plant.
-                    </p>
+                    <span>Cycle Count</span>
                   </button>
                 </div>
               </div>

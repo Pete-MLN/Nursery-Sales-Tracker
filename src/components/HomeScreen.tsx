@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { ScreenType, Order, PlantItem } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { formatOrderScheduledTime } from '../utils/dateUtils';
-import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode, Package, ClipboardList, CheckCircle2, X } from 'lucide-react';
+import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode, Package, CheckCircle2, X } from 'lucide-react';
 import { DraftRecoveryBanner } from './DraftRecoveryBanner';
 import { OrderDraft } from '../services/orderAutoSaveService';
 
@@ -80,8 +80,8 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <p className="text-sm text-[#414844] mt-1">Here is your daily nursery operations overview.</p>
         </div>
 
-        {/* Quick Operations Actions Grid (New Order + Physical Inventory Count) */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Quick Operations Action (New Order) */}
+        <div>
           {/* Big Terracotta New Order Button */}
           <button
             onClick={() => {
@@ -94,17 +94,6 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
               <PlusCircle className="w-7 h-7 text-white fill-white/20" />
             </div>
             <span className="font-semibold text-lg tracking-tight">New Order</span>
-          </button>
-
-          {/* Physical Inventory Counter Button */}
-          <button
-            onClick={() => onNavigate('inventory_audit')}
-            className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] text-[#a0f4c8] flex flex-col items-center justify-center p-5 rounded-xl shadow-md transition-all h-28 cursor-pointer group border border-[#19724f]/50"
-          >
-            <div className="w-9 h-9 rounded-full bg-[#a0f4c8]/20 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-              <ClipboardList className="w-6 h-6 text-[#a0f4c8]" />
-            </div>
-            <span className="font-semibold text-lg tracking-tight text-white group-hover:text-[#a0f4c8]">Physical Inventory Count</span>
           </button>
         </div>
       </section>

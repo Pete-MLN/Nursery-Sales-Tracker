@@ -21,7 +21,8 @@ import {
   AlertCircle,
   FileCode,
   Building,
-  Hash
+  Hash,
+  Tag
 } from 'lucide-react';
 
 interface DataManagementScreenProps {
@@ -80,6 +81,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
   const [editingCustId, setEditingCustId] = useState<string | null>(null);
   const [custName, setCustName] = useState<string>('');
   const [custType, setCustType] = useState<'RETAIL' | 'WHOLESALE' | 'COMMERCIAL'>('RETAIL');
+  const [custCategoryCode, setCustCategoryCode] = useState<string>('');
   const [custAccountNo, setCustAccountNo] = useState<string>('');
   const [custCompany, setCustCompany] = useState<string>('');
   const [custPhone, setCustPhone] = useState<string>('');
@@ -285,6 +287,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     setEditingCustId(null);
     setCustName('');
     setCustType('RETAIL');
+    setCustCategoryCode('');
     setCustAccountNo('');
     setCustCompany('');
     setCustPhone('');
@@ -296,6 +299,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     setEditingCustId(cust.id);
     setCustName(cust.name);
     setCustType(cust.type || 'RETAIL');
+    setCustCategoryCode(cust.categoryCode || '');
     setCustAccountNo(cust.accountNo || '');
     setCustCompany(cust.company || '');
     setCustPhone(cust.phone || '');
@@ -315,6 +319,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
         id: editingCustId,
         name: custName.trim(),
         type: custType,
+        categoryCode: custCategoryCode.trim() || undefined,
         accountNo: custAccountNo.trim() || undefined,
         company: custCompany.trim() || undefined,
         phone: custPhone.trim() || undefined,
@@ -325,6 +330,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
       onAddCustomer({
         name: custName.trim(),
         type: custType,
+        categoryCode: custCategoryCode.trim() || undefined,
         accountNo: custAccountNo.trim() || undefined,
         company: custCompany.trim() || undefined,
         phone: custPhone.trim() || undefined,
@@ -349,7 +355,9 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     (cust.company && cust.company.toLowerCase().includes(customerSearch.toLowerCase())) ||
     (cust.email && cust.email.toLowerCase().includes(customerSearch.toLowerCase())) ||
     (cust.phone && cust.phone.includes(customerSearch)) ||
-    (cust.type && cust.type.toLowerCase().includes(customerSearch.toLowerCase()))
+    (cust.type && cust.type.toLowerCase().includes(customerSearch.toLowerCase())) ||
+    (cust.categoryCode && cust.categoryCode.toLowerCase().includes(customerSearch.toLowerCase())) ||
+    (cust.accountNo && cust.accountNo.toLowerCase().includes(customerSearch.toLowerCase()))
   );
 
   const lastInventoryUpload = uploads.find(u => 
@@ -613,6 +621,17 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                   <div>
                     <div className="flex flex-wrap items-center gap-2">
                       <h4 className="font-bold text-sm text-[#1a1c1a]">{cust.name}</h4>
+                      {cust.accountNo && (
+                        <span className="bg-white border border-[#c1c8c2] text-[#414844] font-mono text-[10px] font-bold px-1.5 py-0.5 rounded">
+                          #{cust.accountNo}
+                        </span>
+                      )}
+                      {cust.categoryCode && (
+                        <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[10px] font-bold px-1.5 py-0.5 rounded shadow-2xs flex items-center gap-1">
+                          <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
+                          CATEG: {cust.categoryCode}
+                        </span>
+                      )}
                       {cust.type && (
                         <span className={`text-[10px] font-bold px-2 py-0.5 rounded ${
                           cust.type === 'WHOLESALE' 
@@ -869,32 +888,62 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                 />
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
-                  Account Type
-                </label>
-                <select
-                  value={custType}
-                  onChange={(e) => setCustType(e.target.value as any)}
-                  className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
-                >
-                  <option value="RETAIL">Retail</option>
-                  <option value="WHOLESALE">Wholesale</option>
-                  <option value="COMMERCIAL">Commercial</option>
-                </select>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                    Account Type
+                  </label>
+                  <select
+                    value={custType}
+                    onChange={(e) => setCustType(e.target.value as any)}
+                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                  >
+                    <option value="RETAIL">Retail</option>
+                    <option value="WHOLESALE">Wholesale</option>
+                    <option value="COMMERCIAL">Commercial</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                    Category (CATEG_COD)
+                  </label>
+                  <input
+                    type="text"
+                    value={custCategoryCode}
+                    onChange={(e) => setCustCategoryCode(e.target.value)}
+                    placeholder="e.g. WHO, RET, LAND"
+                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] font-mono uppercase"
+                  />
+                </div>
               </div>
 
-              <div>
-                <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
-                  Company / Farm Name
-                </label>
-                <input
-                  type="text"
-                  value={custCompany}
-                  onChange={(e) => setCustCompany(e.target.value)}
-                  placeholder="e.g. Green Valley Landscapes"
-                  className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
-                />
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                    Account # (CUST_NO)
+                  </label>
+                  <input
+                    type="text"
+                    value={custAccountNo}
+                    onChange={(e) => setCustAccountNo(e.target.value)}
+                    placeholder="e.g. 10042"
+                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] font-mono"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-[#1a1c1a] uppercase mb-1">
+                    Company / Farm Name
+                  </label>
+                  <input
+                    type="text"
+                    value={custCompany}
+                    onChange={(e) => setCustCompany(e.target.value)}
+                    placeholder="e.g. Green Valley Landscapes"
+                    className="w-full bg-[#f9faf6] border border-[#717973] rounded-lg px-3 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+                  />
+                </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">

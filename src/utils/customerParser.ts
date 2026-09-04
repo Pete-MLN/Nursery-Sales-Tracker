@@ -91,12 +91,49 @@ export function parseRowsToCustomers(rows: Record<string, any>[]): Customer[] {
     const phone = String(norm['PHONE'] || norm['TELEPHONE'] || norm['MOBILE'] || norm['CONTACT_PHONE'] || norm['PHONE_1'] || norm['PHONE_2'] || norm['TEL'] || '').trim();
     const address = String(norm['ADDRESS'] || norm['STREET'] || norm['LOCATION'] || norm['ADDR_1'] || norm['ADDRESS_1'] || norm['STR_ADRS_1'] || '').trim();
 
-    const rawType = String(norm['TYPE'] || norm['CUST_TYPE'] || norm['PRICE_LEVEL'] || norm['RATE_TYPE'] || norm['PRC_LVL'] || '').toUpperCase();
+    // 3. Category Code (CATEG_COD from CounterPoint / Nursery POS)
+    const categoryCode = String(
+      norm['CATEG_COD'] || norm['CUST_CATEG_COD'] || norm['CAT_COD'] || norm['CATEGORY_CODE'] || norm['CATEGORY'] || norm['CATEG'] || ''
+    ).trim();
+
+    // 4. Price Level (PRC_LVL from CounterPoint)
+    const priceLevelNo = String(
+      norm['PRC_LVL'] || norm['PRICE_LEVEL'] || norm['PRC_GRP'] || norm['PRICE_LVL'] || norm['PRICE_LEVEL_NO'] || ''
+    ).trim();
+
+    const rawTypeCombined = String(
+      categoryCode || priceLevelNo || norm['TYPE'] || norm['CUST_TYPE'] || norm['RATE_TYPE'] || ''
+    ).toUpperCase();
+
     let type: 'RETAIL' | 'WHOLESALE' | 'COMMERCIAL' = 'RETAIL';
-    if (rawType.includes('WHOLESALE') || rawType.includes('GARDEN') || rawType.includes('3') || rawType.includes('4') || rawType.includes('5') || rawType.includes('TRADE')) {
+    let defaultPriceLevel: 'retail' | 'wholesale' | 'gardenCenter' | 'elite' = 'retail';
+
+    if (
+      rawTypeCombined.includes('WHOLESALE') || rawTypeCombined === 'WHO' || rawTypeCombined.startsWith('WHO_') ||
+      rawTypeCombined.includes('WHS') || rawTypeCombined.includes('TRADE') || rawTypeCombined === '3' || priceLevelNo === '3'
+    ) {
       type = 'WHOLESALE';
-    } else if (rawType.includes('COMMERCIAL') || rawType.includes('LANDSCAPE') || rawType.includes('CONTRACTOR')) {
+      defaultPriceLevel = 'wholesale';
+    } else if (
+      rawTypeCombined.includes('COMMERCIAL') || rawTypeCombined === 'COMM' || rawTypeCombined.startsWith('COMM_') ||
+      rawTypeCombined.includes('LANDSCAPE') || rawTypeCombined.includes('LAND') || rawTypeCombined.includes('CONTRACTOR') ||
+      rawTypeCombined === 'CTR' || priceLevelNo === '2'
+    ) {
       type = 'COMMERCIAL';
+      defaultPriceLevel = 'wholesale';
+    } else if (
+      rawTypeCombined.includes('GARDEN') || rawTypeCombined === 'GARD' || rawTypeCombined === 'GC' || priceLevelNo === '4'
+    ) {
+      type = 'WHOLESALE';
+      defaultPriceLevel = 'gardenCenter';
+    } else if (
+      rawTypeCombined.includes('ELITE') || rawTypeCombined.includes('VOL') || priceLevelNo === '5'
+    ) {
+      type = 'WHOLESALE';
+      defaultPriceLevel = 'elite';
+    } else {
+      type = 'RETAIL';
+      defaultPriceLevel = 'retail';
     }
 
     const customerObj: Customer = {
@@ -107,6 +144,9 @@ export function parseRowsToCustomers(rows: Record<string, any>[]): Customer[] {
       recent: true
     };
 
+    if (categoryCode) customerObj.categoryCode = categoryCode;
+    if (priceLevelNo) customerObj.priceLevelNo = priceLevelNo;
+    if (defaultPriceLevel) customerObj.defaultPriceLevel = defaultPriceLevel;
     if (company && company !== name) customerObj.company = company;
     if (email) customerObj.email = email;
     if (phone) customerObj.phone = phone;

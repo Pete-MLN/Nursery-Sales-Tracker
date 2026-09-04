@@ -57,7 +57,8 @@ import {
   Info,
   Calendar,
   Building2,
-  ExternalLink
+  ExternalLink,
+  Square
 } from 'lucide-react';
 
 import { OFFICIAL_YARD_LOCATIONS } from '../data/yardLocations';
@@ -1007,30 +1008,24 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
                 {/* Selected Plant Card Preview */}
                 {selectedPlant && !isManualEntry && (
-                  <div className="bg-[#f0fdf4] border-2 border-[#a0f4c8] rounded-xl p-3.5 flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <img
-                        src={selectedPlant.image || DEFAULT_PLANT_IMAGE}
-                        alt={selectedPlant.name}
-                        className="w-12 h-12 rounded-lg object-cover border border-[#a0f4c8] shrink-0"
-                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                      />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-black text-[#012d1d] bg-white px-2 py-0.5 rounded-md border border-[#c1c8c2]">
-                            SKU #{selectedPlant.itemNo || selectedPlant.id}
-                          </span>
-                          <span className="text-xs font-bold text-[#0e6c4a]">
-                            Size: {selectedPlant.size || '3 GAL'}
-                          </span>
-                        </div>
-                        <h3 className="font-extrabold text-sm text-[#012d1d] truncate mt-0.5">
-                          {selectedPlant.name}
-                        </h3>
+                  <div className="bg-[#f0fdf4] border border-[#a0f4c8] rounded-xl p-2.5 flex items-center justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs font-black text-[#012d1d] bg-white px-2 py-0.5 rounded-md border border-[#c1c8c2]">
+                          SKU #{selectedPlant.itemNo || selectedPlant.id}
+                        </span>
+                        <span className="text-xs font-bold text-[#0e6c4a]">
+                          Size: {selectedPlant.size || '3 GAL'}
+                        </span>
+                      </div>
+                      <h3 className="font-extrabold text-sm text-[#012d1d] truncate mt-0.5">
+                        {selectedPlant.name}
+                      </h3>
+                      {selectedPlant.botanicalName && (
                         <p className="text-[11px] text-[#525a55] italic truncate">
                           {selectedPlant.botanicalName}
                         </p>
-                      </div>
+                      )}
                     </div>
 
                     <div className="text-right shrink-0 flex flex-col items-end">
@@ -1845,6 +1840,21 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                 playsInline
                 muted
               />
+
+              {/* Centered STOP Button in the Middle at Top of Viewer */}
+              <div className="absolute top-2.5 left-1/2 -translate-x-1/2 z-20 pointer-events-auto">
+                <button
+                  type="button"
+                  id="audit-scanner-stop-camera-btn"
+                  onClick={stopCameraScanner}
+                  className="bg-red-600 hover:bg-red-700 active:scale-95 text-white font-black text-xs px-4 py-1.5 rounded-full shadow-lg border-2 border-white/50 flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all tracking-wider"
+                  title="Stop Camera Scanner"
+                >
+                  <Square className="w-3 h-3 fill-white" />
+                  <span>STOP</span>
+                </button>
+              </div>
+
               <div className="absolute inset-x-8 top-1/2 -translate-y-1/2 h-0.5 bg-[#a0f4c8] shadow-[0_0_8px_#a0f4c8] animate-pulse" />
             </div>
 

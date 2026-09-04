@@ -91,6 +91,9 @@ export interface Customer {
   phone?: string;
   address?: string;
   recent?: boolean;
+  categoryCode?: string; // CATEG_COD from CounterPoint (e.g. 'WHO', 'RET', 'LAND', 'GARD')
+  priceLevelNo?: string; // PRC_LVL from CounterPoint (e.g. '1', '3', '4', '5')
+  defaultPriceLevel?: 'retail' | 'wholesale' | 'gardenCenter' | 'elite';
 }
 
 export interface Employee {

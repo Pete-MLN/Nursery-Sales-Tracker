@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlantItem, OrderCartItem } from '../types';
-import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
 import { PricingDropdown } from './PricingDropdown';
 import { 
@@ -230,7 +229,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       <div 
         ref={modalCardRef}
         tabIndex={-1}
-        className="bg-white rounded-3xl max-w-lg w-full p-4 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 sm:gap-5 my-2 mb-36 sm:mb-44 animate-scale-up outline-none"
+        className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-3.5 sm:gap-4 my-2 mb-36 sm:mb-44 animate-scale-up outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with Title and Close Button */}
@@ -267,70 +266,65 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
         </div>
 
         {/* Plant Verification Card */}
-        <div className="bg-[#fcfdfa] border-2 border-[#012d1d]/15 rounded-2xl p-3.5 sm:p-4 flex flex-col sm:flex-row items-center sm:items-start gap-4 shadow-2xs">
-          <div className="relative shrink-0">
-            <img
-              src={plant.image || DEFAULT_PLANT_IMAGE}
-              alt={plant.name}
-              className="w-24 h-24 sm:w-28 sm:h-28 rounded-2xl object-cover border border-[#c1c8c2]/60 shadow-sm bg-white"
-              referrerPolicy="no-referrer"
-              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-            />
-            <span className="absolute bottom-1 right-1 bg-[#012d1d]/90 backdrop-blur-xs text-[#a0f4c8] text-[10px] font-bold px-1.5 py-0.5 rounded-md">
-              {plant.category || 'Plant'}
-            </span>
+        <div className="bg-[#fcfdfa] border border-[#012d1d]/15 rounded-xl p-3 flex flex-col gap-2 shadow-2xs">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0 flex-1">
+              <h3 className="font-extrabold text-base sm:text-lg text-[#012d1d] leading-snug">
+                {plant.name}
+              </h3>
+
+              {(plant.botanicalName || plant.commonName) && (
+                <p className="text-xs text-[#414844] italic font-medium mt-0.5">
+                  {plant.botanicalName || plant.commonName}
+                </p>
+              )}
+            </div>
+
+            {plant.category && (
+              <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+                {plant.category}
+              </span>
+            )}
           </div>
 
-          <div className="flex-1 min-w-0 text-center sm:text-left">
-            <h3 className="font-extrabold text-lg sm:text-xl text-[#012d1d] leading-snug">
-              {plant.name}
-            </h3>
+          {/* Badges: Item Number, Container Size, Stock Availability */}
+          <div className="flex flex-wrap items-center gap-1.5 pt-0.5">
+            <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+              <Tag className="w-3 h-3 text-[#a0f4c8]" />
+              #{plant.itemNo || plant.barcode || 'N/A'}
+            </span>
 
-            {(plant.botanicalName || plant.commonName) && (
-              <p className="text-xs sm:text-sm text-[#414844] italic font-medium mt-0.5">
-                {plant.botanicalName || plant.commonName}
-              </p>
-            )}
+            <span className="bg-[#461702] text-amber-100 text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+              <Package className="w-3 h-3 text-amber-300" />
+              {plant.size ? `SIZE: ${plant.size}` : (isBulk ? `UNIT: ${unitLabel}` : 'Std Size')}
+            </span>
 
-            {/* Badges: Item Number, Container Size, Stock Availability */}
-            <div className="flex flex-wrap items-center justify-center sm:justify-start gap-1.5 mt-2.5">
-              <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-2xs">
-                <Tag className="w-3 h-3 text-[#a0f4c8]" />
-                #{plant.itemNo || plant.barcode || 'N/A'}
-              </span>
-
-              <span className="bg-[#461702] text-amber-100 text-xs font-bold px-2 py-1 rounded-lg flex items-center gap-1 shadow-2xs">
-                <Package className="w-3 h-3 text-amber-300" />
-                {plant.size ? `SIZE: ${plant.size}` : (isBulk ? `UNIT: ${unitLabel}` : 'Std Size')}
-              </span>
-
-              <span className={`text-xs font-extrabold px-2 py-1 rounded-lg flex items-center gap-1 shadow-2xs ${
-                plant.stock < 0
-                  ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                  : plant.stock === 0 
-                  ? 'bg-red-100 text-red-800 border border-red-200' 
-                  : plant.stock < 5 
-                  ? 'bg-amber-100 text-amber-900 border border-amber-200' 
-                  : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
-              }`}>
-                {plant.stock < 0 ? (
-                  <>
-                    <AlertCircle className="w-3 h-3 text-rose-700" />
-                    <span>{plant.stock} In Stock (Negative / Oversold)</span>
-                  </>
-                ) : plant.stock === 0 ? (
-                  <>
-                    <AlertCircle className="w-3 h-3 text-red-600" />
-                    <span>0 In Stock (Out of Stock)</span>
-                  </>
-                ) : (
-                  <>
-                    <Check className="w-3 h-3 text-emerald-700" />
-                    <span>{plant.stock} In Stock</span>
-                  </>
-                )}
-              </span>
-            </div>
+            <span className={`text-xs font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs ${
+              plant.stock < 0
+                ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                : plant.stock === 0 
+                ? 'bg-red-100 text-red-800 border border-red-200' 
+                : plant.stock < 5 
+                ? 'bg-amber-100 text-amber-900 border border-amber-200' 
+                : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+            }`}>
+              {plant.stock < 0 ? (
+                <>
+                  <AlertCircle className="w-3 h-3 text-rose-700" />
+                  <span>{plant.stock} In Stock (Negative / Oversold)</span>
+                </>
+              ) : plant.stock === 0 ? (
+                <>
+                  <AlertCircle className="w-3 h-3 text-red-600" />
+                  <span>0 In Stock (Out of Stock)</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-3 h-3 text-emerald-700" />
+                  <span>{plant.stock} In Stock</span>
+                </>
+              )}
+            </span>
           </div>
         </div>
 
@@ -338,14 +332,9 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
         <div className="bg-[#f3f4f0]/70 p-3.5 rounded-2xl border border-[#c1c8c2]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-[#012d1d]" />
-            <div>
-              <span className="text-xs font-bold text-[#717973] uppercase tracking-wider block">
-                Price Tier & Unit Rate
-              </span>
-              <span className="text-xs text-[#414844]">
-                Customer Rate: <strong className="text-[#012d1d] font-extrabold">{selectedPriceLevel.toUpperCase()}</strong>
-              </span>
-            </div>
+            <span className="text-xs text-[#414844]">
+              Customer Rate: <strong className="text-[#012d1d] font-extrabold">{selectedPriceLevel.toUpperCase()}</strong>
+            </span>
           </div>
 
           <div className="flex items-center gap-2 shrink-0">

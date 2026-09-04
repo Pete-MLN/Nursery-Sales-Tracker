@@ -357,11 +357,11 @@ export const INITIAL_PLANTS: PlantItem[] = [
 ];
 
 export const INITIAL_CUSTOMERS: Customer[] = [
-  { id: 'c1', name: 'Sarah J.', type: 'RETAIL', recent: true, email: 'sarah.jenkins@example.com', phone: '(555) 321-7890' },
-  { id: 'c2', name: 'Green Gardens LLC', type: 'WHOLESALE', recent: true, company: 'Green Gardens LLC', email: 'orders@greengardensllc.com', phone: '(555) 456-7890' },
-  { id: 'c3', name: 'Mike T.', type: 'RETAIL', recent: true, email: 'miket@example.com', phone: '(555) 678-9012' },
-  { id: 'c4', name: 'Oakridge Landscaping', type: 'COMMERCIAL', company: 'Oakridge Landscaping', email: 'crew@oakridgelandscape.com', phone: '(555) 890-1234' },
-  { id: 'c5', name: 'Sarah Jenkins', type: 'RETAIL', email: 'sarah.jenkins@example.com', phone: '(555) 321-7890' }
+  { id: 'c1', name: 'Sarah J.', type: 'RETAIL', accountNo: '1001', categoryCode: 'RET', recent: true, email: 'sarah.jenkins@example.com', phone: '(555) 321-7890' },
+  { id: 'c2', name: 'Green Gardens LLC', type: 'WHOLESALE', accountNo: '2045', categoryCode: 'WHO', recent: true, company: 'Green Gardens LLC', email: 'orders@greengardensllc.com', phone: '(555) 456-7890' },
+  { id: 'c3', name: 'Mike T.', type: 'RETAIL', accountNo: '1002', categoryCode: 'RET', recent: true, email: 'miket@example.com', phone: '(555) 678-9012' },
+  { id: 'c4', name: 'Oakridge Landscaping', type: 'COMMERCIAL', accountNo: '3089', categoryCode: 'LAND', company: 'Oakridge Landscaping', email: 'crew@oakridgelandscape.com', phone: '(555) 890-1234' },
+  { id: 'c5', name: 'Sarah Jenkins', type: 'RETAIL', accountNo: '1001', categoryCode: 'RET', email: 'sarah.jenkins@example.com', phone: '(555) 321-7890' }
 ];
 
 export const INITIAL_ORDERS: Order[] = [

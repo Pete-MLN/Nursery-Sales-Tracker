@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer, Order } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink, Square } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode, isValidBarcodeString } from '../utils/barcodeUtils';
 import { PricingDropdown } from './PricingDropdown';
@@ -1182,7 +1182,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       (c.company && c.company.toLowerCase().includes(q)) ||
       (c.email && c.email.toLowerCase().includes(q)) ||
       (c.phone && c.phone.includes(q)) ||
-      c.type.toLowerCase().includes(q)
+      c.type.toLowerCase().includes(q) ||
+      (c.categoryCode && c.categoryCode.toLowerCase().includes(q)) ||
+      (c.accountNo && c.accountNo.toLowerCase().includes(q))
     );
   });
 
@@ -1405,7 +1407,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             </div>
                           </div>
 
-                          <div className="flex items-center gap-2.5 shrink-0 ml-2">
+                          <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
+                            {cust.accountNo && (
+                              <span className="hidden sm:inline-block text-[11px] font-mono text-[#717973] bg-white border border-[#c1c8c2] px-1.5 py-0.5 rounded">
+                                #{cust.accountNo}
+                              </span>
+                            )}
+                            {cust.categoryCode && (
+                              <span className="text-[10px] sm:text-xs font-mono font-bold bg-[#012d1d] text-[#a0f4c8] px-2 py-0.5 rounded">
+                                {cust.categoryCode}
+                              </span>
+                            )}
                             <span
                               className={`text-xs sm:text-sm font-black px-2.5 py-1 rounded-md ${
                                 isSelected
@@ -1880,11 +1892,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         {/* Scanner Framing Overlay */}
         <div className="absolute inset-0 bg-black/20 flex flex-col items-center justify-between p-3.5 pointer-events-none z-10">
           {/* Top Bar */}
-          <div className="w-full flex justify-between items-center text-white/90 text-xs">
+          <div className="w-full relative flex justify-between items-center text-white/90 text-xs">
             <div className="flex items-center gap-1.5 pointer-events-auto">
-              <span className="flex items-center gap-1 font-mono bg-black/60 backdrop-blur-xs px-2 py-1 rounded-md border border-white/10">
+              <span className="flex items-center gap-1 font-mono bg-black/60 backdrop-blur-xs px-2 py-1 rounded-md border border-white/10 text-[11px] sm:text-xs">
                 <QrCode className="w-3.5 h-3.5 text-[#a0f4c8]" />
-                {cameraActive ? 'CAMERA LIVE' : 'DEMO SCANNER'}
+                <span className="hidden sm:inline">{cameraActive ? 'CAMERA LIVE' : 'DEMO SCANNER'}</span>
+                <span className="sm:hidden">{cameraActive ? 'LIVE' : 'DEMO'}</span>
               </span>
 
               {cameraActive && (
@@ -1896,7 +1909,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       triggerScannedFeedback(`Camera timer reset to ${cameraTimeout}s`, 'success', 2500);
                     }
                   }}
-                  className={`backdrop-blur-xs border px-2 py-1 rounded-md text-xs flex items-center gap-1.5 cursor-pointer transition-all active:scale-95 ${
+                  className={`backdrop-blur-xs border px-1.5 sm:px-2 py-1 rounded-md text-[11px] sm:text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 ${
                     cameraTimeout === 0
                       ? 'bg-black/60 text-white/90 border-white/20'
                       : cameraTimeLeft <= 4
@@ -1906,8 +1919,36 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   title={cameraTimeout === 0 ? "Continuous camera stream (No timeout)" : "Click to reset auto-off timer"}
                 >
                   <Clock className={`w-3.5 h-3.5 ${cameraTimeout > 0 && cameraTimeLeft <= 4 ? 'text-black' : 'text-[#a0f4c8]'}`} />
-                  <span>{cameraTimeout === 0 ? 'Continuous' : `${cameraTimeLeft}s auto-off`}</span>
+                  <span>{cameraTimeout === 0 ? 'Cont.' : `${cameraTimeLeft}s`}</span>
+                  <span className="hidden md:inline">{cameraTimeout > 0 ? ' auto-off' : ''}</span>
                   {cameraTimeout > 0 && <RefreshCw className="w-2.5 h-2.5 opacity-70 ml-0.5" />}
+                </button>
+              )}
+            </div>
+
+            {/* STOP / START Button in the Middle at Top of Viewer */}
+            <div className="absolute left-1/2 -translate-x-1/2 top-0 pointer-events-auto z-20">
+              {cameraActive ? (
+                <button
+                  type="button"
+                  id="scanner-stop-camera-btn"
+                  onClick={toggleCameraFeed}
+                  className="bg-red-600 hover:bg-red-700 active:scale-95 text-white font-black text-xs sm:text-sm px-4 sm:px-5 py-1.5 rounded-full shadow-lg border-2 border-white/50 flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all tracking-wider"
+                  title="Stop Camera / Scanner"
+                >
+                  <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-white" />
+                  <span>STOP</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  id="scanner-start-camera-btn"
+                  onClick={toggleCameraFeed}
+                  className="bg-[#012d1d]/85 hover:bg-[#012d1d] active:scale-95 text-[#a0f4c8] font-extrabold text-xs px-3.5 py-1.5 rounded-full shadow-md border border-[#a0f4c8]/30 flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all"
+                  title="Start Camera Feed"
+                >
+                  <Camera className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                  <span>Start Camera</span>
                 </button>
               )}
             </div>
@@ -1918,7 +1959,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 <button
                   type="button"
                   onClick={() => setIsTimeoutMenuOpen(!isTimeoutMenuOpen)}
-                  className={`backdrop-blur-xs border px-2 py-1 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 ${
+                  className={`backdrop-blur-xs border px-1.5 sm:px-2 py-1 rounded-md text-[11px] sm:text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 ${
                     isTimeoutMenuOpen
                       ? 'bg-[#a0f4c8] text-[#002113] border-[#0e6c4a] font-bold'
                       : 'bg-black/60 hover:bg-black/80 text-white border-white/20'
@@ -1987,7 +2028,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 <button
                   type="button"
                   onClick={toggleTorch}
-                  className={`backdrop-blur-xs border px-2 py-1 rounded-md text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 ${
+                  className={`backdrop-blur-xs border px-1.5 sm:px-2 py-1 rounded-md text-[11px] sm:text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95 ${
                     isTorchOn
                       ? 'bg-[#a0f4c8] text-[#002113] border-[#0e6c4a] font-bold shadow-[0_0_8px_#a0f4c8]'
                       : 'bg-black/60 hover:bg-black/80 text-white border-white/20'
@@ -1995,39 +2036,31 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   title="Toggle flashlight / torch for dark nursery areas"
                 >
                   {isTorchOn ? <Zap className="w-3.5 h-3.5 text-[#002113]" /> : <ZapOff className="w-3.5 h-3.5 text-white/80" />}
-                  <span>{isTorchOn ? 'Flash ON' : 'Flash'}</span>
+                  <span className="hidden sm:inline">{isTorchOn ? 'Flash ON' : 'Flash'}</span>
                 </button>
               )}
               {cameraActive && maxZoom > 1 && (
                 <button
                   type="button"
                   onClick={() => setZoom(zoomLevel === 1 ? Math.min(2, maxZoom) : 1)}
-                  className="bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/20 px-2 py-1 rounded-md text-white text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  className="bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/20 px-1.5 sm:px-2 py-1 rounded-md text-white text-[11px] sm:text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
                   title="Toggle 2x camera zoom for smaller barcode tags"
                 >
                   <ZoomIn className="w-3.5 h-3.5 text-[#a0f4c8]" />
-                  <span>{zoomLevel > 1 ? `${zoomLevel.toFixed(1)}x` : '2x Zoom'}</span>
+                  <span>{zoomLevel > 1 ? `${zoomLevel.toFixed(1)}x` : '2x'}</span>
                 </button>
               )}
               {cameraActive && (
                 <button
                   type="button"
                   onClick={switchCameraDevice}
-                  className="bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/20 px-2.5 py-1 rounded-md text-white text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
+                  className="bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/20 px-2 sm:px-2.5 py-1 rounded-md text-white text-[11px] sm:text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
                   title="Switch camera device / flip camera"
                 >
                   <ArrowRightLeft className="w-3.5 h-3.5 text-[#a0f4c8]" />
-                  <span>Switch Cam</span>
+                  <span className="hidden sm:inline">Switch Cam</span>
                 </button>
               )}
-              <button
-                type="button"
-                onClick={toggleCameraFeed}
-                className="bg-black/60 hover:bg-black/80 backdrop-blur-xs border border-white/20 px-2.5 py-1 rounded-md text-white text-xs flex items-center gap-1 cursor-pointer transition-all active:scale-95"
-              >
-                <Camera className="w-3.5 h-3.5 text-[#a0f4c8]" />
-                <span>{cameraActive ? 'Stop' : 'Start Camera'}</span>
-              </button>
             </div>
           </div>
 

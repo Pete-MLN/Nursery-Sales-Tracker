@@ -81,7 +81,7 @@ export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
             </span>
           </div>
           <p className="font-extrabold text-sm sm:text-base text-[#1a1c1a] mt-0.5 truncate">
-            {draft.customerName ? draft.customerName : 'Retail Walk-in'} • {totalItems} item{totalItems === 1 ? '' : 's'} (${totalAmount.toFixed(2)})
+            {draft.customerName ? draft.customerName : 'Walk In Customer'} • {totalItems} item{totalItems === 1 ? '' : 's'} (${totalAmount.toFixed(2)})
           </p>
           <p className="text-xs text-amber-900/90 mt-0.5">
             {draft.isEditingExisting 

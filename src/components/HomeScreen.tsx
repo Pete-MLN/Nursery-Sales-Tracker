@@ -67,7 +67,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           if (onSaveDraft) {
             onSaveDraft(draft);
           }
-          showToast(`Order for ${draft.customerName || 'Retail Walk-in'} has been saved and the draft warning removed.`);
+          showToast(`Order for ${draft.customerName || 'Walk In Customer'} has been saved and the draft warning removed.`);
         }}
       />
 

@@ -356,7 +356,17 @@ export const INITIAL_PLANTS: PlantItem[] = [
   }
 ];
 
+export const DEFAULT_CUSTOMER: Customer = {
+  id: 'cust-cash',
+  name: 'Walk In Customer',
+  accountNo: 'CASH',
+  type: 'RETAIL',
+  categoryCode: 'RET',
+  recent: true
+};
+
 export const INITIAL_CUSTOMERS: Customer[] = [
+  DEFAULT_CUSTOMER,
   { id: 'c1', name: 'Sarah J.', type: 'RETAIL', accountNo: '1001', categoryCode: 'RET', recent: true, email: 'sarah.jenkins@example.com', phone: '(555) 321-7890' },
   { id: 'c2', name: 'Green Gardens LLC', type: 'WHOLESALE', accountNo: '2045', categoryCode: 'WHO', recent: true, company: 'Green Gardens LLC', email: 'orders@greengardensllc.com', phone: '(555) 456-7890' },
   { id: 'c3', name: 'Mike T.', type: 'RETAIL', accountNo: '1002', categoryCode: 'RET', recent: true, email: 'miket@example.com', phone: '(555) 678-9012' },

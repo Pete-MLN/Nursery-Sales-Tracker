@@ -14,6 +14,7 @@ import { PlantItem, Customer, Employee, Order, RecentUpload, HoldingArea, Invent
 import { 
   INITIAL_PLANTS, 
   INITIAL_CUSTOMERS, 
+  DEFAULT_CUSTOMER,
   INITIAL_EMPLOYEES, 
   INITIAL_ORDERS, 
   INITIAL_UPLOADS,
@@ -81,6 +82,11 @@ export async function seedInitialFirestoreData() {
       });
       await batch.commit();
       console.log('Firestore: Customers initialized');
+    } else {
+      const cashDoc = await getDoc(doc(db, CUSTOMERS_COL, 'cust-cash'));
+      if (!cashDoc.exists()) {
+        await setDoc(doc(db, CUSTOMERS_COL, 'cust-cash'), cleanForFirestore(DEFAULT_CUSTOMER));
+      }
     }
 
     const employeesSnap = await getDocs(collection(db, EMPLOYEES_COL));

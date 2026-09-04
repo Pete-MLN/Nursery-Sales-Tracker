@@ -395,7 +395,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="font-bold text-sm text-white">Database Storage & Real-Time Cloud Sync</h4>
-                <span className="bg-[#a0f4c8] text-[#002113] text-[10px] font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                <span className="bg-[#a0f4c8] text-[#002113] text-[14px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
                   Firestore Active
                 </span>
               </div>
@@ -407,8 +407,8 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
           <div className="flex items-center gap-3 shrink-0 self-end md:self-auto border-t md:border-t-0 md:border-l border-[#0e6c4a]/60 pt-3 md:pt-0 md:pl-4 text-xs">
             <div className="text-right">
-              <span className="block text-[10px] font-bold text-[#a0f4c8]/80 uppercase">STORED CUSTOMERS</span>
-              <span className="text-base font-extrabold text-white">{customers.length.toLocaleString()} Records</span>
+              <span className="block text-[14px] font-bold text-[#a0f4c8]/80 uppercase">STORED CUSTOMERS</span>
+              <span className="text-[20px] font-extrabold text-white leading-tight">{customers.length.toLocaleString()} Records</span>
             </div>
             <button
               onClick={() => handleOpenUploadModal('customer')}
@@ -451,10 +451,10 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
             </div>
 
             <div className="relative z-10">
-              <span className="block text-[10px] font-bold text-[#414844] uppercase tracking-wider">
+              <span className="block text-[14px] font-bold text-[#414844] uppercase tracking-wider">
                 LAST UPLOAD
               </span>
-              <span className="block text-sm font-bold text-[#1a1c1a] mt-0.5">
+              <span className="block text-[18px] font-bold text-[#1a1c1a] mt-0.5">
                 {lastInventoryDate}
               </span>
             </div>
@@ -485,10 +485,10 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
             <div className="relative z-10 flex flex-col gap-1">
               <div>
-                <span className="block text-[10px] font-bold text-[#414844] uppercase tracking-wider">
+                <span className="block text-[14px] font-bold text-[#414844] uppercase tracking-wider">
                   STORED IN FIRESTORE
                 </span>
-                <span className="block text-sm font-bold text-[#012d1d] mt-0.5">
+                <span className="block text-[18px] font-bold text-[#012d1d] mt-0.5">
                   {customers.length.toLocaleString()} Active Accounts
                 </span>
               </div>
@@ -522,10 +522,10 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
             </div>
 
             <div className="relative z-10">
-              <span className="block text-[10px] font-bold text-[#414844] uppercase tracking-wider">
+              <span className="block text-[14px] font-bold text-[#414844] uppercase tracking-wider">
                 ACTIVE STAFF
               </span>
-              <span className="block text-sm font-bold text-[#012d1d] mt-0.5">
+              <span className="block text-[18px] font-bold text-[#012d1d] mt-0.5">
                 {employees.length} Employees Configured
               </span>
             </div>
@@ -859,8 +859,8 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
       {/* Manual Add/Edit Customer Modal */}
       {showCustomerModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 pt-4 sm:pt-6 md:pt-8 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in my-0">
             <div className="flex justify-between items-center border-b border-[#f3f4f0] pb-3">
               <h3 className="font-bold text-lg text-[#012d1d]">
                 {editingCustId ? 'Edit Customer Account' : 'Add New Customer'}
@@ -996,8 +996,8 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
       {/* Manual Add/Edit Employee Modal */}
       {showEmployeeModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 pt-4 sm:pt-6 md:pt-8 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in my-0">
             <div className="flex justify-between items-center border-b border-[#f3f4f0] pb-3">
               <h3 className="font-bold text-lg text-[#012d1d]">
                 {editingEmpId ? 'Edit Employee Record' : 'Add New Employee'}
@@ -1103,8 +1103,8 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
       {/* Dataset File Import Modal */}
       {activeUploadModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 pt-8 md:pt-14 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-2xl flex flex-col gap-4 animate-fade-in my-auto md:my-0">
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 pt-4 sm:pt-6 md:pt-8 overflow-y-auto">
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-2xl flex flex-col gap-4 animate-fade-in my-0">
             {/* Hidden HTML File Input */}
             <input
               ref={fileInputRef}

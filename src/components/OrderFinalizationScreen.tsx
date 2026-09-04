@@ -260,7 +260,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       const draft: OrderDraft = {
         orderId: currentOrder.id,
         isEditingExisting: true,
-        customerName: customerName.trim() || currentOrder.customerName || 'Retail Walk-in',
+        customerName: customerName.trim() || currentOrder.customerName || 'Walk In Customer',
         cartItems: items,
         fulfillmentType: fulfillment,
         scheduledDate: scheduledDate,
@@ -285,7 +285,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       return {
         orderId: currentOrder.id,
         isEditingExisting: true,
-        customerName: customerName.trim() || currentOrder.customerName || 'Retail Walk-in',
+        customerName: customerName.trim() || currentOrder.customerName || 'Walk In Customer',
         cartItems: items,
         fulfillmentType: fulfillment,
         scheduledDate: scheduledDate,
@@ -569,7 +569,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
 
     const updated: Order = {
       ...currentOrder,
-      customerName: customerName.trim() || 'Retail Walk-in',
+      customerName: customerName.trim() || 'Walk In Customer',
       type: fulfillment,
       scheduledTime: scheduledTime.trim() || 'Scheduled',
       scheduledDate: scheduledDate.trim(),
@@ -998,7 +998,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             ) : (
               <div className="flex items-center gap-2 mt-1">
                 <h1 className="text-xl sm:text-2xl font-extrabold text-[#1a1c1a]">
-                  {customerName || 'Retail Walk-in'}
+                  {customerName || 'Walk In Customer'}
                 </h1>
                 <button
                   type="button"

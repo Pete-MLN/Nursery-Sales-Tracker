@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings, HoldingArea, InventoryAuditSession } from './types';
-import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, INITIAL_EMPLOYEES, HOLDING_AREAS } from './data/mockData';
+import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, DEFAULT_CUSTOMER, INITIAL_EMPLOYEES, HOLDING_AREAS } from './data/mockData';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './components/HomeScreen';
@@ -161,7 +161,15 @@ export default function App() {
     });
     const unsubCustomers = subscribeToCustomers((data) => {
       if (data && data.length > 0) {
-        setCustomers(data);
+        const cashCust = data.find(c => c.accountNo === 'CASH' || c.id === 'cust-cash' || c.name.toLowerCase() === 'walk in customer');
+        if (cashCust) {
+          const others = data.filter(c => c !== cashCust);
+          setCustomers([cashCust, ...others]);
+        } else {
+          setCustomers([DEFAULT_CUSTOMER, ...data]);
+        }
+      } else {
+        setCustomers(INITIAL_CUSTOMERS);
       }
     });
     const unsubEmployees = subscribeToEmployees((data) => {
@@ -324,7 +332,7 @@ export default function App() {
 
     const newOrder: Order = {
       id: newOrderId,
-      customerName: customerName.trim() || 'Retail Walk-in',
+      customerName: customerName.trim() || 'Walk In Customer',
       itemsCount: cartItems.reduce((sum, item) => sum + item.quantity, 0),
       total: totalAmount,
       type: overrides?.type || 'Take Now',
@@ -423,7 +431,7 @@ export default function App() {
       
       const updatedOrder: Order = {
         id: draft.orderId,
-        customerName: (draft.customerName && draft.customerName.trim()) || (existing ? existing.customerName : 'Retail Walk-in'),
+        customerName: (draft.customerName && draft.customerName.trim()) || (existing ? existing.customerName : 'Walk In Customer'),
         itemsCount: itemsCount > 0 ? itemsCount : (existing ? existing.itemsCount : 0),
         total: totalAmount > 0 ? totalAmount : (existing ? existing.total : 0),
         type: draft.fulfillmentType || (existing ? existing.type : 'Take Now'),
@@ -458,7 +466,7 @@ export default function App() {
 
       const newOrder: Order = {
         id: newOrderId,
-        customerName: (draft.customerName && draft.customerName.trim()) ? draft.customerName.trim() : 'Retail Walk-in',
+        customerName: (draft.customerName && draft.customerName.trim()) ? draft.customerName.trim() : 'Walk In Customer',
         itemsCount: (draft.cartItems || []).reduce((sum, item) => sum + item.quantity, 0),
         total: totalAmount,
         type: draft.fulfillmentType || 'Take Now',

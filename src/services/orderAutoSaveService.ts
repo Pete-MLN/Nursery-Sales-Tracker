@@ -95,7 +95,7 @@ export function autoSaveDraft(draft: OrderDraft, immediateCloudSync: boolean = f
 
           const orderToPersist: Order = {
             id: draft.orderId!,
-            customerName: draft.customerName.trim() || 'Retail Walk-in',
+            customerName: draft.customerName.trim() || 'Walk In Customer',
             itemsCount: totalItemsCount,
             total: totalAmount,
             type: draft.fulfillmentType || 'Take Now',
@@ -328,7 +328,7 @@ export async function flushOfflineSyncQueue() {
 
         const order: Order = {
           id: draft.orderId,
-          customerName: draft.customerName || 'Retail Walk-in',
+          customerName: draft.customerName || 'Walk In Customer',
           itemsCount: totalItemsCount,
           total: totalAmount,
           type: draft.fulfillmentType || 'Take Now',

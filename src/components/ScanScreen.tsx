@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer, Order } from '../types';
-import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
+import { DEFAULT_PLANT_IMAGE, DEFAULT_CUSTOMER } from '../data/mockData';
 import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink, Square } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode, isValidBarcodeString } from '../utils/barcodeUtils';
@@ -58,11 +58,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     return [];
   });
   const [selectedCustomer, setSelectedCustomer] = useState<string>(
-    activeOrder?.customerName || initialDraft?.customerName || ''
+    activeOrder?.customerName || initialDraft?.customerName || DEFAULT_CUSTOMER.name
   );
   const [isCancelModalOpen, setIsCancelModalOpen] = useState<boolean>(false);
   const [customerSearch, setCustomerSearch] = useState<string>(
-    activeOrder?.customerName || initialDraft?.customerName || ''
+    activeOrder?.customerName || initialDraft?.customerName || DEFAULT_CUSTOMER.name
   );
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [customerType, setCustomerType] = useState<'RETAIL' | 'WHOLESALE'>(
@@ -106,17 +106,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const activeDraft = getActiveDraft();
       if (activeDraft && activeDraft.cartItems && activeDraft.cartItems.length > 0 && !activeDraft.isEditingExisting) {
         setCartItems(activeDraft.cartItems.map(item => ({ ...item })));
-        setSelectedCustomer(activeDraft.customerName || '');
-        setCustomerSearch(activeDraft.customerName || '');
+        setSelectedCustomer(activeDraft.customerName || DEFAULT_CUSTOMER.name);
+        setCustomerSearch(activeDraft.customerName || DEFAULT_CUSTOMER.name);
         setItemFulfillmentMap(activeDraft.itemFulfillmentMap || {});
         setGpsLoggedMap(activeDraft.gpsLoggedMap || {});
         setCustomerType(activeDraft.customerType || 'RETAIL');
         setHasUnsavedChanges(true);
       } else {
-        // Clean blank order
+        // Clean blank order defaults to Walk In Customer (#CASH)
         setCartItems([]);
-        setSelectedCustomer('');
-        setCustomerSearch('');
+        setSelectedCustomer(DEFAULT_CUSTOMER.name);
+        setCustomerSearch(DEFAULT_CUSTOMER.name);
         setItemFulfillmentMap({});
         setGpsLoggedMap({});
         setCustomerType('RETAIL');
@@ -1054,7 +1054,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       triggerScannedFeedback('Add at least one item to save the order.', 'warning');
       return;
     }
-    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
+    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || DEFAULT_CUSTOMER.name);
     const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
     const totalAmt = calculateTotal();
 
@@ -1085,7 +1085,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   const handleComplete = () => {
     if (cartItems.length === 0) return;
-    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
+    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || DEFAULT_CUSTOMER.name);
     
     if (activeOrder && onUpdateActiveOrder) {
       const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -1112,7 +1112,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   // Direct hand-off when customer takes entire order with them (skipping staging / holding area page)
   const handleCustomerTookOrder = () => {
     if (cartItems.length === 0) return;
-    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
+    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || DEFAULT_CUSTOMER.name);
     const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
     const totalAmt = calculateTotal();
 
@@ -1151,7 +1151,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   const handleCompleteAndGoToHolding = () => {
     if (cartItems.length === 0) return;
-    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || 'Retail Walk-in');
+    const finalCustomer = (selectedCustomer || customerSearch || '').trim() || (activeOrder?.customerName || DEFAULT_CUSTOMER.name);
     
     if (activeOrder && onUpdateActiveOrder) {
       const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
@@ -1175,7 +1175,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   };
 
   const matchingCustomers = customers.filter(c => {
-    if (!customerSearch.trim()) return true;
+    if (!customerSearch.trim() || customerSearch === DEFAULT_CUSTOMER.name) return true;
     const q = customerSearch.toLowerCase();
     return (
       c.name.toLowerCase().includes(q) ||
@@ -1265,8 +1265,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   clearActiveDraft(activeOrder?.id);
                   onStartNewOrder();
                   setCartItems([]);
-                  setSelectedCustomer('');
-                  setCustomerSearch('');
+                  setSelectedCustomer(DEFAULT_CUSTOMER.name);
+                  setCustomerSearch(DEFAULT_CUSTOMER.name);
+                  setCustomerType('RETAIL');
                   setHasUnsavedChanges(false);
                 }}
                 className="text-xs font-bold text-[#717973] hover:text-[#ba1a1a] hover:bg-white px-2 py-1.5 rounded-lg transition-colors cursor-pointer"
@@ -1291,9 +1292,14 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             </span>
           </div>
 
-          {selectedCustomer ? (
-            <div className="flex items-center gap-1.5 bg-[#e7f8ef] text-[#012d1d] border border-[#a0f4c8] px-2.5 py-0.5 rounded-lg text-xs font-bold truncate max-w-[200px] sm:max-w-[280px]">
-              <Check className="w-3.5 h-3.5 shrink-0 text-[#0e6c4a]" />
+          {selectedCustomer === 'Walk In Customer' ? (
+            <div className="flex items-center gap-1.5 bg-[#e7f8ef] text-[#012d1d] border border-[#a0f4c8] px-2.5 py-0.5 rounded-lg text-xs font-bold truncate max-w-[240px] sm:max-w-[320px]">
+              <span className="text-[10px] font-mono font-black bg-[#012d1d] text-[#a0f4c8] px-1.5 py-0.5 rounded">#CASH</span>
+              <span className="truncate">Walk In Customer (Default)</span>
+            </div>
+          ) : selectedCustomer ? (
+            <div className="flex items-center gap-1.5 bg-[#012d1d] text-[#a0f4c8] px-2.5 py-0.5 rounded-lg text-xs font-bold truncate max-w-[240px] sm:max-w-[320px]">
+              <Check className="w-3.5 h-3.5 shrink-0 text-[#a0f4c8]" />
               <span className="truncate">{selectedCustomer}</span>
             </div>
           ) : (
@@ -1307,34 +1313,28 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           {/* Searchable Dropdown Container */}
           <div className="relative flex-1" ref={dropdownRef}>
             <div className="relative">
-              <User className="w-5 h-5 text-[#012d1d] absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                <User className="w-5 h-5 text-[#012d1d]" />
+              </div>
               <input
+                id="scan-customer-input"
                 type="text"
                 value={customerSearch}
-                onFocus={() => setIsDropdownOpen(true)}
+                onFocus={(e) => {
+                  setIsDropdownOpen(true);
+                  if (customerSearch === 'Walk In Customer') {
+                    e.target.select();
+                  }
+                }}
                 onChange={(e) => {
                   setCustomerSearch(e.target.value);
                   setSelectedCustomer(e.target.value);
                   setIsDropdownOpen(true);
                 }}
-                placeholder="Select or type customer name (e.g. Retail Walk-in, Smith)..."
-                className="w-full bg-[#f9faf6] border-2 border-[#012d1d] focus:border-[#012d1d] focus:bg-white focus:ring-4 focus:ring-[#012d1d]/15 rounded-xl pl-11 pr-16 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] transition-all shadow-sm placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
+                placeholder="Search account name or # (Default: Customer# CASH)..."
+                className="w-full bg-[#f9faf6] border-2 border-[#012d1d] focus:border-[#012d1d] focus:bg-white focus:ring-4 focus:ring-[#012d1d]/15 rounded-xl pl-11 pr-10 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] transition-all shadow-sm placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
               />
-              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center gap-1">
-                {customerSearch && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setCustomerSearch('');
-                      setSelectedCustomer('');
-                      setIsDropdownOpen(true);
-                    }}
-                    className="p-1.5 text-[#717973] hover:text-[#ba1a1a] hover:bg-[#f3f4f0] rounded-lg cursor-pointer transition-colors"
-                    title="Clear customer"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
+              <div className="absolute right-2.5 top-1/2 -translate-y-1/2 flex items-center z-10">
                 <button
                   type="button"
                   onClick={() => setIsDropdownOpen(prev => !prev)}
@@ -1352,8 +1352,27 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 <div className="p-2 flex flex-col gap-1.5">
                   <div className="px-3.5 py-2 text-xs sm:text-sm font-extrabold text-[#717973] uppercase tracking-wider bg-[#f9faf6] rounded-lg flex justify-between items-center">
                     <span>Customer Accounts ({matchingCustomers.length})</span>
-                    <span className="text-xs font-semibold text-[#717973]">Type to filter</span>
+                    <span className="text-xs font-semibold text-[#0e6c4a]">Default: Customer# CASH</span>
                   </div>
+
+                  {customerSearch !== 'Walk In Customer' && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSelectedCustomer('Walk In Customer');
+                        setCustomerSearch('Walk In Customer');
+                        setCustomerType('RETAIL');
+                        setIsDropdownOpen(false);
+                      }}
+                      className="w-full text-left px-3 py-2 bg-[#e7f8ef] hover:bg-[#a0f4c8]/40 border border-[#a0f4c8] rounded-xl text-xs font-bold text-[#012d1d] flex items-center justify-between transition-colors cursor-pointer"
+                    >
+                      <span className="flex items-center gap-2">
+                        <User className="w-4 h-4 text-[#0e6c4a]" />
+                        <span>Quick Reset: <strong>Customer# CASH (Walk In Customer)</strong></span>
+                      </span>
+                      <span className="text-[10px] bg-[#012d1d] text-[#a0f4c8] px-1.5 py-0.5 rounded font-mono font-bold">DEFAULT</span>
+                    </button>
+                  )}
 
                   {matchingCustomers.length === 0 ? (
                     <div className="p-4 text-center text-base text-[#717973]">
@@ -1375,6 +1394,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   ) : (
                     matchingCustomers.map((cust) => {
                       const isSelected = selectedCustomer === cust.name;
+                      const isCash = cust.accountNo === 'CASH' || cust.name === 'Walk In Customer';
                       return (
                         <button
                           key={cust.id}
@@ -1390,6 +1410,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                           className={`w-full text-left px-4 py-3 rounded-xl text-base sm:text-lg font-medium flex items-center justify-between transition-colors cursor-pointer ${
                             isSelected
                               ? 'bg-[#012d1d] text-white font-bold'
+                              : isCash
+                              ? 'bg-[#f3f9f5] hover:bg-[#e7f8ef] text-[#1a1c1a]'
                               : 'hover:bg-[#f3f4f0] text-[#1a1c1a]'
                           }`}
                         >
@@ -1408,6 +1430,13 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                           </div>
 
                           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0 ml-2">
+                            {isCash && (
+                              <span className={`text-[10px] font-mono font-bold px-1.5 py-0.5 rounded ${
+                                isSelected ? 'bg-[#a0f4c8] text-[#002113]' : 'bg-[#012d1d] text-[#a0f4c8]'
+                              }`}>
+                                DEFAULT
+                              </span>
+                            )}
                             {cust.accountNo && (
                               <span className="hidden sm:inline-block text-[11px] font-mono text-[#717973] bg-white border border-[#c1c8c2] px-1.5 py-0.5 rounded">
                                 #{cust.accountNo}
@@ -1690,7 +1719,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
                     if (matches.length === 0) {
                       return (
-                        <div className="p-4 text-center text-xs text-[#717973]">
+                        <div className="p-4 text-center text-[20px] text-[#717973]">
                           No exact plant matches for "{manualBarcodeInput}". Press Enter or Browse Catalog to search all inventory.
                         </div>
                       );
@@ -1711,24 +1740,24 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                           <img
                             src={plant.image || DEFAULT_PLANT_IMAGE}
                             alt={plant.name}
-                            className="w-12 h-12 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
+                            className="w-14 h-14 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
                             referrerPolicy="no-referrer"
                             onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                           />
                           <div className="min-w-0">
-                            <p className="text-sm sm:text-base font-extrabold text-[#012d1d] truncate group-hover:text-[#0e6c4a]">
+                            <p className="text-[22px] sm:text-[24px] font-extrabold text-[#012d1d] truncate group-hover:text-[#0e6c4a] leading-tight">
                               {plant.name}
                             </p>
                             <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                                <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
+                              <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[19px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 leading-tight">
+                                <Tag className="w-3.5 h-3.5 text-[#a0f4c8]" />
                                 #{plant.itemNo || plant.barcode || 'N/A'}
                               </span>
-                              <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
-                                <Package className="w-2.5 h-2.5 text-amber-300" />
+                              <span className="bg-[#461702] text-amber-100 text-[19px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 leading-tight">
+                                <Package className="w-3.5 h-3.5 text-amber-300" />
                                 SIZE: {plant.size || 'Standard'}
                               </span>
-                              <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                              <span className={`text-[20px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 leading-tight ${
                                 plant.stock < 0
                                   ? 'bg-rose-100 text-rose-800 border border-rose-200'
                                   : plant.stock === 0
@@ -1738,11 +1767,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                                   : 'bg-[#f3f4f0] text-[#414844]'
                               }`}>
                                 Avail: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
-                                {plant.stock < 0 ? <span className="text-[10px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[10px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
+                                {plant.stock < 0 ? <span className="text-[18px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[18px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
                               </span>
                             </div>
                             {(plant.botanicalName || plant.commonName) && (
-                              <p className="text-xs text-[#414844] truncate italic mt-0.5">
+                              <p className="text-[20px] text-[#414844] truncate italic mt-1 leading-snug">
                                 {plant.botanicalName || plant.commonName}
                               </p>
                             )}
@@ -1750,11 +1779,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                         </div>
 
                         <div className="flex items-center gap-2.5 shrink-0">
-                          <span className="text-base font-extrabold text-[#012d1d]">
+                          <span className="text-[24px] font-extrabold text-[#012d1d]">
                             ${plant.price.toFixed(2)}
                           </span>
-                          <span className="bg-[#012d1d] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 group-hover:bg-[#0e6c4a] shadow-2xs">
-                            <Plus className="w-4 h-4" />
+                          <span className="bg-[#012d1d] text-[#a0f4c8] text-[20px] font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 group-hover:bg-[#0e6c4a] shadow-2xs">
+                            <Plus className="w-5 h-5" />
                             <span>Add</span>
                           </span>
                         </div>
@@ -2629,8 +2658,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   onClick={() => {
                     clearActiveDraft();
                     setCartItems([]);
-                    setSelectedCustomer('');
-                    setCustomerSearch('');
+                    setSelectedCustomer(DEFAULT_CUSTOMER.name);
+                    setCustomerSearch(DEFAULT_CUSTOMER.name);
+                    setCustomerType('RETAIL');
                     setHasUnsavedChanges(false);
                     setIsCancelModalOpen(false);
                     if (onStartNewOrder) onStartNewOrder();

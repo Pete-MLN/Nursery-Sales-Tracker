@@ -309,11 +309,13 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [catalogSearchQuery, setCatalogSearchQuery] = useState<string>('');
   const [catalogCategory, setCatalogCategory] = useState<string>('All');
   const [showPlantSuggestions, setShowPlantSuggestions] = useState<boolean>(false);
+  const [catalogPriceLevels, setCatalogPriceLevels] = useState<Record<string, PriceLevelKey>>({});
 
   // Plant Verification & Quantity Confirmation Modal State
   const [verifyingPlant, setVerifyingPlant] = useState<{
     plant: PlantItem;
     initialQty?: number;
+    initialPriceLevel?: PriceLevelKey;
     existingCartItem?: OrderCartItem | null;
   } | null>(null);
   const verifyingPlantRef = useRef(verifyingPlant);
@@ -356,7 +358,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   };
 
   // Open the plant verification and quantity pop-up
-  const openPlantVerification = (plant: PlantItem, defaultQty?: number) => {
+  const openPlantVerification = (plant: PlantItem, defaultQty?: number, priceLevel?: PriceLevelKey) => {
     const existing = cartItems.find(i => i.plant.id === plant.id) || null;
     const isBulkItem = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
       (plant.category || '').toUpperCase().includes(cat) || plant.name.toUpperCase().includes(cat)
@@ -364,6 +366,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     setVerifyingPlant({
       plant,
       initialQty: defaultQty !== undefined ? defaultQty : (existing ? existing.quantity : (isBulkItem ? 1.0 : 1)),
+      initialPriceLevel: priceLevel,
       existingCartItem: existing
     });
   };
@@ -464,7 +467,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
   // Helper to add a plant directly to the cart with customizable increment and price tier
   const addPlantToCart = (plant: PlantItem, amount: number = 1, priceLevel?: PriceLevelKey) => {
-    openPlantVerification(plant, amount);
+    openPlantVerification(plant, amount, priceLevel);
   };
 
   // Helper to switch or set price tier for a specific item in the order
@@ -3004,32 +3007,42 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
                 return matches.map((plant) => {
                   const inCartCount = cartItems.find(i => i.plant.id === plant.id)?.quantity || 0;
+                  const activePriceTierKey = catalogPriceLevels[plant.id] || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
 
                   return (
                     <div
                       key={plant.id}
-                      className="p-3 bg-white hover:bg-[#f3f4f0]/60 rounded-xl border border-[#c1c8c2] flex items-center justify-between gap-3 transition-colors"
+                      className="p-3 bg-white hover:bg-[#f9faf6] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2.5 transition-colors shadow-xs"
                     >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <img
-                          src={plant.image || DEFAULT_PLANT_IMAGE}
-                          alt={plant.name}
-                          className="w-12 h-12 rounded-lg object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
-                          referrerPolicy="no-referrer"
-                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                        />
-                        <div className="min-w-0">
-                          <h4 className="font-extrabold text-base text-[#1a1c1a] truncate">{plant.name}</h4>
-                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                      {/* Top Header: Plant Name clearly visible at the top across the full width */}
+                      <div className="border-b border-[#f3f4f0] pb-2">
+                        <h4 className="font-extrabold text-sm sm:text-base text-[#1a1c1a] leading-snug break-words">
+                          {plant.name}
+                        </h4>
+                        {(plant.botanicalName || plant.commonName) && (
+                          <p className="text-xs text-[#525a55] italic mt-0.5 break-words">
+                            {plant.botanicalName || plant.commonName}
+                          </p>
+                        )}
+                      </div>
+
+                      {/* Content Row: Metadata Badges on Left, Stacked Pricing Dropdown & Add Button on Right */}
+                      <div className="flex items-center justify-between gap-3 pt-0.5">
+                        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
                               <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
                               #{plant.itemNo || plant.barcode || 'N/A'}
                             </span>
-                            <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
                               <Package className="w-2.5 h-2.5 text-amber-300" />
                               SIZE: {plant.size || 'Standard'}
                             </span>
-                            <span className={`text-xs font-bold px-1.5 py-0.5 rounded flex items-center gap-1 ${
+                          </div>
+                          <div>
+                            <span className={`text-xs font-bold px-2 py-0.5 rounded-md inline-flex ${
+                              plant.stock <= 0 ? 'flex-col items-start py-1 leading-tight' : 'items-center gap-1'
+                            } ${
                               plant.stock < 0
                                 ? 'bg-rose-100 text-rose-800 border border-rose-200'
                                 : plant.stock === 0
@@ -3038,37 +3051,39 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                                 ? 'bg-amber-100 text-amber-800'
                                 : 'bg-[#f3f4f0] text-[#414844]'
                             }`}>
-                              Stock: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
-                              {plant.stock < 0 ? <span className="text-[10px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[10px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
+                              <span>Stock: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong></span>
+                              {plant.stock < 0 ? (
+                                <span className="text-[10px] text-rose-700 font-extrabold mt-0.5">(Backorder)</span>
+                              ) : plant.stock === 0 ? (
+                                <span className="text-[10px] text-red-600 font-extrabold mt-0.5">(Out of stock)</span>
+                              ) : null}
                             </span>
                           </div>
-                          {(plant.botanicalName || plant.commonName) && (
-                            <p className="text-xs text-[#414844] truncate italic mt-0.5">
-                              {plant.botanicalName || plant.commonName}
-                            </p>
-                          )}
                         </div>
-                      </div>
 
-                      <div className="flex items-center gap-2.5 shrink-0 flex-wrap justify-end">
-                        <PricingDropdown
-                          plant={plant}
-                          currentPrice={plant.prices?.[customerType === 'WHOLESALE' ? 'wholesale' : 'retail'] ?? plant.price}
-                          selectedLevelKey={customerType === 'WHOLESALE' ? 'wholesale' : 'retail'}
-                          onSelectPriceLevel={(levelKey, newPrice) => {
-                            addPlantToCart(plant, 1, levelKey);
-                          }}
-                          size="xs"
-                        />
+                        {/* Stacked Pricing Dropdown & Add Button */}
+                        <div className="flex flex-col items-end gap-1.5 shrink-0 justify-center">
+                          <PricingDropdown
+                            plant={plant}
+                            currentPrice={plant.prices?.[activePriceTierKey] ?? plant.price}
+                            selectedLevelKey={activePriceTierKey}
+                            onSelectPriceLevel={(levelKey, newPrice) => {
+                              setCatalogPriceLevels(prev => ({ ...prev, [plant.id]: levelKey }));
+                              addPlantToCart(plant, 1, levelKey);
+                            }}
+                            size="xs"
+                            align="right"
+                          />
 
-                        <button
-                          type="button"
-                          onClick={() => addPlantToCart(plant)}
-                          className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs sm:text-sm font-bold px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl transition-all flex items-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
-                        >
-                          <Plus className="w-4 h-4" />
-                          <span>{inCartCount > 0 ? `Add (${inCartCount})` : 'Add'}</span>
-                        </button>
+                          <button
+                            type="button"
+                            onClick={() => addPlantToCart(plant, 1, activePriceTierKey)}
+                            className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-bold py-1.5 px-3 rounded-lg transition-all flex items-center justify-center gap-1 cursor-pointer active:scale-95 shadow-2xs"
+                          >
+                            <Plus className="w-3.5 h-3.5" />
+                            <span>{inCartCount > 0 ? `Add (${inCartCount})` : 'Add'}</span>
+                          </button>
+                        </div>
                       </div>
                     </div>
                   );
@@ -3096,6 +3111,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         isOpen={verifyingPlant !== null}
         plant={verifyingPlant?.plant || null}
         initialQuantity={verifyingPlant?.initialQty}
+        initialPriceLevel={verifyingPlant?.initialPriceLevel}
         existingCartItem={verifyingPlant?.existingCartItem}
         customerType={customerType}
         onConfirm={(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes) => {

@@ -32,6 +32,7 @@ interface PlantVerificationModalProps {
   isOpen: boolean;
   plant: PlantItem | null;
   initialQuantity?: number;
+  initialPriceLevel?: PriceLevelKey;
   existingCartItem?: OrderCartItem | null;
   customerType?: 'RETAIL' | 'WHOLESALE';
   onConfirm: (
@@ -51,6 +52,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   isOpen,
   plant,
   initialQuantity = 1,
+  initialPriceLevel,
   existingCartItem,
   customerType = 'RETAIL',
   onConfirm,
@@ -66,6 +68,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
   // Determine initial pricing tier and price
   const defaultTier: PriceLevelKey = existingCartItem?.selectedPriceLevel 
+    || initialPriceLevel
     || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
   
   const tiers = plant ? getPlantPriceTiers(plant) : [];
@@ -151,7 +154,9 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       setQuantity(startingQty);
       setQuantityInput(startingQty.toString());
       
-      const tierKey = existingCartItem?.selectedPriceLevel || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
+      const tierKey = existingCartItem?.selectedPriceLevel 
+        || initialPriceLevel 
+        || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
       setSelectedPriceLevel(tierKey);
 
       const plantTiers = getPlantPriceTiers(plant);

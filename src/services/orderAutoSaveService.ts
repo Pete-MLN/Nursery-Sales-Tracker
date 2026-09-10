@@ -105,7 +105,7 @@ export function autoSaveDraft(draft: OrderDraft, immediateCloudSync: boolean = f
             date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
             createdAt: nowIso,
             items: draft.cartItems,
-            holdingLocation: draft.holdingLocation || 'Greenhouse B, Aisle 4, Bay 12',
+            holdingLocation: draft.holdingLocation || 'Left in Place (Current Row)',
             notes: draft.notes || '',
             remainingPickupDate: draft.remainingPickupDate,
             partialPickupNotes: draft.partialPickupNotes
@@ -338,7 +338,7 @@ export async function flushOfflineSyncQueue() {
           date: new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
           createdAt: draft.lastSavedAt || new Date().toISOString(),
           items: draft.cartItems,
-          holdingLocation: draft.holdingLocation || 'Greenhouse B, Aisle 4, Bay 12',
+          holdingLocation: draft.holdingLocation || 'Left in Place (Current Row)',
           notes: draft.notes || ''
         };
 

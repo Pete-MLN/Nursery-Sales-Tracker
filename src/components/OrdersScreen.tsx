@@ -527,6 +527,14 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                   )}
                 </div>
 
+                {/* Order Notes Preview */}
+                {order.notes && (
+                  <div className="bg-[#fffbeb] border border-[#fde68a] text-[#92400e] px-3 py-1.5 rounded-xl text-xs flex items-start gap-1.5">
+                    <span className="font-extrabold shrink-0">📝 Notes:</span>
+                    <span className="truncate italic">{order.notes}</span>
+                  </div>
+                )}
+
                 {/* Items Preview with Product Number & Size for Yard Loaders */}
                 {order.items && order.items.length > 0 && (
                   <div className="flex flex-wrap gap-1.5 pt-0.5">
@@ -616,7 +624,11 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
                         <span>GPS Map</span>
                         {(() => {
-                          const gpsCount = (order.items || []).filter(it => !!it.gpsLocation).length;
+                          const gpsCount = (order.items || []).reduce((acc, it) => {
+                            if (it.gpsLocations && it.gpsLocations.length > 0) return acc + it.gpsLocations.length;
+                            if (it.gpsLocation) return acc + 1;
+                            return acc;
+                          }, 0);
                           return gpsCount > 0 ? (
                             <span className="bg-[#012d1d] text-[#a0f4c8] text-[9px] font-black px-1.5 py-0.2 rounded-full">
                               {gpsCount}
@@ -663,11 +675,11 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {/* Complete & Archive Order Confirmation Modal */}
       {orderToComplete && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in"
           onClick={() => setOrderToComplete(null)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden"
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden mt-1 sm:mt-2 mb-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
@@ -728,11 +740,11 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {/* Delete / Cancel Order Confirmation Modal */}
       {orderToDelete && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in"
           onClick={() => setOrderToDelete(null)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden"
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden mt-1 sm:mt-2 mb-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">

@@ -11,6 +11,17 @@ export type ScreenType =
   | 'instructions'
   | 'login';
 
+export interface GPSLocationEntry {
+  id: string;
+  latitude: number;
+  longitude: number;
+  accuracy?: number; // Accuracy radius in meters
+  timestamp: string;
+  label?: string; // Optional user label, e.g. "Bed 4", "Greenhouse 2", "North Yard"
+  notes?: string; // Optional notes, e.g. "10 pots", "Back left corner"
+  quantity?: number; // Optional count at this specific spot
+}
+
 export interface PlantItem {
   id: string;
   name: string; // Common name or description
@@ -42,6 +53,7 @@ export interface PlantItem {
     accuracy?: number; // Accuracy radius in meters
     timestamp: string;
   };
+  gpsLocations?: GPSLocationEntry[];
 }
 
 export interface OrderCartItem {
@@ -56,6 +68,8 @@ export interface OrderCartItem {
     accuracy?: number; // Accuracy radius in meters
     timestamp: string;
   };
+  gpsLocations?: GPSLocationEntry[];
+  itemNotes?: string;
 }
 
 export interface Order {

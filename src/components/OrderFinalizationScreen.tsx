@@ -99,7 +99,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       scheduledTime: '10/27/2023',
       status: 'Ready for Pickup',
       date: 'Oct 24, 2023',
-      holdingLocation: 'Greenhouse B, Aisle 4, Bay 12',
+      holdingLocation: 'Left in Place (Current Row)',
       items: []
     };
   });
@@ -120,7 +120,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
         setScheduledTime(order.type === 'Take Now' ? 'Immediate (Take Now)' : 'Morning (8:00 AM - 12:00 PM)');
       }
       setOrderStatus(order.status || 'Pending');
-      setHoldingLocation(order.holdingLocation || 'Holding Area B - North Greenhouse');
+      setHoldingLocation(order.holdingLocation || 'Left in Place (Current Row)');
       setOrderNotes(order.notes || '');
       setItems(order.items ? order.items.map(item => ({ ...item })) : []);
       setRemainingPickupDate(order.remainingPickupDate || '');
@@ -142,7 +142,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     return currentOrder.type === 'Take Now' ? 'Immediate (Take Now)' : 'Morning (8:00 AM - 12:00 PM)';
   });
   const [orderStatus, setOrderStatus] = useState<'Pending' | 'Ready for Pickup' | 'Completed' | 'In Transit' | 'Cancelled' | 'Partial Pickup'>(currentOrder.status || 'Pending');
-  const [holdingLocation, setHoldingLocation] = useState<string>(currentOrder.holdingLocation || 'Holding Area B - North Greenhouse');
+  const [holdingLocation, setHoldingLocation] = useState<string>(currentOrder.holdingLocation || 'Left in Place (Current Row)');
   const [orderNotes, setOrderNotes] = useState<string>(currentOrder.notes || '');
   const [items, setItems] = useState<OrderCartItem[]>(currentOrder.items || []);
   const [mapModalItem, setMapModalItem] = useState<OrderCartItem | null>(null);
@@ -1699,8 +1699,8 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
                         {/* High-Visibility Loading Identifiers: Product # and Size */}
                         <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#012d1d] shadow-2xs">
-                            <Tag className="w-3 h-3 text-[#a0f4c8]" />
+                          <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[22px] font-black px-2 py-0.5 rounded-md flex items-center gap-1.5 border border-[#012d1d] shadow-2xs leading-tight">
+                            <Tag className="w-4 h-4 text-[#a0f4c8]" />
                             #{item.plant.itemNo || item.plant.barcode || 'N/A'}
                           </span>
                           <span className="bg-[#461702] text-amber-100 text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#461702] shadow-2xs">
@@ -1711,7 +1711,50 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
                         {/* Plant GPS Location Controls & Badges */}
                         <div className="flex items-center gap-2 mt-2 flex-wrap">
-                          {item.gpsLocation ? (
+                          {item.gpsLocations && item.gpsLocations.length > 0 ? (
+                            <div className="flex flex-col gap-1.5 w-full bg-[#e8f5e9] p-2.5 rounded-xl border border-[#a0f4c8] shadow-2xs">
+                              <div className="flex items-center justify-between gap-2 flex-wrap">
+                                <span className="text-xs font-black text-[#0e6c4a] flex items-center gap-1">
+                                  <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                                  <span>{item.gpsLocations.length} Yard Locations Logged:</span>
+                                </span>
+                                <div className="flex items-center gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={() => handleLogGPS(item.plant.id)}
+                                    disabled={isLoggingGpsId === item.plant.id}
+                                    className="text-[10px] font-black uppercase text-[#0e6c4a] hover:text-[#012d1d] hover:underline cursor-pointer flex items-center gap-0.5"
+                                    title="Re-tag current GPS location in nursery"
+                                  >
+                                    {isLoggingGpsId === item.plant.id ? (
+                                      <RefreshCw className="w-2.5 h-2.5 animate-spin" />
+                                    ) : (
+                                      <RefreshCw className="w-2.5 h-2.5" />
+                                    )}
+                                    <span>{isLoggingGpsId === item.plant.id ? 'Saving...' : 'Update GPS'}</span>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => setMapModalItem(item)}
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg bg-white hover:bg-[#f3f4f0] text-[#012d1d] border border-[#a0f4c8] text-[11px] font-bold transition-all cursor-pointer shadow-2xs"
+                                    title="View plant spots on Yard Map"
+                                  >
+                                    <MapIcon className="w-3 h-3 text-[#0e6c4a]" />
+                                    <span>View Map</span>
+                                  </button>
+                                </div>
+                              </div>
+                              <div className="flex flex-wrap gap-1.5">
+                                {item.gpsLocations.map((loc, idx) => (
+                                  <span key={loc.id || idx} className="text-[11px] bg-white/95 border border-[#a0f4c8] px-2 py-0.5 rounded-md font-medium text-[#002113] flex items-center gap-1 shadow-2xs">
+                                    <span className="font-bold text-[#0e6c4a]">{loc.label || `Spot #${idx + 1}`}:</span>
+                                    <span className="font-mono text-[10px]">{loc.latitude.toFixed(5)}°, {Math.abs(loc.longitude).toFixed(5)}°W</span>
+                                    {loc.notes && <span className="italic text-[#717973] text-[10px]">({loc.notes})</span>}
+                                  </span>
+                                ))}
+                              </div>
+                            </div>
+                          ) : item.gpsLocation ? (
                             <div className="flex items-center gap-1.5 bg-[#e8f5e9] text-[#012d1d] px-2.5 py-1 rounded-lg border border-[#a0f4c8] text-xs font-bold shadow-2xs">
                               <div className="w-5 h-5 rounded-full bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shrink-0">
                                 <MapPin className="w-3 h-3 text-[#a0f4c8]" />
@@ -1752,16 +1795,26 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           )}
 
                           {/* View on Map Button */}
-                          <button
-                            type="button"
-                            onClick={() => setMapModalItem(item)}
-                            className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] text-xs font-bold transition-all cursor-pointer shadow-2xs"
-                            title="View plant location on Yard Satellite Map"
-                          >
-                            <MapIcon className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                            <span>View Map</span>
-                          </button>
+                          {(!item.gpsLocations || item.gpsLocations.length === 0) && (
+                            <button
+                              type="button"
+                              onClick={() => setMapModalItem(item)}
+                              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border border-[#c1c8c2] text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                              title="View plant location on Yard Satellite Map"
+                            >
+                              <MapIcon className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                              <span>View Map</span>
+                            </button>
+                          )}
                         </div>
+
+                        {/* Plant Item Note if present */}
+                        {item.itemNotes && (
+                          <div className="bg-[#fffbeb] border border-[#fde68a] text-[#92400e] px-2.5 py-1.5 rounded-lg text-xs flex items-start gap-1.5 mt-1.5">
+                            <span className="font-extrabold shrink-0">📝 Note:</span>
+                            <span className="italic">{item.itemNotes}</span>
+                          </div>
+                        )}
 
                         {item.plant.botanicalName && (
                           <span className="text-xs italic text-[#414844] block truncate mt-1.5">
@@ -1824,7 +1877,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                             min="1"
                             value={item.quantity}
                             onChange={(e) => handleSetQuantity(item.plant.id, parseInt(e.target.value) || 1)}
-                            className="w-10 text-center font-extrabold text-xs sm:text-sm text-[#012d1d] bg-transparent focus:outline-none"
+                            className="w-12 text-center font-extrabold text-[22px] sm:text-[24px] text-[#012d1d] bg-transparent focus:outline-none"
                           />
 
                           <button
@@ -3054,11 +3107,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
       {/* Cancel / Delete Order Confirmation Modal */}
       {isDeleteModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in"
           onClick={() => setIsDeleteModalOpen(false)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden"
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden mt-1 sm:mt-2 mb-auto"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">

@@ -322,3 +322,39 @@ export function generateGoogleMapsPinUrl(lat: number, lng: number, plantLabel?: 
 export function generateGoogleMapsWalkingUrl(destLat: number, destLng: number): string {
   return `https://www.google.com/maps/dir/?api=1&destination=${destLat.toFixed(6)},${destLng.toFixed(6)}&travelmode=walking`;
 }
+
+/**
+ * Calculates straight-line ground distance in meters between two lat/lng coordinates
+ */
+export function calculateDistanceMeters(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  const R = 6371e3; // Earth radius in meters
+  const p1 = (lat1 * Math.PI) / 180;
+  const p2 = (lat2 * Math.PI) / 180;
+  const dp = ((lat2 - lat1) * Math.PI) / 180;
+  const dl = ((lng2 - lng1) * Math.PI) / 180;
+
+  const a = Math.sin(dp / 2) * Math.sin(dp / 2) +
+            Math.cos(p1) * Math.cos(p2) *
+            Math.sin(dl / 2) * Math.sin(dl / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+
+  return R * c;
+}
+
+/**
+ * Calculates distance in feet between two lat/lng coordinates
+ */
+export function calculateDistanceFeet(lat1: number, lng1: number, lat2: number, lng2: number): number {
+  return metersToFeet(calculateDistanceMeters(lat1, lng1, lat2, lng2));
+}
+
+/**
+ * Formats distance nicely (e.g. "45 ft" or "0.2 mi")
+ */
+export function formatDistanceFeet(feet: number): string {
+  if (feet > 1000) {
+    const miles = (feet / 5280).toFixed(1);
+    return `${miles} mi`;
+  }
+  return `${feet} ft`;
+}

@@ -1,6 +1,9 @@
 import { HoldingArea } from '../types';
 
 export const OFFICIAL_YARD_LOCATIONS: HoldingArea[] = [
+  // Special Primary Option (Default)
+  { id: 'left_in_place', title: 'Left in Place', subtitle: 'Keep in current physical location (no relocation needed)', category: 'Special', icon: 'pin_drop' },
+
   // Retail (36 locations)
   { id: 'loc-h1-a', title: 'H1-a', subtitle: 'Front Retail', category: 'Retail', icon: 'store' },
   { id: 'loc-h1-b', title: 'H1-b', subtitle: 'Front Retail', category: 'Retail', icon: 'store' },
@@ -204,8 +207,5 @@ export const OFFICIAL_YARD_LOCATIONS: HoldingArea[] = [
   { id: 'loc-m14-holding', title: 'M14-Holding Area', subtitle: 'On the hill before the old potting house', category: 'Loading/Staging', icon: 'local_shipping' },
   { id: 'loc-loading-1', title: 'Loading Area 1', subtitle: 'In retail area by the bulk stone', category: 'Loading/Staging', icon: 'local_shipping' },
   { id: 'loc-loading-2', title: 'Loading Area 2', subtitle: 'In front of the Red Barn', category: 'Loading/Staging', icon: 'local_shipping' },
-  { id: 'loc-loading-3', title: 'Loading Area 3', subtitle: 'M14-Holding area (Open mat by old potting shed)', category: 'Loading/Staging', icon: 'local_shipping' },
-
-  // Special System Option
-  { id: 'left_in_place', title: 'Left in Place', subtitle: 'Keep in current physical location', category: 'Special', icon: 'pin_drop' }
+  { id: 'loc-loading-3', title: 'Loading Area 3', subtitle: 'M14-Holding area (Open mat by old potting shed)', category: 'Loading/Staging', icon: 'local_shipping' }
 ];

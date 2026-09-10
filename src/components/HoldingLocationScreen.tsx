@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { ScreenType, Order, HoldingArea } from '../types';
 import { HOLDING_AREAS } from '../data/mockData';
 import { PlantMapModal } from './PlantMapModal';
@@ -74,39 +74,82 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
     return HOLDING_AREAS;
   });
 
-  const areas = propHoldingAreas && propHoldingAreas.length > 0 ? propHoldingAreas : localAreas;
+  const rawAreas = propHoldingAreas && propHoldingAreas.length > 0 ? propHoldingAreas : localAreas;
 
+  // Always ensure 'Left in Place' is the first option in the list
+  const areas = useMemo(() => {
+    const leftItem = rawAreas.find(a => a.id === 'left_in_place') || { 
+      id: 'left_in_place', 
+      title: 'Left in Place', 
+      subtitle: 'Keep in current physical location (no relocation needed)', 
+      category: 'Special', 
+      icon: 'pin_drop' 
+    };
+    const rest = rawAreas.filter(a => a.id !== 'left_in_place');
+    return [leftItem, ...rest];
+  }, [rawAreas]);
+
+  // Always default to 'left_in_place' unless activeOrder specifies an existing non-default location
   const [selectedAreaId, setSelectedAreaId] = useState<string>(() => {
-    if (areas.length > 0) return areas[0].id;
-    return 'loc-h1-a';
+    if (activeOrder?.holdingLocation) {
+      if (activeOrder.holdingLocation.toLowerCase().includes('left in place')) {
+        return 'left_in_place';
+      }
+      const match = rawAreas.find(a => activeOrder.holdingLocation?.includes(a.title));
+      if (match) return match.id;
+    }
+    return 'left_in_place';
   });
   const [customRowInput, setCustomRowInput] = useState<string>('Row 12, Sec B');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [selectedCategory, setSelectedCategory] = useState<string>('All');
+  const [selectedCategory, setSelectedCategory] = useState<string>('Loading/Staging');
 
   // Edit / Add Modal state
   const [editingArea, setEditingArea] = useState<HoldingArea | null>(null);
   const [isCreatingNew, setIsCreatingNew] = useState<boolean>(false);
   const [formTitle, setFormTitle] = useState<string>('');
   const [formSubtitle, setFormSubtitle] = useState<string>('');
-  const [formCategory, setFormCategory] = useState<string>('Retail');
+  const [formCategory, setFormCategory] = useState<string>('Loading/Staging');
   const [formIcon, setFormIcon] = useState<string>('warehouse');
   const [formError, setFormError] = useState<string>('');
   const [successToast, setSuccessToast] = useState<string>('');
   const [isPlantMapOpen, setIsPlantMapOpen] = useState<boolean>(false);
 
-  const CATEGORIES = ['All', 'Retail', 'B&B', 'Barn Area', 'Greenhouses', 'Loading/Staging'];
+  const CATEGORIES = ['Loading/Staging', 'All', 'Special', 'Retail', 'B&B', 'Barn Area', 'Greenhouses'];
 
-  const filteredAreas = areas.filter(area => {
-    const matchesCategory = selectedCategory === 'All' || area.category === selectedCategory;
-    if (!matchesCategory) return false;
-    if (!searchQuery.trim()) return true;
-    const q = searchQuery.toLowerCase();
-    const titleMatch = (area.title || '').toLowerCase().includes(q);
-    const subtitleMatch = (area.subtitle || '').toLowerCase().includes(q);
-    const catMatch = (area.category || '').toLowerCase().includes(q);
-    return titleMatch || subtitleMatch || catMatch;
-  });
+  const filteredAreas = useMemo(() => {
+    // Left in place is always preserved as the primary first option
+    const leftItem = areas.find(a => a.id === 'left_in_place');
+
+    const otherAreas = areas.filter(area => {
+      if (area.id === 'left_in_place') return false; // Handled explicitly
+      const matchesCategory = selectedCategory === 'All' || area.category === selectedCategory;
+      if (!matchesCategory) return false;
+      if (!searchQuery.trim()) return true;
+      const q = searchQuery.toLowerCase();
+      const titleMatch = (area.title || '').toLowerCase().includes(q);
+      const subtitleMatch = (area.subtitle || '').toLowerCase().includes(q);
+      const catMatch = (area.category || '').toLowerCase().includes(q);
+      return titleMatch || subtitleMatch || catMatch;
+    });
+
+    // Check if search query matches Left in Place when user searches
+    let showLeftInPlace = true;
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      const matchesSearch = leftItem && (
+        leftItem.title.toLowerCase().includes(q) || 
+        leftItem.subtitle.toLowerCase().includes(q) ||
+        'left in place'.includes(q)
+      );
+      showLeftInPlace = Boolean(matchesSearch);
+    }
+
+    if (showLeftInPlace && leftItem) {
+      return [leftItem, ...otherAreas];
+    }
+    return otherAreas;
+  }, [areas, selectedCategory, searchQuery]);
 
   const showToast = (msg: string) => {
     setSuccessToast(msg);
@@ -242,7 +285,8 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
         setLocalAreas(HOLDING_AREAS);
         localStorage.setItem('nursery_holding_areas', JSON.stringify(HOLDING_AREAS));
       }
-      setSelectedAreaId('area_b');
+      setSelectedAreaId('left_in_place');
+      setSelectedCategory('Loading/Staging');
       showToast('Reset locations to default settings');
     }
   };
@@ -251,7 +295,7 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
     let locationText = '';
     const selected = areas.find(a => a.id === selectedAreaId);
     if (selectedAreaId === 'left_in_place') {
-      locationText = customRowInput ? `Left in Place (${customRowInput})` : 'Left in Place (Current Row)';
+      locationText = customRowInput && customRowInput.trim() ? `Left in Place (${customRowInput.trim()})` : 'Left in Place (Current Row)';
     } else {
       locationText = `${selected?.title || 'Holding Area'} - ${selected?.subtitle || ''}`;
     }
@@ -281,23 +325,23 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
           </div>
 
           {/* Quick Header Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2.5">
             <button
               onClick={handleOpenCreate}
               type="button"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-[#012d1d] text-[#a0f4c8] hover:bg-[#0e6c4a] text-xs font-bold transition-colors cursor-pointer shadow-2xs"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#012d1d] text-[#a0f4c8] hover:bg-[#0e6c4a] text-[22px] font-bold transition-colors cursor-pointer shadow-2xs"
               title="Add a new custom holding location"
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="w-5 h-5 shrink-0" />
               <span>Add Zone</span>
             </button>
             <button
               onClick={handleReset}
               type="button"
-              className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-[#e7e9e5] text-[#414844] hover:text-[#012d1d] hover:bg-[#dbe0dc] text-xs font-semibold transition-colors cursor-pointer"
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#e7e9e5] text-[#414844] hover:text-[#012d1d] hover:bg-[#dbe0dc] text-[22px] font-semibold transition-colors cursor-pointer"
               title="Reset location names and descriptions to defaults"
             >
-              <RotateCcw className="w-3 h-3" />
+              <RotateCcw className="w-5 h-5 shrink-0" />
               <span className="hidden sm:inline">Reset Defaults</span>
             </button>
           </div>
@@ -311,25 +355,38 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
         </p>
 
         {activeOrder && (
-          <div className="mt-3 p-3 bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl flex justify-between items-center text-xs sm:text-sm gap-2 flex-wrap">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[#012d1d]">
-                Order: <span className="underline">{activeOrder.id}</span>
-              </span>
-              <span className="font-semibold text-[#414844]">{activeOrder.customerName}</span>
+          <div className="mt-3 p-3.5 sm:p-4 bg-[#f3f4f0] border border-[#c1c8c2] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3.5 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
+              <div className="flex items-center gap-2">
+                <span className="font-bold text-sm sm:text-base text-[#012d1d]">
+                  Order: <span className="underline">{activeOrder.id}</span>
+                </span>
+                <span className="font-semibold text-xs sm:text-sm text-[#414844]">{activeOrder.customerName}</span>
+              </div>
+              
+              {activeOrder.items && activeOrder.items.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsPlantMapOpen(true)}
+                  className="px-3 py-1.5 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs w-fit"
+                  title="View Google Map with pins for plant GPS locations"
+                >
+                  <MapPin className="w-3.5 h-3.5" />
+                  <span>View Plant GPS Map</span>
+                </button>
+              )}
             </div>
-            
-            {activeOrder.items && activeOrder.items.length > 0 && (
-              <button
-                type="button"
-                onClick={() => setIsPlantMapOpen(true)}
-                className="px-3 py-1 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs"
-                title="View Google Map with pins for plant GPS locations"
-              >
-                <MapPin className="w-3.5 h-3.5" />
-                <span>View Plant GPS Map</span>
-              </button>
-            )}
+
+            {/* Top Copy of Confirm & Continue Button in the same size */}
+            <button
+              id="confirm-location-btn-top"
+              type="button"
+              onClick={handleConfirm}
+              className="w-full sm:w-auto min-w-[260px] bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-[#a0f4c8] hover:text-white py-4 px-7 rounded-xl font-extrabold text-sm uppercase tracking-wider shadow-lg transition-all flex justify-center items-center gap-2.5 cursor-pointer border border-[#a0f4c8]/30 shrink-0"
+            >
+              <CheckCircle className="w-5 h-5 text-[#a0f4c8]" />
+              <span>Confirm & Continue to Finalize</span>
+            </button>
           </div>
         )}
 
@@ -386,6 +443,8 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
             const isCatActive = selectedCategory === cat;
             const count = cat === 'All' 
               ? areas.length 
+              : cat === 'Loading/Staging'
+              ? areas.filter(a => a.category === cat).length + (areas.some(a => a.id === 'left_in_place') ? 1 : 0)
               : areas.filter(a => a.category === cat).length;
 
             return (
@@ -484,7 +543,14 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
                     >
                       {area.title}
                     </span>
-                    {area.category && (
+                    {area.id === 'left_in_place' && (
+                      <span className={`text-[10px] uppercase font-black px-2 py-0.5 rounded-full shadow-2xs ${
+                        isSelected ? 'bg-[#a0f4c8] text-[#002113]' : 'bg-[#012d1d] text-[#a0f4c8]'
+                      }`}>
+                        Default
+                      </span>
+                    )}
+                    {area.category && area.id !== 'left_in_place' && (
                       <span className={`text-[10px] uppercase font-extrabold px-1.5 py-0.5 rounded ${
                         isSelected ? 'bg-[#a0f4c8] text-[#002113]' : 'bg-[#e2e3df] text-[#414844]'
                       }`}>

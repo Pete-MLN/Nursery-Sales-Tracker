@@ -84,17 +84,30 @@ export default function App() {
   const [uploads, setUploads] = useState<RecentUpload[]>(INITIAL_UPLOADS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
+
+  const ensureLeftInPlaceFirst = (list: HoldingArea[]): HoldingArea[] => {
+    const leftItem = list.find(a => a.id === 'left_in_place') || { 
+      id: 'left_in_place', 
+      title: 'Left in Place', 
+      subtitle: 'Keep in current physical location (no relocation needed)', 
+      category: 'Special', 
+      icon: 'pin_drop' 
+    };
+    const rest = list.filter(a => a.id !== 'left_in_place');
+    return [leftItem, ...rest];
+  };
+
   const [holdingAreas, setHoldingAreas] = useState<HoldingArea[]>(() => {
     const saved = localStorage.getItem('nursery_holding_areas');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 100) return parsed;
+        if (Array.isArray(parsed) && parsed.length >= 100) return ensureLeftInPlaceFirst(parsed);
       } catch (e) {
         // Fallback to default
       }
     }
-    return HOLDING_AREAS;
+    return ensureLeftInPlaceFirst(HOLDING_AREAS);
   });
   const [auditSessions, setAuditSessions] = useState<InventoryAuditSession[]>([]);
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
@@ -199,13 +212,15 @@ export default function App() {
     });
     const unsubHoldingLocations = subscribeToHoldingLocations((data) => {
       if (data && data.length >= 100) {
-        setHoldingAreas(data);
-        localStorage.setItem('nursery_holding_areas', JSON.stringify(data));
+        const ordered = ensureLeftInPlaceFirst(data);
+        setHoldingAreas(ordered);
+        localStorage.setItem('nursery_holding_areas', JSON.stringify(ordered));
       } else {
         // Upgrade legacy/empty list to official 195 locations
-        setHoldingAreas(HOLDING_AREAS);
-        localStorage.setItem('nursery_holding_areas', JSON.stringify(HOLDING_AREAS));
-        batchSaveHoldingLocationsToFirestore(HOLDING_AREAS);
+        const ordered = ensureLeftInPlaceFirst(HOLDING_AREAS);
+        setHoldingAreas(ordered);
+        localStorage.setItem('nursery_holding_areas', JSON.stringify(ordered));
+        batchSaveHoldingLocationsToFirestore(ordered);
       }
     });
     const unsubAudits = subscribeToAuditSessions((data) => {
@@ -342,7 +357,7 @@ export default function App() {
       date: formattedCreatedDate,
       createdAt: now.toISOString(),
       items: isDirectTaken ? cartItems.map(i => ({ ...i, pickedUpQuantity: i.quantity })) : (overrides?.items || cartItems),
-      holdingLocation: overrides?.holdingLocation || 'Greenhouse B, Aisle 4, Bay 12',
+      holdingLocation: overrides?.holdingLocation || 'Left in Place (Current Row)',
       ...overrides
     };
 
@@ -441,7 +456,7 @@ export default function App() {
         date: existing ? existing.date : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         createdAt: existing ? existing.createdAt : new Date().toISOString(),
         items: draft.cartItems && draft.cartItems.length > 0 ? draft.cartItems : (existing ? existing.items : []),
-        holdingLocation: draft.holdingLocation || (existing ? existing.holdingLocation : 'Greenhouse B, Aisle 4, Bay 12'),
+        holdingLocation: draft.holdingLocation || (existing ? existing.holdingLocation : 'Left in Place (Current Row)'),
         notes: draft.notes !== undefined ? draft.notes : (existing ? existing.notes : ''),
         remainingPickupDate: draft.remainingPickupDate || (existing ? existing.remainingPickupDate : undefined),
         partialPickupNotes: draft.partialPickupNotes || (existing ? existing.partialPickupNotes : undefined),
@@ -476,7 +491,7 @@ export default function App() {
         date: formattedCreatedDate,
         createdAt: now.toISOString(),
         items: draft.cartItems || [],
-        holdingLocation: draft.holdingLocation || 'Greenhouse B, Aisle 4, Bay 12',
+        holdingLocation: draft.holdingLocation || 'Left in Place (Current Row)',
         notes: draft.notes || ''
       };
 
@@ -543,6 +558,7 @@ export default function App() {
           ...newPlant,
           // If the uploaded file didn't supply new GPS coordinates, preserve existing logged GPS
           gpsLocation: newPlant.gpsLocation || existingMatch.gpsLocation || undefined,
+          gpsLocations: newPlant.gpsLocations || existingMatch.gpsLocations || undefined,
           // Preserve holding location if existing has one and uploaded is empty
           holdingLocation: newPlant.holdingLocation || existingMatch.holdingLocation || undefined
         };

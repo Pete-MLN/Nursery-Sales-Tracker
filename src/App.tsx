@@ -560,7 +560,10 @@ export default function App() {
           gpsLocation: newPlant.gpsLocation || existingMatch.gpsLocation || undefined,
           gpsLocations: newPlant.gpsLocations || existingMatch.gpsLocations || undefined,
           // Preserve holding location if existing has one and uploaded is empty
-          holdingLocation: newPlant.holdingLocation || existingMatch.holdingLocation || undefined
+          holdingLocation: newPlant.holdingLocation || existingMatch.holdingLocation || undefined,
+          // Preserve descr / botanicalName
+          descr: newPlant.descr || existingMatch.descr || undefined,
+          botanicalName: newPlant.botanicalName || existingMatch.botanicalName || undefined
         };
       }
       return newPlant;

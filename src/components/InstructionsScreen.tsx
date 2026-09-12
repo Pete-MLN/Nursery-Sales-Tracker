@@ -24,34 +24,53 @@ import {
   Copy, 
   Check, 
   ExternalLink,
-  Layers,
-  FileSpreadsheet,
-  Zap,
-  ShoppingBag,
-  HelpCircle,
-  Camera,
-  RefreshCw,
-  Sliders,
-  CheckCircle,
-  Building,
-  MessageSquare,
-  Navigation,
-  Compass,
-  Archive,
-  Eye,
-  Globe
+  Layers, 
+  FileSpreadsheet, 
+  Zap, 
+  ShoppingBag, 
+  HelpCircle, 
+  Camera, 
+  RefreshCw, 
+  Sliders, 
+  CheckCircle, 
+  Building, 
+  MessageSquare, 
+  Navigation, 
+  Compass, 
+  Archive, 
+  Eye, 
+  Globe,
+  Warehouse,
+  Package,
+  Tag,
+  Leaf,
+  ClipboardCheck,
+  ArrowUpRight,
+  Sun,
+  Store,
+  Sprout
 } from 'lucide-react';
 
 interface InstructionsScreenProps {
   onNavigate: (screen: ScreenType) => void;
 }
 
-type GuideTopic = 'all' | 'new_order' | 'gps_mapping' | 'editing_order' | 'completing_order' | 'partial_pickup' | 'scanning' | 'data_sync';
+type GuideTopic = 
+  | 'all' 
+  | 'new_order' 
+  | 'catalog_pricing'
+  | 'gps_mapping' 
+  | 'holding_bays' 
+  | 'editing_order' 
+  | 'partial_pickup' 
+  | 'inventory_audit' 
+  | 'completing_order' 
+  | 'data_sync';
 
 export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNavigate }) => {
   const [activeTopic, setActiveTopic] = useState<GuideTopic>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
-  const [expandedFaq, setExpandedFaq] = useState<string | null>('faq_gps_mapping');
+  const [expandedFaq, setExpandedFaq] = useState<string | null>('faq_catalog_pricing');
   const [copiedSection, setCopiedSection] = useState<string | null>(null);
 
   const toggleFaq = (id: string) => {
@@ -65,14 +84,16 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
   };
 
   const topics: { id: GuideTopic; label: string; icon: React.ReactNode; badge?: string }[] = [
-    { id: 'all', label: 'All Instructions', icon: <BookOpen className="w-4 h-4" /> },
+    { id: 'all', label: 'All Topics', icon: <BookOpen className="w-4 h-4" /> },
     { id: 'new_order', label: '1. New Order & Customers', icon: <UserPlus className="w-4 h-4" />, badge: 'Essential' },
-    { id: 'gps_mapping', label: '2. GPS Yard Mapping & Pins', icon: <Navigation className="w-4 h-4" />, badge: 'Updated' },
-    { id: 'editing_order', label: '3. Edit & Modify Orders', icon: <Edit3 className="w-4 h-4" /> },
-    { id: 'completing_order', label: '4. Complete & Archive', icon: <CheckCircle2 className="w-4 h-4" /> },
-    { id: 'partial_pickup', label: '5. Partial Pickup & Staff Email', icon: <Mail className="w-4 h-4" /> },
-    { id: 'scanning', label: '6. Barcode & Scanning', icon: <Barcode className="w-4 h-4" /> },
-    { id: 'data_sync', label: '7. Customers & Cloud Sync', icon: <FileSpreadsheet className="w-4 h-4" /> },
+    { id: 'catalog_pricing', label: '2. Catalog & 4-Tier Pricing', icon: <Tag className="w-4 h-4" />, badge: 'Updated' },
+    { id: 'gps_mapping', label: '3. GPS Yard Mapping & Pins', icon: <Navigation className="w-4 h-4" />, badge: 'Sub-Meter' },
+    { id: 'holding_bays', label: '4. Staging Bays & Greenhouses', icon: <Warehouse className="w-4 h-4" /> },
+    { id: 'editing_order', label: '5. Edit & Modify Orders', icon: <Edit3 className="w-4 h-4" /> },
+    { id: 'partial_pickup', label: '6. Partial Pickup & Staff Email', icon: <Mail className="w-4 h-4" /> },
+    { id: 'inventory_audit', label: '7. Stock Audits & Counts', icon: <ClipboardCheck className="w-4 h-4" />, badge: 'Audit Tool' },
+    { id: 'completing_order', label: '8. Complete & Archive', icon: <CheckCircle2 className="w-4 h-4" /> },
+    { id: 'data_sync', label: '9. Customers & POS Sync', icon: <FileSpreadsheet className="w-4 h-4" /> },
   ];
 
   const matchesSearch = (text: string) => {
@@ -81,9 +102,9 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
   };
 
   return (
-    <div className="flex-1 px-4 py-6 w-full max-w-4xl mx-auto pb-44 animate-fade-in flex flex-col gap-6 text-[#1a1c1a]">
+    <div className="flex-1 px-4 py-6 w-full max-w-5xl mx-auto pb-44 animate-fade-in flex flex-col gap-6 text-[#1a1c1a]">
       {/* Header Banner */}
-      <div className="bg-gradient-to-br from-[#012d1d] via-[#08422a] to-[#0e6c4a] text-white p-6 rounded-3xl shadow-md border border-[#19724f]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
+      <div className="bg-gradient-to-br from-[#012d1d] via-[#08422a] to-[#0e6c4a] text-white p-6 sm:p-7 rounded-3xl shadow-md border border-[#19724f]/30 flex flex-col sm:flex-row sm:items-center justify-between gap-5">
         <div className="flex items-start gap-4">
           <div className="w-12 h-12 rounded-2xl bg-[#a0f4c8]/20 text-[#a0f4c8] flex items-center justify-center shrink-0 border border-[#a0f4c8]/30 shadow-inner">
             <BookOpen className="w-6 h-6" />
@@ -98,8 +119,8 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
             <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight mt-1 text-white">
               Nursery Staff User Guide
             </h1>
-            <p className="text-xs sm:text-sm text-white/80 mt-1 max-w-xl">
-              Complete step-by-step instructions for entering new customer orders, creating unlisted accounts, scanning plants, modifying loads, managing partial pickups, and emailing hold tickets.
+            <p className="text-xs sm:text-sm text-white/80 mt-1 max-w-2xl leading-relaxed">
+              Complete reference manual for creating customer orders, utilizing the enhanced plant catalog search, applying 4-tier POS pricing, tagging sub-meter GPS yard coordinates, managing partial pickups, and running physical inventory audits.
             </p>
           </div>
         </div>
@@ -123,7 +144,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
             type="text"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search instructions (e.g., 'new customer', 'partial pickup', 'email staff', 'holding area')..."
+            placeholder="Search guide (e.g. 'catalog search', '4-tier price', 'gps pin', 'partial pickup', 'stock audit')..."
             className="w-full bg-white border border-[#c1c8c2] rounded-2xl pl-10 pr-10 py-3 text-sm font-semibold text-[#1a1c1a] focus:outline-none focus:border-[#012d1d] focus:ring-1 focus:ring-[#012d1d] shadow-2xs placeholder:text-xs placeholder:font-normal"
           />
           {searchQuery && (
@@ -166,7 +187,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
       </div>
 
       {/* Quick Jump Action Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2.5">
         <button
           onClick={() => onNavigate('scan')}
           className="bg-white p-3 rounded-2xl border border-[#c1c8c2] hover:border-[#012d1d] text-left flex flex-col gap-1 transition-all group shadow-2xs cursor-pointer"
@@ -175,18 +196,29 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
             <Plus className="w-4 h-4" />
           </div>
           <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">1. New Order</span>
-          <span className="text-[11px] text-[#717973]">Scan & add plants</span>
+          <span className="text-[10px] text-[#717973]">Scan & add plants</span>
+        </button>
+
+        <button
+          onClick={() => onNavigate('scan')}
+          className="bg-white p-3 rounded-2xl border border-[#c1c8c2] hover:border-[#012d1d] text-left flex flex-col gap-1 transition-all group shadow-2xs cursor-pointer"
+        >
+          <div className="w-7 h-7 rounded-lg bg-[#461702] text-amber-100 flex items-center justify-center text-xs font-bold">
+            <Tag className="w-4 h-4" />
+          </div>
+          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">2. Plant Catalog</span>
+          <span className="text-[10px] text-[#717973]">Search & 4-tier POS</span>
         </button>
 
         <button
           onClick={() => onNavigate('orders')}
           className="bg-white p-3 rounded-2xl border border-[#c1c8c2] hover:border-[#012d1d] text-left flex flex-col gap-1 transition-all group shadow-2xs cursor-pointer"
         >
-          <div className="w-7 h-7 rounded-lg bg-[#a0f4c8] text-[#002113] flex items-center justify-center text-xs font-bold">
-            <ShoppingBag className="w-4 h-4" />
+          <div className="w-7 h-7 rounded-lg bg-[#004d40] text-[#a0f4c8] flex items-center justify-center text-xs font-bold">
+            <Navigation className="w-4 h-4" />
           </div>
-          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">2. View Orders & GPS</span>
-          <span className="text-[11px] text-[#717973]">Manage & map loads</span>
+          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">3. Orders & GPS</span>
+          <span className="text-[10px] text-[#717973]">Satellite map pins</span>
         </button>
 
         <button
@@ -194,10 +226,21 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
           className="bg-white p-3 rounded-2xl border border-[#c1c8c2] hover:border-[#012d1d] text-left flex flex-col gap-1 transition-all group shadow-2xs cursor-pointer"
         >
           <div className="w-7 h-7 rounded-lg bg-[#f3f4f0] text-[#012d1d] flex items-center justify-center text-xs font-bold">
-            <MapPin className="w-4 h-4" />
+            <Warehouse className="w-4 h-4" />
           </div>
-          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">3. Staging Bays</span>
-          <span className="text-[11px] text-[#717973]">Greenhouses & shade</span>
+          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">4. Staging Bays</span>
+          <span className="text-[10px] text-[#717973]">Greenhouse zones</span>
+        </button>
+
+        <button
+          onClick={() => onNavigate('inventory_audit')}
+          className="bg-white p-3 rounded-2xl border border-[#c1c8c2] hover:border-[#012d1d] text-left flex flex-col gap-1 transition-all group shadow-2xs cursor-pointer"
+        >
+          <div className="w-7 h-7 rounded-lg bg-[#0e6c4a] text-white flex items-center justify-center text-xs font-bold">
+            <ClipboardCheck className="w-4 h-4" />
+          </div>
+          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">5. Stock Audits</span>
+          <span className="text-[10px] text-[#717973]">Cycle count tools</span>
         </button>
 
         <button
@@ -207,15 +250,15 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
           <div className="w-7 h-7 rounded-lg bg-[#f3f4f0] text-[#012d1d] flex items-center justify-center text-xs font-bold">
             <FileSpreadsheet className="w-4 h-4" />
           </div>
-          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">4. Customer List</span>
-          <span className="text-[11px] text-[#717973]">Manage accounts</span>
+          <span className="font-extrabold text-xs text-[#012d1d] group-hover:underline">6. POS Sync</span>
+          <span className="text-[10px] text-[#717973]">CSV import/export</span>
         </button>
       </div>
 
       {/* ========================================================================= */}
-      {/* SECTION 1: ENTERING A NEW ORDER & CUSTOMER NAMES (INCLUDING UNLISTED) */}
+      {/* SECTION 1: ENTERING A NEW ORDER & CUSTOMER NAMES */}
       {/* ========================================================================= */}
-      {(activeTopic === 'all' || activeTopic === 'new_order') && matchesSearch('new order customer enter name scan unlisted') && (
+      {(activeTopic === 'all' || activeTopic === 'new_order') && matchesSearch('new order customer enter name scan unlisted walk-in') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
           <div className="border-b border-[#f3f4f0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-3">
@@ -227,23 +270,22 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                   Order Creation Workflow
                 </span>
                 <h2 className="text-xl sm:text-2xl font-extrabold text-[#012d1d]">
-                  Entering a New Order & Customer Name
+                  Entering a New Order & Customer Names
                 </h2>
               </div>
             </div>
             <span className="text-xs font-bold px-3 py-1 bg-amber-100 text-amber-900 border border-amber-300 rounded-full shrink-0 w-fit">
-              Includes Unlisted / Custom Customers
+              Includes Walk-Ins & Unlisted Accounts
             </span>
           </div>
 
-          {/* Step 1: Customer Name Entry - Deep Dive */}
           <div className="flex flex-col gap-4">
             <h3 className="text-base font-extrabold text-[#012d1d] flex items-center gap-2">
               <UserPlus className="w-5 h-5 text-[#0e6c4a]" />
-              <span>Step 1: Selecting or Entering Any Customer Name</span>
+              <span>Step 1: Selecting or Typing Any Customer Name</span>
             </h3>
             <p className="text-xs sm:text-sm text-[#414844] leading-relaxed">
-              When starting an order from the <strong>Scan Screen</strong> or home dashboard, you can choose from your existing customer database or effortlessly type any new customer name on the fly.
+              When starting an order from the <strong>Scan Screen</strong>, you can pick an existing contractor account or simply type any walk-in customer's name. The app automatically assigns wholesale or retail rates based on their profile.
             </p>
 
             {/* Visual UI Simulation: Customer Input */}
@@ -251,7 +293,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
               <div className="flex items-center justify-between">
                 <span className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
                   <Smartphone className="w-4 h-4 text-[#0e6c4a]" />
-                  <span>Interactive Screenshot Preview: Customer Search & Entry</span>
+                  <span>Interactive Screenshot Preview: Customer Search & Unlisted Entry</span>
                 </span>
                 <span className="text-[10px] font-bold bg-[#012d1d] text-[#a0f4c8] px-2 py-0.5 rounded">
                   Scan Screen Top Bar
@@ -296,15 +338,15 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
               {/* Step instructions */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mt-1 text-xs">
                 <div className="p-3 bg-white rounded-xl border border-[#e2e3df]">
-                  <strong className="text-[#012d1d] block mb-1 font-extrabold">Option A: Existing Customers</strong>
+                  <strong className="text-[#012d1d] block mb-1 font-extrabold">Option A: Existing Accounts</strong>
                   <p className="text-[#414844]">
-                    Tap the search field and type a few letters of the company or contact name (e.g. <em>"Valley View"</em>, <em>"Pete"</em>). Click their card from the dropdown to automatically apply their wholesale or retail pricing tier.
+                    Tap into the search field and type a few letters (e.g. <em>"Valley View"</em>, <em>"Pete"</em>). Click their card to instantly apply their default wholesale or contractor discount tier.
                   </p>
                 </div>
                 <div className="p-3 bg-white rounded-xl border border-[#e2e3df]">
-                  <strong className="text-[#461702] block mb-1 font-extrabold">Option B: Unlisted / New Customers</strong>
+                  <strong className="text-[#461702] block mb-1 font-extrabold">Option B: Unlisted / Walk-In Customers</strong>
                   <p className="text-[#414844]">
-                    Simply type their full name into the search bar (e.g. <em>"John & Mary Smith"</em>). You can either tap <strong>"Use [Name] as customer"</strong> or just continue scanning plants. The order will be saved under their custom name!
+                    Type their name into the search bar (e.g. <em>"John & Mary Smith"</em>). Tap <strong>"Use [Name] as customer"</strong> or just start scanning plants. The order will be saved directly under that name!
                   </p>
                 </div>
               </div>
@@ -317,7 +359,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                 <span>Step 2: Adding Plants & Materials</span>
               </h3>
               <p className="text-xs sm:text-sm text-[#414844]">
-                You have 4 fast ways to add items into the active cart:
+                Staff have 4 fast methods to append items into the active cart:
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
@@ -327,7 +369,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                     <span>1. Camera Barcode Scanner</span>
                   </div>
                   <p className="text-[#414844]">
-                    Tap <strong>"Start Camera Scan"</strong> to turn on live barcode scanning. Point your device camera at pot tags or hangtags. It beeps and vibrates upon detection.
+                    Tap <strong>"Start Camera Scan"</strong> to turn on live barcode scanning. Aim at tag barcodes on pots or hangtags. A confirmation beep confirms the read.
                   </p>
                 </div>
 
@@ -337,7 +379,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                     <span>2. Handheld / Bluetooth Scanner</span>
                   </div>
                   <p className="text-[#414844]">
-                    Use the <strong>Manual Barcode Input</strong> box or pair a Bluetooth ring/gun scanner. As barcodes are fired, items instantly append to the cart.
+                    Pair any Bluetooth ring or gun scanner. The manual input box captures continuous laser reads and adds plants instantly.
                   </p>
                 </div>
 
@@ -347,7 +389,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                     <span>3. Plant Catalog Search</span>
                   </div>
                   <p className="text-[#414844]">
-                    Tap <strong>"Browse Catalog"</strong> to search by botanical name (e.g. <em>Buxus</em>), common name (<em>Boxwood</em>), or SKU number (e.g. <em>1000</em>).
+                    Tap <strong>"Browse Catalog"</strong> to search by plant name, botanical name, category, or Item # (e.g. <em>1000</em>, <em>Hydrangea</em>).
                   </p>
                 </div>
 
@@ -357,43 +399,258 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                     <span>4. Bulk Materials Quick-Add</span>
                   </div>
                   <p className="text-[#414844]">
-                    Tap the <strong>Bulk Soil / Mulch / Stone</strong> bar to quickly tap 0.5 yard, 1 yard, or 2 yard increments without needing a barcode tag.
+                    Tap the <strong>Bulk Soil / Mulch / Stone</strong> bar to add 0.5 yard, 1 yard, or 2 yard increments with a single tap without needing tags.
                   </p>
                 </div>
               </div>
-            </div>
-
-            {/* Step 3: Staging Zone Selection */}
-            <div className="p-4 bg-[#e7f8ef] border border-[#a0f4c8] rounded-2xl flex items-center justify-between gap-3 text-xs">
-              <div className="flex items-center gap-2.5 text-[#012d1d]">
-                <MapPin className="w-5 h-5 text-[#0e6c4a] shrink-0" />
-                <div>
-                  <span className="font-extrabold block text-sm">Step 3: Staging Bay Selection</span>
-                  <span className="text-[#414844]">
-                    Click <strong>"Continue to Placement"</strong> to assign the order to a Greenhouse, Shade Bay, Loading Dock, or custom row.
-                  </span>
-                </div>
-              </div>
-              <button
-                onClick={() => onNavigate('holding_location')}
-                className="px-3 py-1.5 bg-[#012d1d] text-[#a0f4c8] rounded-xl font-bold shrink-0 cursor-pointer"
-              >
-                View Zones
-              </button>
             </div>
           </div>
         </section>
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 2: INTERACTIVE GPS YARD MAPPING & HIGH-RESOLUTION SATELLITE PINS */}
+      {/* SECTION 2: PLANT CATALOG SEARCH POP-UP & 4-TIER POS PRICING */}
       {/* ========================================================================= */}
-      {(activeTopic === 'all' || activeTopic === 'gps_mapping') && matchesSearch('gps map satellite coordinates pin location yard navigation') && (
+      {(activeTopic === 'all' || activeTopic === 'catalog_pricing') && matchesSearch('catalog search price tier pos wholesale retail contractor size item number out of stock') && (
+        <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
+          <div className="border-b border-[#f3f4f0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold">
+                2
+              </div>
+              <div>
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a]">
+                  Enhanced Catalog & POS Pricing
+                </span>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-[#012d1d]">
+                  Plant Catalog Search & 4-Tier POS Pricing
+                </h2>
+              </div>
+            </div>
+            <span className="text-xs font-bold px-3 py-1 bg-[#a0f4c8] text-[#002113] rounded-full shrink-0 w-fit">
+              10pt Larger Text & Stacked Controls
+            </span>
+          </div>
+
+          <p className="text-xs sm:text-sm text-[#414844] leading-relaxed">
+            The <strong>Plant Catalog Search pop-up</strong> allows crew members to look up any plant in the nursery without a barcode. We have optimized this interface for outdoor sunlight readability, prominent plant titles, stacked action buttons, and instantaneous 4-tier price selection.
+          </p>
+
+          {/* Simulated UI Screenshot: Updated Plant Catalog Search */}
+          <div className="bg-[#f9faf6] border-2 border-dashed border-[#c1c8c2] rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                <Smartphone className="w-4 h-4 text-[#0e6c4a]" />
+                <span>Interactive Screenshot Preview: Plant Catalog Search Modal</span>
+              </span>
+              <span className="text-[10px] font-bold bg-[#012d1d] text-[#a0f4c8] px-2 py-0.5 rounded">
+                Updated Field Layout
+              </span>
+            </div>
+
+            {/* Modal Container Mockup */}
+            <div className="bg-white rounded-2xl p-4 sm:p-5 border border-[#c1c8c2] shadow-md flex flex-col gap-3 max-w-2xl mx-auto w-full">
+              {/* Modal Top Bar */}
+              <div className="flex justify-between items-center pb-2 border-b border-[#e2e3df]">
+                <div className="flex items-center gap-2">
+                  <div className="p-2 bg-[#a0f4c8] text-[#012d1d] rounded-xl">
+                    <BookOpen className="w-4 h-4 text-[#0e6c4a]" />
+                  </div>
+                  <div>
+                    <h4 className="font-extrabold text-sm text-[#012d1d]">Plant Catalog Search</h4>
+                    <p className="text-[11px] text-[#717973]">Search plant name, botanical name, or category</p>
+                  </div>
+                </div>
+                <button className="p-1 text-[#717973] hover:text-[#1a1c1a] rounded-lg">
+                  <span className="text-xs font-bold font-mono">✕</span>
+                </button>
+              </div>
+
+              {/* Search Bar & Category Pills */}
+              <div className="flex flex-col gap-2">
+                <div className="relative">
+                  <Search className="w-4 h-4 absolute left-3 top-2.5 text-[#717973]" />
+                  <input
+                    type="text"
+                    readOnly
+                    value="Hydrangea"
+                    className="w-full bg-[#f3f4f0] border border-[#012d1d] rounded-xl pl-9 pr-3 py-2 text-xs font-bold text-[#1a1c1a]"
+                  />
+                </div>
+                <div className="flex gap-1.5 overflow-x-auto text-[11px]">
+                  <span className="px-2.5 py-1 rounded-full font-bold bg-[#012d1d] text-[#a0f4c8]">All (14)</span>
+                  <span className="px-2.5 py-1 rounded-full font-bold bg-[#f3f4f0] text-[#414844]">Trees & Shrubs</span>
+                  <span className="px-2.5 py-1 rounded-full font-bold bg-[#f3f4f0] text-[#414844]">Perennials</span>
+                </div>
+              </div>
+
+              {/* Card 1: In-Stock Plant with 4-Tier Pricing Dropdown & Add Button Stack */}
+              <div className="p-3.5 bg-white hover:bg-[#f9faf6] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2.5 shadow-xs">
+                {/* Full-Width Plant Name Header */}
+                <div className="border-b border-[#f3f4f0] pb-1.5">
+                  <h5 className="font-extrabold text-sm sm:text-base text-[#1a1c1a] leading-snug">
+                    Hydrangea macrophylla 'Nikko Blue'
+                  </h5>
+                  <p className="text-xs text-[#525a55] italic mt-0.5">
+                    Nikko Blue Bigleaf Hydrangea • Deciduous Shrub
+                  </p>
+                </div>
+
+                {/* Badges on Left, Stacked Actions on Right */}
+                <div className="flex items-center justify-between gap-3 pt-0.5">
+                  <div className="flex flex-col gap-2 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[21px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0 shadow-2xs">
+                        <Tag className="w-4 h-4 text-[#a0f4c8]" />
+                        #1088
+                      </span>
+                      <span className="bg-[#461702] text-amber-100 text-[21px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0 shadow-2xs">
+                        <Package className="w-4 h-4 text-amber-300" />
+                        SIZE: 3 Gal
+                      </span>
+                    </div>
+                    <div>
+                      <span className="text-xs font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 bg-[#f3f4f0] text-[#414844]">
+                        Stock: <strong className="text-[#012d1d]">42</strong>
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Stacked Controls: Pricing Dropdown over Add Button */}
+                  <div className="flex flex-col items-end gap-1.5 shrink-0 justify-center">
+                    <div className="px-2.5 py-1 bg-white border border-[#c1c8c2] rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer">
+                      <span className="text-[22px] font-black text-[#012d1d] tracking-tight leading-none">$38.50</span>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                    </div>
+                    <button className="w-full bg-[#012d1d] text-[#a0f4c8] text-xs font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 shadow-2xs cursor-pointer">
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Card 2: Out-of-Stock Plant with 2-Line Staggered Status */}
+              <div className="p-3.5 bg-white rounded-2xl border border-[#c1c8c2] flex flex-col gap-2.5 shadow-xs opacity-95">
+                <div className="border-b border-[#f3f4f0] pb-1.5">
+                  <h5 className="font-extrabold text-sm sm:text-base text-[#1a1c1a] leading-snug">
+                    Hydrangea paniculata 'Limelight'
+                  </h5>
+                  <p className="text-xs text-[#525a55] italic mt-0.5">
+                    PeeGee Panicle Hydrangea
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between gap-3 pt-0.5">
+                  <div className="flex flex-col gap-2 min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[21px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0 shadow-2xs">
+                        <Tag className="w-4 h-4 text-[#a0f4c8]" />
+                        #1094
+                      </span>
+                      <span className="bg-[#461702] text-amber-100 text-[21px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0 shadow-2xs">
+                        <Package className="w-4 h-4 text-amber-300" />
+                        SIZE: 7 Gal
+                      </span>
+                    </div>
+                    <div>
+                      {/* Out of Stock 2-Line Stacked Badge */}
+                      <span className="text-xs font-bold px-2 py-1 rounded-md inline-flex flex-col items-start leading-tight bg-red-100 text-red-700 border border-red-200">
+                        <span>Stock: <strong className="text-red-700">0</strong></span>
+                        <span className="text-[10px] text-red-600 font-extrabold mt-0.5">(Out of stock)</span>
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col items-end gap-1.5 shrink-0 justify-center">
+                    <div className="px-2.5 py-1 bg-white border border-[#c1c8c2] rounded-lg shadow-2xs flex items-center gap-1 cursor-pointer">
+                      <span className="text-[22px] font-black text-[#012d1d] tracking-tight leading-none">$68.00</span>
+                      <ChevronDown className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                    </div>
+                    <button className="w-full bg-[#012d1d] text-[#a0f4c8] text-xs font-bold py-1.5 px-3 rounded-lg flex items-center justify-center gap-1 shadow-2xs cursor-pointer">
+                      <Plus className="w-3.5 h-3.5" />
+                      <span>Add</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Key Field Upgrades Summary */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df]">
+                <strong className="text-[#012d1d] block mb-1 font-extrabold flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                  <span>1. 10pt Larger Text</span>
+                </strong>
+                <p className="text-[#414844]">
+                  Item Number and Size are rendered in bold <strong>21px</strong> font, and Price in bold <strong>22px</strong>, making them legible in bright nursery sunlight without squinting.
+                </p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df]">
+                <strong className="text-[#012d1d] block mb-1 font-extrabold flex items-center gap-1">
+                  <Sliders className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                  <span>2. Vertical Action Stack</span>
+                </strong>
+                <p className="text-[#414844]">
+                  The Pricing dropdown and the green <strong>Add</strong> button are stacked vertically on the right, keeping the Size and Stock badges completely unobstructed.
+                </p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df]">
+                <strong className="text-[#012d1d] block mb-1 font-extrabold flex items-center gap-1">
+                  <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                  <span>3. Two-Line Stock Badge</span>
+                </strong>
+                <p className="text-[#414844]">
+                  Out-of-stock items cleanly place the quantity count on line 1 and the <strong>(Out of stock)</strong> notice on line 2 for immediate identification.
+                </p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df]">
+                <strong className="text-[#012d1d] block mb-1 font-extrabold flex items-center gap-1">
+                  <Zap className="w-3.5 h-3.5 text-amber-600" />
+                  <span>4. 4-Tier POS Pricing</span>
+                </strong>
+                <p className="text-[#414844]">
+                  Click the price button to switch between <em>Retail</em>, <em>Wholesale</em>, <em>Contractor</em>, or <em>Landscaper</em> rates right from the search card.
+                </p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df] sm:col-span-2 md:col-span-2">
+                <strong className="text-[#012d1d] block mb-1 font-extrabold flex items-center gap-1">
+                  <Leaf className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                  <span>5. Confirm Pop-up: "DESCR" Column & In-Card Price Dropdown</span>
+                </strong>
+                <p className="text-[#414844]">
+                  On the <strong>Confirm Plant Selection</strong> pop-up, the plant name on the top line strictly pulls from the uploaded POS spreadsheet column titled <strong>"DESCR"</strong> in <strong>12pt larger (28px–32px) font</strong> for instant outdoor readability. The <strong>4-tier Price Dropdown</strong> is placed directly inside the same card on the line immediately below the <em>Item Number</em>, <em>Size</em>, and <em>Quantity / Stock</em> badges.
+                </p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df] sm:col-span-2 md:col-span-2">
+                <strong className="text-[#012d1d] block mb-1 font-extrabold flex items-center gap-1">
+                  <Tag className="w-3.5 h-3.5 text-[#012d1d]" />
+                  <span>6. Order Item Cards: High-Visibility Layout & 8pt Larger Typography</span>
+                </strong>
+                <p className="text-[#414844]">
+                  On each <strong>Current Order Item card</strong>, typography is enlarged by <strong>8 points</strong> for sunlight visibility: the plant name (24px–27px) sits on line 1, the botanical/common subtitle (18px–20px) is placed directly on line 2 immediately above the <em>Item Number</em> and <em>Container Size</em> badges (20px–22px) on line 3, and the Stepper Quantity counter (22px–25px) provides large touch targets.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION 3: INTERACTIVE GPS YARD MAPPING & HIGH-RESOLUTION SATELLITE PINS */}
+      {/* ========================================================================= */}
+      {(activeTopic === 'all' || activeTopic === 'gps_mapping') && matchesSearch('gps map satellite coordinates pin location yard navigation sub-meter') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
           <div className="border-b border-[#f3f4f0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-[#004d40] text-[#a0f4c8] flex items-center justify-center font-bold">
-                2
+                3
               </div>
               <div>
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#004d40]">
@@ -418,7 +675,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
             <div className="flex items-center justify-between">
               <span className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
                 <Navigation className="w-4 h-4 text-[#004d40]" />
-                <span>Where You Can Tag & View GPS Locations</span>
+                <span>Interactive Screenshot Preview: GPS Coordinate Logging & Satellite Pins</span>
               </span>
               <span className="text-[10px] font-bold bg-[#004d40] text-[#a0f4c8] px-2 py-0.5 rounded">
                 Real-Time Cloud Sync
@@ -458,7 +715,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                   </span>
                 </div>
                 <span className="text-[11px] text-[#717973] font-semibold">
-                  Saved to order & permanent plant catalog in Firestore
+                  Saved to order & master plant catalog in Firestore
                 </span>
               </div>
             </div>
@@ -481,7 +738,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                   <span>2. In Order Review</span>
                 </strong>
                 <p className="text-[#414844]">
-                  When pulling up an order later, every plant item has a dedicated <strong>"Log GPS"</strong> or <strong>"Update GPS"</strong> button and coordinate pill on its card.
+                  When reviewing an order later, every plant item has a dedicated <strong>"Log GPS"</strong> or <strong>"Update GPS"</strong> button and coordinate pill on its card.
                 </p>
               </div>
 
@@ -510,13 +767,70 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 3: HOW TO EDIT & MODIFY EXISTING ORDERS */}
+      {/* SECTION 4: HOLDING BAYS & STAGING ZONES */}
+      {/* ========================================================================= */}
+      {(activeTopic === 'all' || activeTopic === 'holding_bays') && matchesSearch('holding bay staging zone greenhouse shade structure dock location') && (
+        <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
+          <div className="border-b border-[#f3f4f0] pb-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold">
+              4
+            </div>
+            <div>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a]">
+                Order Staging Logistics
+              </span>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#012d1d]">
+                Holding Bays & Staging Zone Assignments
+              </h2>
+            </div>
+          </div>
+
+          <p className="text-xs sm:text-sm text-[#414844] leading-relaxed">
+            Every order assembled in the nursery can be designated to a specific holding bay (Greenhouses A-D, Shade Areas, Loading Bays, or Custom Rows). Staff know exactly where customer orders are waiting for pickup.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+            <div className="p-4 bg-[#f3f4f0] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-[#012d1d] font-extrabold">
+                <Warehouse className="w-4 h-4 text-[#0e6c4a]" />
+                <span>1. Greenhouses A-D</span>
+              </div>
+              <p className="text-[#414844]">
+                Ideal for delicate perennials, tender stock, and hanging baskets requiring automated misting or frost protection.
+              </p>
+            </div>
+
+            <div className="p-4 bg-[#f3f4f0] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-[#012d1d] font-extrabold">
+                <Sun className="w-4 h-4 text-amber-600" />
+                <span>2. Outdoor Shade Structures</span>
+              </div>
+              <p className="text-[#414844]">
+                Designated for broadleaf evergreens, boxwoods, and shade-loving shrubs awaiting contractor trailer loading.
+              </p>
+            </div>
+
+            <div className="p-4 bg-[#f3f4f0] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2">
+              <div className="flex items-center gap-2 text-[#012d1d] font-extrabold">
+                <Truck className="w-4 h-4 text-[#461702]" />
+                <span>3. Loading Bays & Custom Rows</span>
+              </div>
+              <p className="text-[#414844]">
+                Designated for bulk orders, ball-and-burlap shade trees, palletized stone, and immediate same-day pickups.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION 5: HOW TO EDIT & MODIFY EXISTING ORDERS */}
       {/* ========================================================================= */}
       {(activeTopic === 'all' || activeTopic === 'editing_order') && matchesSearch('edit order modify quantity customer name price change') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
           <div className="border-b border-[#f3f4f0] pb-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold">
-              3
+              5
             </div>
             <div>
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a]">
@@ -638,14 +952,14 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 4: PARTIAL PICKUP & EMAIL STAFF INSTRUCTIONS */}
+      {/* SECTION 6: PARTIAL PICKUP & EMAIL STAFF INSTRUCTIONS */}
       {/* ========================================================================= */}
       {(activeTopic === 'all' || activeTopic === 'partial_pickup') && matchesSearch('partial pickup email staff hold ticket remaining plants yard crew') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
           <div className="border-b border-[#f3f4f0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-2xl bg-amber-600 text-white flex items-center justify-center font-bold">
-                4
+                6
               </div>
               <div>
                 <span className="text-[11px] font-extrabold uppercase tracking-wider text-amber-800">
@@ -772,13 +1086,140 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 5: COMPLETING, ARCHIVING & NATIVE PHONE DISPATCH */}
+      {/* SECTION 7: PHYSICAL INVENTORY AUDITS & CYCLE COUNTS */}
+      {/* ========================================================================= */}
+      {(activeTopic === 'all' || activeTopic === 'inventory_audit') && matchesSearch('inventory audit physical count cycle discrepancy variance scan stock bench') && (
+        <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
+          <div className="border-b border-[#f3f4f0] pb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-2xl bg-[#0e6c4a] text-white flex items-center justify-center font-bold">
+                7
+              </div>
+              <div>
+                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a]">
+                  Stock Control & Audit Engine
+                </span>
+                <h2 className="text-xl sm:text-2xl font-extrabold text-[#012d1d]">
+                  Physical Inventory Audits & Cycle Counts
+                </h2>
+              </div>
+            </div>
+            <span className="text-xs font-extrabold px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-full shrink-0 w-fit">
+              GPS Bench Tagging & Variance Analysis
+            </span>
+          </div>
+
+          <p className="text-xs sm:text-sm text-[#414844] leading-relaxed">
+            Staff can perform structured physical cycle counts across greenhouses, shade houses, or outdoor tree fields using the <strong>Inventory Audit Screen</strong>. Scan pot barcodes, tally counts with single taps, tag GPS coordinates of specific nursery blocks, and automatically calculate variances against expected stock.
+          </p>
+
+          {/* Visual UI Simulation: Inventory Audit Screen */}
+          <div className="bg-[#f9faf6] border-2 border-dashed border-[#c1c8c2] rounded-2xl p-4 sm:p-5 flex flex-col gap-4">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                <ClipboardCheck className="w-4 h-4 text-[#0e6c4a]" />
+                <span>Interactive Screenshot Preview: Physical Inventory Audit Session</span>
+              </span>
+              <span className="text-[10px] font-bold bg-[#012d1d] text-[#a0f4c8] px-2 py-0.5 rounded">
+                Active Audit Mode
+              </span>
+            </div>
+
+            {/* Audit Screen Mockup */}
+            <div className="bg-white p-4 rounded-2xl border border-[#c1c8c2] shadow-sm flex flex-col gap-3">
+              <div className="flex justify-between items-center border-b border-[#f3f4f0] pb-3">
+                <div>
+                  <span className="text-[10px] font-bold text-[#717973] uppercase">Session #AUD-2026-08</span>
+                  <h4 className="text-sm font-extrabold text-[#012d1d]">Greenhouse B - Perennial Bench Count</h4>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2.5 py-1 bg-amber-100 text-amber-900 font-bold text-xs rounded-lg">
+                    3 Discrepancies
+                  </span>
+                  <span className="px-2.5 py-1 bg-[#a0f4c8] text-[#002113] font-bold text-xs rounded-lg">
+                    48 Counted
+                  </span>
+                </div>
+              </div>
+
+              {/* Mockup Audited Line Item */}
+              <div className="p-3 bg-[#f3f4f0] rounded-xl border border-[#e2e3df] flex items-center justify-between gap-3 text-xs">
+                <div>
+                  <span className="font-extrabold text-[#1a1c1a] block">Echinacea purpurea 'Magnus' (Coneflower)</span>
+                  <span className="text-[11px] text-[#717973]">SKU #1004 • Expected: 50 • Counted: 48 (Variance: -2)</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="px-2 py-1 bg-red-100 text-red-800 font-extrabold rounded-lg text-xs">
+                    Short (-2)
+                  </span>
+                  <span className="px-2 py-1 bg-white border border-[#c1c8c2] rounded-lg font-bold text-xs flex items-center gap-1">
+                    <MapPin className="w-3 h-3 text-[#0e6c4a]" />
+                    <span>Bench 4</span>
+                  </span>
+                </div>
+              </div>
+
+              <div className="flex justify-between items-center pt-1 text-xs">
+                <div className="flex items-center gap-2">
+                  <button className="px-3 py-1.5 bg-[#012d1d] text-[#a0f4c8] rounded-xl font-bold flex items-center gap-1 shadow-2xs">
+                    <Barcode className="w-3.5 h-3.5" />
+                    <span>Scan Next Pot</span>
+                  </button>
+                  <button className="px-3 py-1.5 bg-white border border-[#c1c8c2] text-[#012d1d] rounded-xl font-bold flex items-center gap-1">
+                    <Mail className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                    <span>Email Discrepancy Report</span>
+                  </button>
+                </div>
+                <span className="text-[11px] text-[#717973] font-semibold">
+                  Exports directly to CSV spreadsheet
+                </span>
+              </div>
+            </div>
+
+            {/* Step instructions */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df] flex flex-col gap-1">
+                <strong className="text-[#012d1d] font-extrabold flex items-center gap-1">
+                  <Warehouse className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                  <span>1. Choose Location</span>
+                </strong>
+                <p className="text-[#414844]">
+                  Pick the target greenhouse, outdoor row, or shade house to organize counts by physical zone.
+                </p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df] flex flex-col gap-1">
+                <strong className="text-[#012d1d] font-extrabold flex items-center gap-1">
+                  <Camera className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                  <span>2. Scan or Search</span>
+                </strong>
+                <p className="text-[#414844]">
+                  Scan pot tags with camera or Bluetooth reader, or use quick search. Increment counts with rapid taps.
+                </p>
+              </div>
+
+              <div className="p-3 bg-white rounded-xl border border-[#e2e3df] flex flex-col gap-1">
+                <strong className="text-[#012d1d] font-extrabold flex items-center gap-1">
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                  <span>3. Reconcile & Export</span>
+                </strong>
+                <p className="text-[#414844]">
+                  Review short/over counts and click <strong>"Email Audit Report"</strong> to dispatch results to Pete for inventory adjustment.
+                </p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION 8: COMPLETING, ARCHIVING & NATIVE PHONE DISPATCH */}
       {/* ========================================================================= */}
       {(activeTopic === 'all' || activeTopic === 'completing_order') && matchesSearch('complete order fulfill ready for pickup status save archive restore dispatch email sms') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
           <div className="border-b border-[#f3f4f0] pb-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#0e6c4a] text-white flex items-center justify-center font-bold">
-              5
+              8
             </div>
             <div>
               <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a]">
@@ -869,9 +1310,56 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
       )}
 
       {/* ========================================================================= */}
-      {/* SECTION 6: FREQUENTLY ASKED QUESTIONS & TROUBLESHOOTING */}
+      {/* SECTION 9: CUSTOMERS, POS IMPORT & CLOUD SYNC */}
       {/* ========================================================================= */}
-      {(activeTopic === 'all' || activeTopic === 'data_sync' || activeTopic === 'scanning' || activeTopic === 'gps_mapping') && (
+      {(activeTopic === 'all' || activeTopic === 'data_sync') && matchesSearch('customers pos import csv spreadsheet export cloud firestore sync') && (
+        <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-6">
+          <div className="border-b border-[#f3f4f0] pb-4 flex items-center gap-3">
+            <div className="w-10 h-10 rounded-2xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold">
+              9
+            </div>
+            <div>
+              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#0e6c4a]">
+                Database & Spreadsheet Integration
+              </span>
+              <h2 className="text-xl sm:text-2xl font-extrabold text-[#012d1d]">
+                Customer Management & POS CSV Sync
+              </h2>
+            </div>
+          </div>
+
+          <p className="text-xs sm:text-sm text-[#414844] leading-relaxed">
+            The app synchronizes with your master inventory spreadsheets and contractor database. In <strong>Data Management</strong>, you can import new plant pricing or contractor accounts while always preserving your logged GPS coordinates.
+          </p>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+            <div className="p-4 bg-[#f3f4f0] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2">
+              <strong className="text-[#012d1d] font-extrabold flex items-center gap-1.5">
+                <FileSpreadsheet className="w-4 h-4 text-[#0e6c4a]" />
+                <span>POS Inventory CSV Uploads</span>
+              </strong>
+              <p className="text-[#414844]">
+                Upload CSV or Excel exports from your POS system. The system matches item numbers and automatically retains all previously recorded GPS coordinates and holding bays.
+              </p>
+            </div>
+
+            <div className="p-4 bg-[#f3f4f0] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2">
+              <strong className="text-[#012d1d] font-extrabold flex items-center gap-1.5">
+                <User className="w-4 h-4 text-[#0e6c4a]" />
+                <span>Customer Accounts & Pricing Tiers</span>
+              </strong>
+              <p className="text-[#414844]">
+                Manage retail customers, contractor accounts, and wholesale profiles. Set phone numbers, email addresses, and default discount percentages.
+              </p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {/* ========================================================================= */}
+      {/* SECTION 10: FREQUENTLY ASKED QUESTIONS & TROUBLESHOOTING */}
+      {/* ========================================================================= */}
+      {(activeTopic === 'all' || activeTopic === 'catalog_pricing' || activeTopic === 'gps_mapping' || activeTopic === 'data_sync') && (
         <section className="bg-white rounded-3xl p-5 sm:p-7 border border-[#c1c8c2] shadow-xs flex flex-col gap-5">
           <div className="border-b border-[#f3f4f0] pb-4 flex items-center gap-3">
             <div className="w-10 h-10 rounded-2xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold">
@@ -888,6 +1376,28 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
           </div>
 
           <div className="flex flex-col gap-2.5">
+            {/* FAQ: Plant Catalog Search & 4-Tier Pricing */}
+            <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleFaq('faq_catalog_pricing')}
+                className="w-full p-4 text-left font-extrabold text-sm text-[#012d1d] bg-[#f9faf6] hover:bg-[#f3f4f0] flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <span>Q: How does the Plant Catalog Search pop-up and 4-tier POS pricing work?</span>
+                {expandedFaq === 'faq_catalog_pricing' ? <ChevronUp className="w-4 h-4 text-[#012d1d]" /> : <ChevronDown className="w-4 h-4 text-[#717973]" />}
+              </button>
+              {expandedFaq === 'faq_catalog_pricing' && (
+                <div className="p-4 bg-white text-xs text-[#414844] border-t border-[#c1c8c2] flex flex-col gap-2 leading-relaxed">
+                  <p>
+                    <strong>Answer:</strong> On the Scan Screen, tap <strong>"Browse Catalog"</strong> to open the full nursery search pop-up. You can filter by plant name, botanical name, or category pills (e.g. <em>Trees & Shrubs</em>, <em>Perennials</em>).
+                  </p>
+                  <p>
+                    Each card displays the plant name in full at the top, along with enlarged <strong>21px Item Number and Size badges</strong> and a <strong>22px Price dropdown</strong>. You can click the price button to select from all 4 POS price levels (Retail, Wholesale, Contractor, or Landscaper) before tapping <strong>Add</strong>. The Size badge is positioned on the left so the price dropdown never obscures it.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* FAQ: GPS Mapping */}
             <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
               <button
@@ -954,32 +1464,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
               )}
             </div>
 
-            {/* FAQ 1: Walk-in / New Customer */}
-            <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
-              <button
-                type="button"
-                onClick={() => toggleFaq('faq_new_customer')}
-                className="w-full p-4 text-left font-extrabold text-sm text-[#012d1d] bg-[#f9faf6] hover:bg-[#f3f4f0] flex items-center justify-between transition-colors cursor-pointer"
-              >
-                <span>Q: How do I enter a walk-in customer whose name is not in the system?</span>
-                {expandedFaq === 'faq_new_customer' ? <ChevronUp className="w-4 h-4 text-[#012d1d]" /> : <ChevronDown className="w-4 h-4 text-[#717973]" />}
-              </button>
-              {expandedFaq === 'faq_new_customer' && (
-                <div className="p-4 bg-white text-xs text-[#414844] border-t border-[#c1c8c2] flex flex-col gap-2 leading-relaxed">
-                  <p>
-                    <strong>Answer:</strong> On the Scan Screen, tap into the customer search box and type the customer's full name (e.g. <em>"Sarah Jenkins"</em>).
-                  </p>
-                  <p>
-                    A button will appear below the field saying <strong>Use "Sarah Jenkins" as customer</strong>. You can click that button or simply scan your plants and proceed. The system will save the order under that name without requiring a formal account creation step!
-                  </p>
-                  <p>
-                    If you want to save them as a permanent account with Wholesale pricing, go to <strong>Settings &gt; Data Management &gt; Customers &gt; Add Customer</strong>.
-                  </p>
-                </div>
-              )}
-            </div>
-
-            {/* FAQ 2: Wet / Damaged barcode */}
+            {/* FAQ: Wet / Damaged barcode */}
             <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
               <button
                 type="button"
@@ -1001,7 +1486,7 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
               )}
             </div>
 
-            {/* FAQ 3: Multi device sync */}
+            {/* FAQ: Multi device sync */}
             <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
               <button
                 type="button"

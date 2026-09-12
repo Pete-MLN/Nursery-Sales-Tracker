@@ -931,19 +931,21 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           )}
           <button
             type="button"
+            id="btn-order-finalization-cancel-delete"
             onClick={handleDeleteOrder}
-            className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-xs font-bold transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[21px] font-bold transition-colors cursor-pointer shadow-2xs"
             title="Cancel or Delete this order"
           >
-            <Trash2 className="w-3.5 h-3.5 text-red-600" />
+            <Trash2 className="w-5 h-5 text-red-600 shrink-0" />
             <span>Cancel / Delete</span>
           </button>
           <button
             type="button"
+            id="btn-order-finalization-save-order"
             onClick={handleSaveChanges}
-            className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs font-extrabold shadow-sm transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[21px] font-extrabold shadow-sm transition-all cursor-pointer"
           >
-            <Save className="w-3.5 h-3.5" />
+            <Save className="w-5 h-5 shrink-0" />
             <span>Save Order</span>
           </button>
         </div>

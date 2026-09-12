@@ -398,6 +398,15 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
     }
   };
 
+  // Top line plant name comes from the uploaded data column "DESCR" (stored in descr or botanicalName)
+  const descrPlantName = plant.descr || plant.botanicalName || plant.name;
+  // Sub-line for secondary / common name if distinct from the primary DESCR value
+  const secondaryPlantName = (plant.commonName && plant.commonName.trim() !== descrPlantName.trim())
+    ? plant.commonName
+    : (plant.name && plant.name.trim() !== descrPlantName.trim())
+      ? plant.name
+      : undefined;
+
   return (
     <div 
       ref={scrollContainerRef}
@@ -451,19 +460,22 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
         <div className="bg-[#fcfdfa] border border-[#012d1d]/15 rounded-xl p-3 flex flex-col gap-2 shadow-2xs">
           <div className="flex items-start justify-between gap-2">
             <div className="min-w-0 flex-1">
-              <h3 className="font-extrabold text-base sm:text-lg text-[#012d1d] leading-snug">
-                {plant.name}
+              <h3 
+                id="confirm-plant-name"
+                className="font-black sm:font-extrabold text-[28px] sm:text-[32px] text-[#012d1d] leading-tight tracking-tight break-words"
+              >
+                {descrPlantName}
               </h3>
 
-              {(plant.botanicalName || plant.commonName) && (
-                <p className="text-xs text-[#414844] italic font-medium mt-0.5">
-                  {plant.botanicalName || plant.commonName}
+              {secondaryPlantName && (
+                <p className="text-sm sm:text-base text-[#414844] italic font-medium mt-1">
+                  {secondaryPlantName}
                 </p>
               )}
             </div>
 
             {plant.category && (
-              <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0">
+              <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-bold px-2 py-0.5 rounded-md uppercase tracking-wider shrink-0 mt-1">
                 {plant.category}
               </span>
             )}
@@ -489,7 +501,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
               <span>{plant.size ? `SIZE: ${plant.size}` : (isBulk ? `UNIT: ${unitLabel}` : 'Std Size')}</span>
             </span>
 
-            <span className={`text-xs font-extrabold px-2.5 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs self-center ${
+            <span className={`text-xs sm:text-sm font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs self-center ${
               plant.stock < 0
                 ? 'bg-rose-100 text-rose-900 border border-rose-300'
                 : plant.stock === 0 
@@ -501,20 +513,48 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
               {plant.stock < 0 ? (
                 <>
                   <AlertCircle className="w-3.5 h-3.5 text-rose-700" />
-                  <span>{plant.stock} In Stock (Negative / Oversold)</span>
+                  <span>{plant.stock} Qty (Oversold)</span>
                 </>
               ) : plant.stock === 0 ? (
                 <>
                   <AlertCircle className="w-3.5 h-3.5 text-red-600" />
-                  <span>0 In Stock (Out of Stock)</span>
+                  <span>0 Qty (Out of Stock)</span>
                 </>
               ) : (
                 <>
                   <Check className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>{plant.stock} In Stock</span>
+                  <span>Qty: {plant.stock} In Stock</span>
                 </>
               )}
             </span>
+          </div>
+
+          {/* Line below 'item number', 'Size' and Quantity line: Price Dropdown */}
+          <div id="confirm-plant-pricing" className="pt-2 mt-0.5 border-t border-[#012d1d]/10 flex items-center justify-between gap-2 flex-nowrap">
+            <div className="flex items-center gap-1.5 min-w-0">
+              <div className="w-6 h-6 rounded-md bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center shrink-0 shadow-2xs">
+                <DollarSign className="w-3.5 h-3.5 text-[#a0f4c8]" />
+              </div>
+              <span className="text-xs sm:text-sm text-[#414844] font-bold whitespace-nowrap truncate">
+                Rate: <strong className="text-[#012d1d] font-black uppercase">{selectedPriceLevel === 'gardenCenter' ? 'GARDEN' : selectedPriceLevel}</strong>
+              </span>
+            </div>
+
+            <div className="flex items-center gap-1.5 shrink-0">
+              <PricingDropdown
+                plant={plant}
+                currentPrice={selectedUnitPrice}
+                selectedLevelKey={selectedPriceLevel}
+                onSelectPriceLevel={handlePriceChange}
+                size="md"
+                align="right"
+                priceClassName="text-[19px] sm:text-[21px] font-black text-[#012d1d]"
+                buttonClassName="py-1.5 px-2.5 sm:px-3 rounded-xl border-2 border-[#012d1d]/20 hover:border-[#012d1d] bg-white shadow-xs"
+              />
+              <span className="text-xs font-bold text-[#717973] uppercase tracking-wide shrink-0">
+                /{unitLabel}
+              </span>
+            </div>
           </div>
         </div>
 
@@ -851,30 +891,6 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
               })}
             </div>
           )}
-        </div>
-
-        {/* Pricing Tier & Unit Price Selector */}
-        <div id="confirm-plant-pricing" className="bg-[#f3f4f0]/70 p-3.5 rounded-2xl border border-[#c1c8c2]/60 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center gap-2">
-            <DollarSign className="w-4 h-4 text-[#012d1d]" />
-            <span className="text-xs text-[#414844]">
-              Customer Rate: <strong className="text-[#012d1d] font-extrabold">{selectedPriceLevel.toUpperCase()}</strong>
-            </span>
-          </div>
-
-          <div className="flex items-center gap-2 shrink-0">
-            <PricingDropdown
-              plant={plant}
-              currentPrice={selectedUnitPrice}
-              selectedLevelKey={selectedPriceLevel}
-              onSelectPriceLevel={handlePriceChange}
-              size="sm"
-            />
-            <span className="text-lg font-extrabold text-[#012d1d] min-w-[70px] text-right">
-              ${selectedUnitPrice.toFixed(2)}
-              <span className="text-xs text-[#717973] font-medium block">/{unitLabel}</span>
-            </span>
-          </div>
         </div>
 
         {/* Fulfillment Choice: Take Now vs Stage for Pickup */}

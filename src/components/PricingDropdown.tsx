@@ -12,6 +12,8 @@ interface PricingDropdownProps {
   size?: 'xs' | 'sm' | 'md';
   align?: 'left' | 'right';
   className?: string;
+  priceClassName?: string;
+  buttonClassName?: string;
 }
 
 export const PricingDropdown: React.FC<PricingDropdownProps> = ({
@@ -22,7 +24,9 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
   isInteractive = true,
   size = 'sm',
   align = 'right',
-  className = ''
+  className = '',
+  priceClassName = '',
+  buttonClassName = ''
 }) => {
   const [isOpen, setIsOpen] = useState<boolean>(false);
   const dropdownRef = useRef<HTMLDivElement | null>(null);
@@ -115,10 +119,10 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
           isOpen
             ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-sm ring-2 ring-[#a0f4c8]/50'
             : 'bg-white hover:bg-[#f9faf6] text-[#012d1d] border-[#c1c8c2] shadow-2xs hover:border-[#0e6c4a]'
-        }`}
+        } ${buttonClassName}`}
         title="Click to view and switch between all 4 POS price levels"
       >
-        <span className="font-extrabold text-[#012d1d] group-hover:text-[#0e6c4a]">
+        <span className={`font-extrabold text-[#012d1d] group-hover:text-[#0e6c4a] ${priceClassName}`}>
           ${displayPrice.toFixed(2)}
         </span>
 

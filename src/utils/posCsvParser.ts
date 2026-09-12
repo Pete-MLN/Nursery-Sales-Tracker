@@ -57,10 +57,10 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
     const stat = normalizedRow['STAT'] || normalizedRow['STATUS'] || 'A';
     const locId = normalizedRow['LOC_ID'] || normalizedRow['STORE_ID'] || '101';
 
-    // Display Name prioritization
+    // Display Name prioritization - Column "DESCR" is the primary botanical/nursery catalog description
     const commonName = addlDescr1 || descr || `Item #${itemNo}`;
     const botanicalName = descr;
-    const primaryName = addlDescr1 ? addlDescr1 : descr ? descr : `Item #${itemNo}`;
+    const primaryName = descr ? descr : addlDescr1 ? addlDescr1 : `Item #${itemNo}`;
 
     const effectivePrice = retailPrice ?? wholesalePrice ?? 0;
 
@@ -114,6 +114,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
     };
 
     if (parsedGps) plantItem.gpsLocation = parsedGps;
+    if (descr) plantItem.descr = descr;
     if (commonName) plantItem.commonName = commonName;
     if (botanicalName) plantItem.botanicalName = botanicalName;
     if (stkUnit) plantItem.size = stkUnit;

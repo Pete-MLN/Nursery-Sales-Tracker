@@ -301,7 +301,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   }, [cameraActive, cameraTimeout, cameraStream]);
 
   // Bulk Quick Selector State
-  const [bulkTab, setBulkTab] = useState<'ALL' | 'MULCH' | 'STONE' | 'TOP SOIL'>('ALL');
+  const [bulkTab, setBulkTab] = useState<'ALL' | 'MULCH' | 'STONE' | 'TOP SOIL'>('MULCH');
   const [isBulkSectionOpen, setIsBulkSectionOpen] = useState<boolean>(false);
 
   // Plant Name Search Modal & Autocomplete State
@@ -1536,7 +1536,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             {/* Category Filter Pills (Visible when open) */}
             {isBulkSectionOpen && (
               <div className="flex items-center gap-1.5 overflow-x-auto text-xs sm:text-sm">
-                {(['ALL', 'MULCH', 'STONE', 'TOP SOIL'] as const).map((tab) => (
+                {(['MULCH', 'STONE', 'TOP SOIL', 'ALL'] as const).map((tab) => (
                   <button
                     key={tab}
                     type="button"
@@ -2250,32 +2250,38 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       <img
                         src={item.plant.image || DEFAULT_PLANT_IMAGE}
                         alt={item.plant.name}
-                        className="w-12 h-12 rounded-lg object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]/60 mt-0.5 group-hover:border-[#0e6c4a] transition-colors"
+                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]/60 mt-0.5 group-hover:border-[#0e6c4a] transition-colors"
                         referrerPolicy="no-referrer"
                         onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
                       />
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 className="font-extrabold text-base text-[#1a1c1a] group-hover:text-[#0e6c4a] transition-colors truncate">
+                          <h3 className="font-black text-[24px] sm:text-[27px] text-[#1a1c1a] group-hover:text-[#0e6c4a] transition-colors leading-tight">
                             {item.plant.name}
                           </h3>
                         </div>
 
+                        {(item.plant.botanicalName || item.plant.commonName) && (
+                          <p className="text-[18px] sm:text-[20px] text-[#414844] italic truncate mt-1 font-medium">
+                            {item.plant.botanicalName || item.plant.commonName}
+                          </p>
+                        )}
+
                         {/* High-Visibility Loading Identifiers: Product #, Size & GPS Status Indicator */}
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#012d1d] shadow-2xs">
-                            <Tag className="w-3 h-3 text-[#a0f4c8]" />
+                        <div className="flex items-center gap-2 mt-2 flex-wrap">
+                          <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[20px] sm:text-[22px] font-black px-3 py-1 rounded-xl flex items-center gap-1.5 border border-[#012d1d] shadow-2xs">
+                            <Tag className="w-5 h-5 text-[#a0f4c8]" />
                             #{item.plant.itemNo || item.plant.barcode || 'N/A'}
                           </span>
-                          <span className="bg-[#461702] text-amber-100 text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#461702] shadow-2xs">
-                            <Package className="w-3 h-3 text-amber-300" />
+                          <span className="bg-[#461702] text-amber-100 text-[20px] sm:text-[22px] font-black px-3 py-1 rounded-xl flex items-center gap-1.5 border border-[#461702] shadow-2xs">
+                            <Package className="w-5 h-5 text-amber-300" />
                             SIZE: {item.plant.size || 'Standard'}
                           </span>
 
                           {/* GPS Logged Status Indicator Badge */}
                           {gpsLocation ? (
-                            <span className="bg-[#0e6c4a] text-[#a0f4c8] text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-[#0e6c4a] shadow-2xs">
-                              <MapPin className="w-3 h-3 text-[#a0f4c8]" />
+                            <span className="bg-[#0e6c4a] text-[#a0f4c8] text-xs font-black px-2.5 py-1 rounded-lg flex items-center gap-1 border border-[#0e6c4a] shadow-2xs">
+                              <MapPin className="w-3.5 h-3.5 text-[#a0f4c8]" />
                               <span>GPS Logged</span>
                             </span>
                           ) : (
@@ -2285,12 +2291,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             </span>
                           )}
                         </div>
-                        
-                        {(item.plant.botanicalName || item.plant.commonName) && (
-                          <p className="text-xs text-[#414844] italic truncate mt-1">
-                            {item.plant.botanicalName || item.plant.commonName}
-                          </p>
-                        )}
 
                         {/* Interactive 4-Tier Pricing Dropdown */}
                         <div className="flex items-center gap-2 mt-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
@@ -2333,23 +2333,23 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   {/* Quantity, Pick-up/Delivery, GPS & View on Map Action Controls */}
                   <div className="flex flex-wrap items-center justify-between gap-2 mt-1 pt-2 border-t border-[#f3f4f0]">
                     {/* Stepper Quantity */}
-                    <div className="flex items-center bg-[#f3f4f0] rounded-lg border border-[#c1c8c2]">
+                    <div className="flex items-center bg-[#f3f4f0] rounded-xl border border-[#c1c8c2] shadow-2xs">
                       <button
                         onClick={() => updateQuantity(item.plant.id, -1)}
-                        className="p-1.5 hover:bg-[#e2e3df] text-[#1a1c1a] rounded-l-lg transition-colors cursor-pointer"
+                        className="p-2 sm:p-2.5 hover:bg-[#e2e3df] text-[#1a1c1a] rounded-l-xl transition-colors cursor-pointer"
                         title="Decrease Quantity"
                       >
-                        <Minus className="w-3.5 h-3.5" />
+                        <Minus className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
-                      <span className="w-8 text-center font-bold text-sm text-[#012d1d]">
+                      <span className="w-10 sm:w-12 text-center font-black text-[22px] sm:text-[25px] text-[#012d1d]">
                         {item.quantity}
                       </span>
                       <button
                         onClick={() => updateQuantity(item.plant.id, 1)}
-                        className="p-1.5 hover:bg-[#e2e3df] text-[#1a1c1a] rounded-r-lg transition-colors cursor-pointer"
+                        className="p-2 sm:p-2.5 hover:bg-[#e2e3df] text-[#1a1c1a] rounded-r-xl transition-colors cursor-pointer"
                         title="Increase Quantity"
                       >
-                        <Plus className="w-3.5 h-3.5" />
+                        <Plus className="w-4 h-4 sm:w-5 sm:h-5" />
                       </button>
                     </div>
 
@@ -3028,14 +3028,14 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
                       {/* Content Row: Metadata Badges on Left, Stacked Pricing Dropdown & Add Button on Right */}
                       <div className="flex items-center justify-between gap-3 pt-0.5">
-                        <div className="flex flex-col gap-1.5 min-w-0 flex-1">
-                          <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
-                              <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
+                        <div className="flex flex-col gap-2 min-w-0 flex-1">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[21px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0 shadow-2xs">
+                              <Tag className="w-4 h-4 text-[#a0f4c8]" />
                               #{plant.itemNo || plant.barcode || 'N/A'}
                             </span>
-                            <span className="bg-[#461702] text-amber-100 text-[11px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
-                              <Package className="w-2.5 h-2.5 text-amber-300" />
+                            <span className="bg-[#461702] text-amber-100 text-[21px] font-bold px-2.5 py-1 rounded-lg flex items-center gap-1.5 shrink-0 shadow-2xs">
+                              <Package className="w-4 h-4 text-amber-300" />
                               SIZE: {plant.size || 'Standard'}
                             </span>
                           </div>
@@ -3072,6 +3072,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                               addPlantToCart(plant, 1, levelKey);
                             }}
                             size="xs"
+                            priceClassName="text-[22px] font-black tracking-tight leading-none"
+                            buttonClassName="py-1 px-2.5"
                             align="right"
                           />
 

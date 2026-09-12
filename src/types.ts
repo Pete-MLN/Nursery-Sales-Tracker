@@ -25,6 +25,7 @@ export interface GPSLocationEntry {
 export interface PlantItem {
   id: string;
   name: string; // Common name or description
+  descr?: string; // Directly from uploaded column "DESCR"
   botanicalName?: string; // DESCR (e.g. Spiraea jap. Little Princess)
   commonName?: string; // ADDL_DESCR_1 (e.g. Little Princess Japanese Spirea)
   itemNo?: string; // ITEM_NO (e.g. 1000)

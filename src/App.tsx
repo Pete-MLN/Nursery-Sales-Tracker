@@ -170,7 +170,46 @@ export default function App() {
     seedInitialFirestoreData();
 
     const unsubPlants = subscribeToPlants((data) => {
-      if (data && data.length > 0) setInventory(data);
+      if (data && data.length > 0) {
+        // Deduplicate plants to prevent duplicate entries from past imports or overlapping IDs
+        const deduped: PlantItem[] = [];
+        const seenKeys = new Set<string>();
+
+        for (const p of data) {
+          const itemNoKey = (p.itemNo || '').trim().toUpperCase();
+          const nameKey = (p.name || '').trim().toUpperCase().replace(/\s+/g, ' ');
+          const barcodeKey = (p.barcode || '').trim().toUpperCase();
+
+          const isDuplicate =
+            (itemNoKey && seenKeys.has(`item:${itemNoKey}`)) ||
+            (nameKey && seenKeys.has(`name:${nameKey}`)) ||
+            (barcodeKey && barcodeKey.length > 2 && seenKeys.has(`barcode:${barcodeKey}`)) ||
+            seenKeys.has(`id:${p.id}`);
+
+          if (!isDuplicate) {
+            if (itemNoKey) seenKeys.add(`item:${itemNoKey}`);
+            if (nameKey) seenKeys.add(`name:${nameKey}`);
+            if (barcodeKey && barcodeKey.length > 2) seenKeys.add(`barcode:${barcodeKey}`);
+            seenKeys.add(`id:${p.id}`);
+            deduped.push({ ...p });
+          } else {
+            const existing = deduped.find(u =>
+              (itemNoKey && (u.itemNo || '').trim().toUpperCase() === itemNoKey) ||
+              (nameKey && (u.name || '').trim().toUpperCase().replace(/\s+/g, ' ') === nameKey) ||
+              (barcodeKey && barcodeKey.length > 2 && (u.barcode || '').trim().toUpperCase() === barcodeKey) ||
+              u.id === p.id
+            );
+            if (existing) {
+              if (!existing.gpsLocation && p.gpsLocation) existing.gpsLocation = p.gpsLocation;
+              if ((!existing.holdingLocation || existing.holdingLocation === '') && p.holdingLocation) existing.holdingLocation = p.holdingLocation;
+              if (p.stock > existing.stock) existing.stock = p.stock;
+              if (p.price && (!existing.price || existing.price === 0)) existing.price = p.price;
+              if (p.prices && (!existing.prices || Object.keys(existing.prices).length === 0)) existing.prices = p.prices;
+            }
+          }
+        }
+        setInventory(deduped);
+      }
     });
     const unsubCustomers = subscribeToCustomers((data) => {
       if (data && data.length > 0) {
@@ -543,34 +582,66 @@ export default function App() {
   };
 
   const handleImportInventoryPlants = (newPlants: PlantItem[]) => {
-    // Preserve existing plant GPS coordinates and holding locations across inventory updates
-    const mergedPlants = newPlants.map(newPlant => {
+    // Preserve existing plant IDs, GPS coordinates, and holding locations across inventory updates
+    const mergedList: PlantItem[] = [];
+    const seenImportKeys = new Set<string>();
+
+    for (const newPlant of newPlants) {
       // Find matching existing plant by itemNo, barcode, id, or normalized name
       const existingMatch = inventory.find(existing => 
-        (newPlant.itemNo && existing.itemNo && newPlant.itemNo.trim() === existing.itemNo.trim()) ||
-        (newPlant.barcode && existing.barcode && newPlant.barcode.trim() === existing.barcode.trim()) ||
+        (newPlant.itemNo && existing.itemNo && newPlant.itemNo.trim().toUpperCase() === existing.itemNo.trim().toUpperCase()) ||
+        (newPlant.barcode && existing.barcode && newPlant.barcode.trim().toUpperCase() === existing.barcode.trim().toUpperCase()) ||
         (newPlant.id && existing.id && newPlant.id === existing.id) ||
         (newPlant.name && existing.name && newPlant.name.toLowerCase().trim() === existing.name.toLowerCase().trim())
       );
 
-      if (existingMatch) {
-        return {
-          ...newPlant,
-          // If the uploaded file didn't supply new GPS coordinates, preserve existing logged GPS
-          gpsLocation: newPlant.gpsLocation || existingMatch.gpsLocation || undefined,
-          gpsLocations: newPlant.gpsLocations || existingMatch.gpsLocations || undefined,
-          // Preserve holding location if existing has one and uploaded is empty
-          holdingLocation: newPlant.holdingLocation || existingMatch.holdingLocation || undefined,
-          // Preserve descr / botanicalName
-          descr: newPlant.descr || existingMatch.descr || undefined,
-          botanicalName: newPlant.botanicalName || existingMatch.botanicalName || undefined
-        };
-      }
-      return newPlant;
-    });
+      const resolvedPlant: PlantItem = existingMatch ? {
+        ...newPlant,
+        // Crucial: preserve existing ID so Firestore updates the existing document instead of duplicating!
+        id: existingMatch.id,
+        // If the uploaded file didn't supply new GPS coordinates, preserve existing logged GPS
+        gpsLocation: newPlant.gpsLocation || existingMatch.gpsLocation || undefined,
+        gpsLocations: newPlant.gpsLocations || existingMatch.gpsLocations || undefined,
+        // Preserve holding location if existing has one and uploaded is empty
+        holdingLocation: newPlant.holdingLocation || existingMatch.holdingLocation || undefined,
+        // Preserve descr / botanicalName
+        descr: newPlant.descr || existingMatch.descr || undefined,
+        botanicalName: newPlant.botanicalName || existingMatch.botanicalName || undefined
+      } : newPlant;
 
-    setInventory(mergedPlants);
-    batchSavePlantsToFirestore(mergedPlants);
+      const itemNoKey = (resolvedPlant.itemNo || '').trim().toUpperCase();
+      const nameKey = (resolvedPlant.name || '').trim().toUpperCase().replace(/\s+/g, ' ');
+      const barcodeKey = (resolvedPlant.barcode || '').trim().toUpperCase();
+
+      const isDup =
+        (itemNoKey && seenImportKeys.has(`item:${itemNoKey}`)) ||
+        (nameKey && seenImportKeys.has(`name:${nameKey}`)) ||
+        (barcodeKey && barcodeKey.length > 2 && seenImportKeys.has(`barcode:${barcodeKey}`)) ||
+        seenImportKeys.has(`id:${resolvedPlant.id}`);
+
+      if (!isDup) {
+        if (itemNoKey) seenImportKeys.add(`item:${itemNoKey}`);
+        if (nameKey) seenImportKeys.add(`name:${nameKey}`);
+        if (barcodeKey && barcodeKey.length > 2) seenImportKeys.add(`barcode:${barcodeKey}`);
+        seenImportKeys.add(`id:${resolvedPlant.id}`);
+        mergedList.push(resolvedPlant);
+      } else {
+        const existing = mergedList.find(u =>
+          (itemNoKey && (u.itemNo || '').trim().toUpperCase() === itemNoKey) ||
+          (nameKey && (u.name || '').trim().toUpperCase().replace(/\s+/g, ' ') === nameKey) ||
+          (barcodeKey && barcodeKey.length > 2 && (u.barcode || '').trim().toUpperCase() === barcodeKey) ||
+          u.id === resolvedPlant.id
+        );
+        if (existing) {
+          if (!existing.gpsLocation && resolvedPlant.gpsLocation) existing.gpsLocation = resolvedPlant.gpsLocation;
+          if ((!existing.holdingLocation || existing.holdingLocation === '') && resolvedPlant.holdingLocation) existing.holdingLocation = resolvedPlant.holdingLocation;
+          if (resolvedPlant.stock > existing.stock) existing.stock = resolvedPlant.stock;
+        }
+      }
+    }
+
+    setInventory(mergedList);
+    batchSavePlantsToFirestore(mergedList);
   };
 
   const handleImportCustomers = (newCustomers: Customer[]) => {

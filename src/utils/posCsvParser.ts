@@ -123,7 +123,21 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
     if (addlDescr2) plantItem.holdingLocation = addlDescr2;
     if (subcatCod) plantItem.subCategoryCode = subcatCod;
 
-    plants.push(plantItem);
+    const existingIndex = plants.findIndex(p => 
+      (plantItem.itemNo && p.itemNo && plantItem.itemNo.trim().toUpperCase() === p.itemNo.trim().toUpperCase()) ||
+      (plantItem.barcode && p.barcode && plantItem.barcode.trim().toUpperCase() === p.barcode.trim().toUpperCase())
+    );
+
+    if (existingIndex >= 0) {
+      const existing = plants[existingIndex];
+      existing.stock = Math.max(existing.stock, plantItem.stock);
+      if (plantItem.gpsLocation && !existing.gpsLocation) existing.gpsLocation = plantItem.gpsLocation;
+      if (plantItem.holdingLocation && !existing.holdingLocation) existing.holdingLocation = plantItem.holdingLocation;
+      if (plantItem.prices) existing.prices = { ...(existing.prices || {}), ...plantItem.prices };
+      if (plantItem.descr && !existing.descr) existing.descr = plantItem.descr;
+    } else {
+      plants.push(plantItem);
+    }
   });
 
   return plants;

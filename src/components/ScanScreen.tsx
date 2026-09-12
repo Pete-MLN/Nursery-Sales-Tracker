@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer, Order, GPSLocationEntry } from '../types';
 import { DEFAULT_PLANT_IMAGE, DEFAULT_CUSTOMER } from '../data/mockData';
 import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink, Square } from 'lucide-react';
@@ -1219,21 +1219,66 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     );
   });
 
-  const bulkItems = inventory.filter(p => {
-    const cat = (p.category || '').toUpperCase();
-    const name = (p.name || '').toUpperCase();
-    const isMulch = cat.includes('MULCH') || name.includes('MULCH');
-    const isStone = cat.includes('STONE') || cat.includes('GRAVEL') || name.includes('STONE') || name.includes('GRAVEL');
-    const isSoil = cat.includes('SOIL') || cat.includes('DIRT') || name.includes('SOIL') || name.includes('TOP SOIL') || name.includes('COMPOST');
-    
-    if (bulkTab === 'MULCH') return isMulch;
-    if (bulkTab === 'STONE') return isStone;
-    if (bulkTab === 'TOP SOIL') return isSoil;
-    return isMulch || isStone || isSoil;
-  });
+  // Deduplicate and filter Bulk Quick Select items so the same product never appears more than once
+  const bulkItems = useMemo(() => {
+    const rawMatches = inventory.filter(p => {
+      if (p.statusActive === false) return false;
+      const cat = (p.category || '').toUpperCase();
+      const name = (p.name || '').toUpperCase();
+      const descr = (p.descr || '').toUpperCase();
+      const isMulch = cat.includes('MULCH') || name.includes('MULCH') || descr.includes('MULCH');
+      const isStone = cat.includes('STONE') || cat.includes('GRAVEL') || name.includes('STONE') || name.includes('GRAVEL') || descr.includes('STONE') || descr.includes('GRAVEL');
+      const isSoil = cat.includes('SOIL') || cat.includes('DIRT') || name.includes('SOIL') || name.includes('TOP SOIL') || name.includes('COMPOST') || descr.includes('SOIL') || descr.includes('TOP SOIL');
+      
+      if (bulkTab === 'MULCH') return isMulch;
+      if (bulkTab === 'STONE') return isStone;
+      if (bulkTab === 'TOP SOIL') return isSoil;
+      return isMulch || isStone || isSoil;
+    });
+
+    const uniqueBulkList: PlantItem[] = [];
+    const seenKeys = new Set<string>();
+
+    for (const p of rawMatches) {
+      const itemNoKey = (p.itemNo || '').trim().toUpperCase();
+      const nameKey = (p.name || '').trim().toUpperCase().replace(/\s+/g, ' ');
+      const barcodeKey = (p.barcode || '').trim().toUpperCase();
+
+      const isDuplicate =
+        (itemNoKey && seenKeys.has(`item:${itemNoKey}`)) ||
+        (nameKey && seenKeys.has(`name:${nameKey}`)) ||
+        (barcodeKey && barcodeKey.length > 2 && seenKeys.has(`barcode:${barcodeKey}`)) ||
+        seenKeys.has(`id:${p.id}`);
+
+      if (!isDuplicate) {
+        if (itemNoKey) seenKeys.add(`item:${itemNoKey}`);
+        if (nameKey) seenKeys.add(`name:${nameKey}`);
+        if (barcodeKey && barcodeKey.length > 2) seenKeys.add(`barcode:${barcodeKey}`);
+        seenKeys.add(`id:${p.id}`);
+        uniqueBulkList.push({ ...p });
+      } else {
+        // Merge metadata into the existing card so no data is lost
+        const existing = uniqueBulkList.find(u =>
+          (itemNoKey && (u.itemNo || '').trim().toUpperCase() === itemNoKey) ||
+          (nameKey && (u.name || '').trim().toUpperCase().replace(/\s+/g, ' ') === nameKey) ||
+          (barcodeKey && barcodeKey.length > 2 && (u.barcode || '').trim().toUpperCase() === barcodeKey) ||
+          u.id === p.id
+        );
+        if (existing) {
+          if (!existing.gpsLocation && p.gpsLocation) existing.gpsLocation = p.gpsLocation;
+          if ((!existing.holdingLocation || existing.holdingLocation === '') && p.holdingLocation) existing.holdingLocation = p.holdingLocation;
+          if (p.stock > existing.stock) existing.stock = p.stock;
+          if (p.price && (!existing.price || existing.price === 0)) existing.price = p.price;
+          if (p.prices && (!existing.prices || Object.keys(existing.prices).length === 0)) existing.prices = p.prices;
+        }
+      }
+    }
+
+    return uniqueBulkList;
+  }, [inventory, bulkTab]);
 
   return (
-    <div className="flex-1 px-4 py-4 w-full max-w-2xl mx-auto pb-44 animate-fade-in flex flex-col gap-4">
+    <div className="flex-1 px-4 py-4 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-4">
       {/* Active Order Editing Banner */}
       {activeOrder && (
         <div className="bg-[#e7f8ef] border border-[#a0f4c8] p-3.5 rounded-2xl flex items-center justify-between gap-3 shadow-2xs">
@@ -1556,7 +1601,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
           {/* Collapsible Grid Content */}
           {isBulkSectionOpen && (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 max-h-64 overflow-y-auto pr-0.5 animate-fade-in pt-1">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 max-h-80 sm:max-h-96 overflow-y-auto pr-0.5 animate-fade-in pt-1">
               {bulkItems.length === 0 ? (
                 <p className="text-xs text-[#717973] py-3 col-span-2 text-center bg-white rounded-xl border border-dashed border-[#c1c8c2]">
                   No items found under category {bulkTab}.
@@ -1570,27 +1615,46 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   return (
                     <div
                       key={plant.id}
-                      className="bg-white p-3 rounded-xl border border-[#c1c8c2] flex flex-col justify-between gap-2.5 shadow-2xs hover:border-[#0e6c4a] transition-all"
+                      className="bg-white p-3.5 rounded-xl border border-[#c1c8c2] flex flex-col justify-between gap-3 shadow-2xs hover:border-[#0e6c4a] transition-all"
                     >
-                      <div className="flex items-start justify-between gap-2 min-w-0">
-                        <div className="min-w-0 flex-1">
+                      <div className="flex flex-col gap-2 w-full">
+                        {/* Top Badges & Price Row */}
+                        <div className="flex items-center justify-between gap-2 flex-wrap">
                           <div className="flex items-center gap-1.5 flex-wrap">
-                            <span className="text-xs font-extrabold uppercase px-2 py-0.5 rounded bg-[#012d1d] text-[#a0f4c8]">
+                            <span className="text-xs font-black uppercase px-2 py-0.5 rounded bg-[#012d1d] text-[#a0f4c8]">
                               {plant.category || 'BULK'}
                             </span>
+                            {plant.itemNo && (
+                              <span className="text-xs font-mono font-bold text-[#525a55] bg-[#f3f4f0] px-1.5 py-0.5 rounded border border-[#c1c8c2]">
+                                #{plant.itemNo}
+                              </span>
+                            )}
                             {inCart && (
                               <span className="text-xs font-bold text-[#0e6c4a] bg-[#a0f4c8] px-2 py-0.5 rounded">
                                 {inCart.quantity} {unitLabel}(s) in order
                               </span>
                             )}
                           </div>
-                          <h4 className="font-extrabold text-base text-[#1a1c1a] truncate mt-1" title={plant.name}>
+                          <span className="text-sm sm:text-base font-black text-[#012d1d] bg-[#f3f4f0] px-2 py-0.5 rounded-lg border border-[#c1c8c2]/50 shrink-0 ml-auto">
+                            ${plant.price.toFixed(2)} / {unitLabel}
+                          </span>
+                        </div>
+
+                        {/* DESCR Plant Name - Full width without cut-off */}
+                        <div className="w-full">
+                          <h4 
+                            id={`bulk-plant-name-${plant.id}`}
+                            className="font-black text-base sm:text-lg text-[#012d1d] leading-snug break-words w-full" 
+                            title={plant.name}
+                          >
                             {plant.name}
                           </h4>
+                          {(plant.botanicalName || plant.commonName) && (
+                            <p className="text-xs text-[#525a55] italic mt-0.5 break-words">
+                              {plant.botanicalName || plant.commonName}
+                            </p>
+                          )}
                         </div>
-                        <span className="text-base font-extrabold text-[#012d1d] shrink-0">
-                          ${plant.price.toFixed(2)} / {unitLabel}
-                        </span>
                       </div>
 
                       {/* 0.5 and 1.0 Increment Action Buttons */}

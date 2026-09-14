@@ -123,6 +123,30 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
     if (addlDescr2) plantItem.holdingLocation = addlDescr2;
     if (subcatCod) plantItem.subCategoryCode = subcatCod;
 
+    // Sale Price / Discount if optionally present in spreadsheet
+    const rawSalePrice = parsePosCurrency(normalizedRow['SALE_PRICE'] || normalizedRow['SALE_PRC'] || normalizedRow['SPECIAL_PRICE'] || normalizedRow['PROMO_PRICE']);
+    const rawDiscountPct = parsePosCurrency(normalizedRow['DISCOUNT_PERCENT'] || normalizedRow['DISCOUNT_PCT'] || normalizedRow['DISCOUNT'] || normalizedRow['SALE_PCT']);
+    const saleLabel = normalizedRow['SALE_LABEL'] || normalizedRow['SALE_TAG'] || normalizedRow['SALE_NAME'] || '';
+
+    if (rawSalePrice !== undefined && rawSalePrice > 0) {
+      plantItem.saleDiscount = {
+        type: 'fixed_price',
+        value: rawSalePrice,
+        salePrice: rawSalePrice,
+        saleLabel: saleLabel || 'Special Sale',
+        active: true,
+        appliedAt: new Date().toISOString()
+      };
+    } else if (rawDiscountPct !== undefined && rawDiscountPct > 0 && rawDiscountPct <= 100) {
+      plantItem.saleDiscount = {
+        type: 'percentage',
+        value: rawDiscountPct,
+        saleLabel: saleLabel || `${rawDiscountPct}% OFF`,
+        active: true,
+        appliedAt: new Date().toISOString()
+      };
+    }
+
     const existingIndex = plants.findIndex(p => 
       (plantItem.itemNo && p.itemNo && plantItem.itemNo.trim().toUpperCase() === p.itemNo.trim().toUpperCase()) ||
       (plantItem.barcode && p.barcode && plantItem.barcode.trim().toUpperCase() === p.barcode.trim().toUpperCase())
@@ -135,6 +159,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
       if (plantItem.holdingLocation && !existing.holdingLocation) existing.holdingLocation = plantItem.holdingLocation;
       if (plantItem.prices) existing.prices = { ...(existing.prices || {}), ...plantItem.prices };
       if (plantItem.descr && !existing.descr) existing.descr = plantItem.descr;
+      if (plantItem.saleDiscount && !existing.saleDiscount) existing.saleDiscount = plantItem.saleDiscount;
     } else {
       plants.push(plantItem);
     }

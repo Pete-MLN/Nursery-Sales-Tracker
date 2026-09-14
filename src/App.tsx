@@ -652,7 +652,9 @@ export default function App() {
         holdingLocation: newPlant.holdingLocation || existingMatch.holdingLocation || undefined,
         // Preserve descr / botanicalName
         descr: newPlant.descr || existingMatch.descr || undefined,
-        botanicalName: newPlant.botanicalName || existingMatch.botanicalName || undefined
+        botanicalName: newPlant.botanicalName || existingMatch.botanicalName || undefined,
+        // Preserve custom sale prices and active discounts configured in the app
+        saleDiscount: newPlant.saleDiscount || existingMatch.saleDiscount || undefined
       } : newPlant;
 
       const itemNoKey = (resolvedPlant.itemNo || '').trim().toUpperCase();
@@ -682,6 +684,7 @@ export default function App() {
           if (!existing.gpsLocation && resolvedPlant.gpsLocation) existing.gpsLocation = resolvedPlant.gpsLocation;
           if ((!existing.holdingLocation || existing.holdingLocation === '') && resolvedPlant.holdingLocation) existing.holdingLocation = resolvedPlant.holdingLocation;
           if (resolvedPlant.stock > existing.stock) existing.stock = resolvedPlant.stock;
+          if (!existing.saleDiscount && resolvedPlant.saleDiscount) existing.saleDiscount = resolvedPlant.saleDiscount;
         }
       }
     }

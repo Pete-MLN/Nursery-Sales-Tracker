@@ -209,6 +209,24 @@ export function getActiveDraft(existingOrders?: Order[]): OrderDraft | null {
 
     const draft = parsed as OrderDraft;
 
+    // Filter out legacy default items from cart if any were saved in local draft
+    if (Array.isArray(draft.cartItems)) {
+      draft.cartItems = draft.cartItems.filter(ci => {
+        const itemNo = (ci.plant?.itemNo || '').trim().toUpperCase();
+        const id = (ci.plant?.id || '').trim().toLowerCase();
+        return (
+          itemNo !== 'BLK-M1' &&
+          itemNo !== 'BLK-M2' &&
+          itemNo !== 'BLK-ST1' &&
+          itemNo !== 'BLK-ST2' &&
+          id !== 'blk-m1' &&
+          id !== 'blk-m2' &&
+          id !== 'blk-st1' &&
+          id !== 'blk-st2'
+        );
+      });
+    }
+
     // Check if the draft actually has meaningful data
     const hasItems = Array.isArray(draft.cartItems) && draft.cartItems.length > 0;
     const hasCustomer = typeof draft.customerName === 'string' && draft.customerName.trim().length > 0;

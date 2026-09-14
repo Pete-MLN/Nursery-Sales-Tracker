@@ -85,14 +85,14 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
 
   const topics: { id: GuideTopic; label: string; icon: React.ReactNode; badge?: string }[] = [
     { id: 'all', label: 'All Topics', icon: <BookOpen className="w-4 h-4" /> },
-    { id: 'new_order', label: '1. New Order & Customers', icon: <UserPlus className="w-4 h-4" />, badge: 'Essential' },
+    { id: 'new_order', label: '1. New Order & Fast-Track', icon: <UserPlus className="w-4 h-4" />, badge: 'Take Now' },
     { id: 'catalog_pricing', label: '2. Catalog & 4-Tier Pricing', icon: <Tag className="w-4 h-4" />, badge: 'Updated' },
     { id: 'gps_mapping', label: '3. GPS Yard Mapping & Pins', icon: <Navigation className="w-4 h-4" />, badge: 'Sub-Meter' },
     { id: 'holding_bays', label: '4. Staging Bays & Greenhouses', icon: <Warehouse className="w-4 h-4" /> },
     { id: 'editing_order', label: '5. Edit & Modify Orders', icon: <Edit3 className="w-4 h-4" /> },
     { id: 'partial_pickup', label: '6. Partial Pickup & Staff Email', icon: <Mail className="w-4 h-4" /> },
     { id: 'inventory_audit', label: '7. Stock Audits & Counts', icon: <ClipboardCheck className="w-4 h-4" />, badge: 'Audit Tool' },
-    { id: 'completing_order', label: '8. Complete & Archive', icon: <CheckCircle2 className="w-4 h-4" /> },
+    { id: 'completing_order', label: '8. Complete & Archive', icon: <CheckCircle2 className="w-4 h-4" />, badge: 'Fast-Track' },
     { id: 'data_sync', label: '9. Customers & POS Sync', icon: <FileSpreadsheet className="w-4 h-4" /> },
   ];
 
@@ -120,7 +120,7 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
               Nursery Staff User Guide
             </h1>
             <p className="text-xs sm:text-sm text-white/80 mt-1 max-w-2xl leading-relaxed">
-              Complete reference manual for creating customer orders, utilizing the enhanced plant catalog search, applying 4-tier POS pricing, tagging sub-meter GPS yard coordinates, managing partial pickups, and running physical inventory audits.
+              Complete reference manual for creating customer orders, expedited "Take Now" walk-in sales with direct email/text receipts, 1-tap "Next Customer" checkout, plant catalog lookup, 4-tier POS pricing, sub-meter GPS yard pinning, and inventory cycle audits.
             </p>
           </div>
         </div>
@@ -399,8 +399,114 @@ export const InstructionsScreen: React.FC<InstructionsScreenProps> = ({ onNaviga
                     <span>4. Bulk Materials Quick-Add</span>
                   </div>
                   <p className="text-[#414844]">
-                    Tap the <strong>Bulk Soil / Mulch / Stone</strong> bar to add 0.5 yard, 1 yard, or 2 yard increments with a single tap without needing tags.
+                    Tap the <strong>Bulk Soil / Mulch / Stone</strong> bar to add 0.5 yard, 1 yard, or 2 yard increments with a single tap. Products are consolidated and deduplicated with live yard stock.
                   </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Step 3: Fast-Track "Take Now (Email/Text)" vs "Stage / Finish" */}
+            <div className="flex flex-col gap-3 pt-4 border-t border-[#f3f4f0]">
+              <div className="flex items-center justify-between flex-wrap gap-2">
+                <h3 className="text-base font-extrabold text-[#012d1d] flex items-center gap-2">
+                  <Zap className="w-5 h-5 text-[#0e6c4a] fill-[#0e6c4a]" />
+                  <span>Step 3: Fast-Track "Take Now (Email/Text)" vs. "Stage / Finish"</span>
+                </h3>
+                <span className="text-[11px] font-extrabold px-2.5 py-0.5 rounded-full bg-[#012d1d] text-[#a0f4c8] border border-[#a0f4c8]/30">
+                  ⚡ Minimum Clicks Speed Checkout
+                </span>
+              </div>
+              <p className="text-xs sm:text-sm text-[#414844] leading-relaxed">
+                When ringing up a sale on the Scan Screen, staff have two distinct checkout paths designed to eliminate unnecessary steps depending on whether the customer is walking out now or staging for later:
+              </p>
+
+              {/* Visual Simulation of Dual Checkout Buttons */}
+              <div className="bg-[#f9faf6] border-2 border-dashed border-[#c1c8c2] rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                    <Smartphone className="w-4 h-4 text-[#0e6c4a]" />
+                    <span>Interactive Preview: Fast-Track Checkout Controls</span>
+                  </span>
+                  <span className="text-[10px] font-bold bg-[#0e6c4a] text-white px-2 py-0.5 rounded">
+                    Scan Screen Top Bar & Footer
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  {/* Option 1: Fast-Track Take Now */}
+                  <div className="p-4 bg-white rounded-2xl border-2 border-[#0e6c4a] shadow-xs flex flex-col justify-between gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-[#0e6c4a] flex items-center gap-1">
+                          <Zap className="w-3.5 h-3.5 fill-[#0e6c4a]" />
+                          Walk-In / In-Hand Sale
+                        </span>
+                        <span className="text-[10px] font-extrabold bg-[#a0f4c8] text-[#012d1d] px-2 py-0.5 rounded-full">
+                          1-Tap Bypass
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-sm text-[#012d1d]">
+                        "Take Now (Email/Text)" Button
+                      </h4>
+                      <p className="text-xs text-[#414844] leading-relaxed">
+                        Use whenever the customer is taking plants with them right now. Tap this button (available in both the top action bar and bottom cart bar) to:
+                      </p>
+                      <ul className="text-[11px] text-[#414844] list-disc list-inside space-y-1 mt-1">
+                        <li><strong>Skip staging holding area</strong> selection completely.</li>
+                        <li>Automatically tag items as <em>Taken by Customer</em>.</li>
+                        <li>Jump directly to <strong>Order Finalization</strong>.</li>
+                        <li>One-tap access to <strong>Email Receipt</strong>, <strong>Email Office</strong>, or <strong>Text Employee (SMS)</strong>.</li>
+                        <li>Tap <strong>"Next Customer"</strong> to clear the cart and instantly ring up the next customer in line.</li>
+                      </ul>
+                    </div>
+
+                    <div className="pt-2 border-t border-[#f3f4f0]">
+                      <button
+                        type="button"
+                        className="w-full bg-[#0e6c4a] text-white font-extrabold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 shadow-sm pointer-events-none"
+                      >
+                        <Zap className="w-4 h-4 text-[#a0f4c8] fill-[#a0f4c8]" />
+                        <span>Take Now (Email/Text)</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Option 2: Stage / Finish */}
+                  <div className="p-4 bg-white rounded-2xl border border-[#c1c8c2] shadow-xs flex flex-col justify-between gap-3">
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-black uppercase tracking-wider text-[#461702] flex items-center gap-1">
+                          <Warehouse className="w-3.5 h-3.5 text-[#461702]" />
+                          Hold For Later / Delivery
+                        </span>
+                        <span className="text-[10px] font-extrabold bg-[#f3f4f0] text-[#414844] px-2 py-0.5 rounded-full">
+                          Staging Flow
+                        </span>
+                      </div>
+                      <h4 className="font-extrabold text-sm text-[#012d1d]">
+                        "Stage / Finish" Button
+                      </h4>
+                      <p className="text-xs text-[#414844] leading-relaxed">
+                        Use when an order needs to be pulled from hoop houses or field rows and stored in physical nursery staging bays:
+                      </p>
+                      <ul className="text-[11px] text-[#414844] list-disc list-inside space-y-1 mt-1">
+                        <li>Assign physical <strong>Holding Bays 1 through 20</strong> or greenhouse zones.</li>
+                        <li>Schedule customer pickup date and target time.</li>
+                        <li>Configure delivery truck address and driver loading instructions.</li>
+                        <li>Status automatically sets to <em>Pending (Staging)</em>.</li>
+                      </ul>
+                    </div>
+
+                    <div className="pt-2 border-t border-[#f3f4f0]">
+                      <button
+                        type="button"
+                        className="w-full bg-[#012d1d] text-[#a0f4c8] font-extrabold text-xs py-2.5 px-3 rounded-xl flex items-center justify-center gap-2 shadow-sm pointer-events-none"
+                      >
+                        <CheckCircle className="w-4 h-4 text-[#a0f4c8]" />
+                        <span>Stage / Finish</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </div>
             </div>
@@ -1263,6 +1369,73 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
             </div>
           </div>
 
+          {/* Fast-Track Immediate Hand-off & Next Customer Flow */}
+          <div className="bg-[#012d1d] text-white rounded-2xl p-4 sm:p-5 border border-[#a0f4c8]/30 flex flex-col gap-3 shadow-md">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-xl bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center border border-[#a0f4c8]/30">
+                  <Zap className="w-4 h-4 fill-[#a0f4c8]" />
+                </div>
+                <div>
+                  <h3 className="font-extrabold text-sm sm:text-base text-white">
+                    Fast-Track "Take Now" Banner & Next Customer Flow
+                  </h3>
+                  <span className="text-[11px] text-[#a0f4c8] font-semibold">
+                    Streamlined line-busting checkout for in-person pickups
+                  </span>
+                </div>
+              </div>
+              <span className="text-[10px] font-extrabold bg-[#a0f4c8] text-[#012d1d] px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                ⚡ Zero Delay
+              </span>
+            </div>
+
+            <p className="text-xs text-emerald-100/90 leading-relaxed">
+              When an order is created via <strong>"Take Now (Email/Text)"</strong> or marked as <em>Taken by Customer</em>, the Order Finalization screen automatically adapts:
+            </p>
+
+            {/* Visual simulation of Immediate Hand-off Banner */}
+            <div className="bg-[#08422a] border border-[#a0f4c8]/30 rounded-xl p-3.5 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shrink-0">
+                  <Zap className="w-4 h-4 fill-[#a0f4c8]" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-black text-xs sm:text-sm text-[#a0f4c8]">⚡ Immediate Hand-off / Take Now</span>
+                    <span className="bg-[#0e6c4a] text-white text-[9px] font-extrabold px-2 py-0.2 rounded-full uppercase">
+                      No Staging Needed
+                    </span>
+                  </div>
+                  <p className="text-[11px] text-emerald-200 mt-0.5">
+                    Customer took all items. Email or text their receipt, then start the next sale.
+                  </p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <div className="px-3 py-1.5 bg-[#a0f4c8] text-[#012d1d] font-black text-xs rounded-lg flex items-center gap-1.5 shadow-xs">
+                  <Plus className="w-3.5 h-3.5 text-[#012d1d]" />
+                  <span>Next Customer</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs text-emerald-100/90 mt-1">
+              <div className="p-3 bg-[#002113]/50 rounded-xl border border-[#a0f4c8]/20">
+                <strong className="text-[#a0f4c8] block mb-1 font-bold">1. Send Immediate Receipt</strong>
+                <p className="text-[11px] leading-relaxed">
+                  Use the <strong>"Email Receipt"</strong> button to send an itemized invoice to the customer, or <strong>"Text Employee (SMS)"</strong> to alert yard crews. The customer leaves with their documentation in seconds.
+                </p>
+              </div>
+              <div className="p-3 bg-[#002113]/50 rounded-xl border border-[#a0f4c8]/20">
+                <strong className="text-[#a0f4c8] block mb-1 font-bold">2. One-Tap "Next Customer" Reset</strong>
+                <p className="text-[11px] leading-relaxed">
+                  Tap the <strong>"Next Customer"</strong> button in either the top bar or inside the green hand-off banner. It instantly resets the cart and returns to the Scan Screen ready for the next customer in line.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Native Phone Apps Integration Guide */}
           <div className="bg-[#f3f4f0] rounded-2xl p-4 sm:p-5 border border-[#c1c8c2] flex flex-col gap-3">
             <div className="flex items-center gap-2">
@@ -1376,6 +1549,64 @@ Customer took first 5 on flatbed. Coming back with trailer tomorrow. Daily water
           </div>
 
           <div className="flex flex-col gap-2.5">
+            {/* FAQ: Take Now Fast-Track Flow */}
+            <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleFaq('faq_take_now_fast_track')}
+                className="w-full p-4 text-left font-extrabold text-sm text-[#012d1d] bg-[#f9faf6] hover:bg-[#f3f4f0] flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Zap className="w-4 h-4 text-[#0e6c4a] fill-[#0e6c4a] shrink-0" />
+                  <span>Q: How do I ring up a customer taking plants immediately and email/text their receipt fast?</span>
+                </div>
+                {expandedFaq === 'faq_take_now_fast_track' ? <ChevronUp className="w-4 h-4 text-[#012d1d]" /> : <ChevronDown className="w-4 h-4 text-[#717973]" />}
+              </button>
+              {expandedFaq === 'faq_take_now_fast_track' && (
+                <div className="p-4 bg-white text-xs text-[#414844] border-t border-[#c1c8c2] flex flex-col gap-2 leading-relaxed">
+                  <p>
+                    <strong>Answer:</strong> On the Scan Screen, add the customer's plants and materials using the scanner or catalog. Then tap the emerald <strong>"Take Now (Email/Text)"</strong> button located in either the top quick bar or at the bottom of your cart.
+                  </p>
+                  <p>
+                    This button is specifically designed for customers taking their order immediately. It automatically:
+                  </p>
+                  <ul className="list-disc list-inside space-y-1 pl-1">
+                    <li>Skips holding bay / staging selection entirely.</li>
+                    <li>Marks all items as <em>Taken by Customer</em>.</li>
+                    <li>Brings you straight to the <strong>Order Finalization</strong> screen with an <strong>"⚡ Immediate Hand-off"</strong> banner.</li>
+                  </ul>
+                  <p>
+                    From there, tap <strong>"Email Receipt"</strong> to open their invoice in your device's email client or <strong>"Text Employee (SMS)"</strong> to dispatch an SMS confirmation. Then tap <strong>"Next Customer"</strong> to start the next sale in seconds!
+                  </p>
+                </div>
+              )}
+            </div>
+
+            {/* FAQ: Next Customer Button */}
+            <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
+              <button
+                type="button"
+                onClick={() => toggleFaq('faq_next_customer')}
+                className="w-full p-4 text-left font-extrabold text-sm text-[#012d1d] bg-[#f9faf6] hover:bg-[#f3f4f0] flex items-center justify-between transition-colors cursor-pointer"
+              >
+                <div className="flex items-center gap-2">
+                  <Plus className="w-4 h-4 text-[#0e6c4a] shrink-0" />
+                  <span>Q: How does the "Next Customer" button help speed up checkout lines?</span>
+                </div>
+                {expandedFaq === 'faq_next_customer' ? <ChevronUp className="w-4 h-4 text-[#012d1d]" /> : <ChevronDown className="w-4 h-4 text-[#717973]" />}
+              </button>
+              {expandedFaq === 'faq_next_customer' && (
+                <div className="p-4 bg-white text-xs text-[#414844] border-t border-[#c1c8c2] flex flex-col gap-2 leading-relaxed">
+                  <p>
+                    <strong>Answer:</strong> After emailing or texting a customer's receipt on the Order Finalization screen, tap <strong>"Next Customer"</strong> (located in both the top navigation bar and inside the fast-track banner).
+                  </p>
+                  <p>
+                    With one single tap, the app safely saves the completed order, clears all cart items and customer inputs, and brings you directly back to the Scan Screen ready to scan plants for the next person waiting in line. You don't have to navigate through the home menu or click multiple back buttons.
+                  </p>
+                </div>
+              )}
+            </div>
+
             {/* FAQ: Plant Catalog Search & 4-Tier Pricing */}
             <div className="border border-[#c1c8c2] rounded-2xl overflow-hidden">
               <button

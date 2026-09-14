@@ -44,7 +44,9 @@ import {
   Tag,
   Send,
   RefreshCw,
-  Map as MapIcon
+  Map as MapIcon,
+  Zap,
+  Flame,
 } from 'lucide-react';
 import { PricingDropdown } from './PricingDropdown';
 import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
@@ -71,6 +73,7 @@ interface OrderFinalizationScreenProps {
   onUpdateOrder?: (updatedOrder: Order) => void;
   onDeleteOrder?: (orderId: string) => void;
   onSendNotification?: (type: string) => void;
+  onStartNewOrder?: () => void;
 }
 
 export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = ({
@@ -82,7 +85,8 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   holdingAreas = [],
   onUpdateOrder,
   onDeleteOrder,
-  onSendNotification
+  onSendNotification,
+  onStartNewOrder
 }) => {
   // Check if uncommitted edit draft exists for this order
   const savedEditDraft = order?.id ? getDraftForOrderId(order.id) : null;
@@ -304,6 +308,14 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   // Computed Totals
   const calculatedTotal = items.reduce((sum, item) => sum + (getItemEffectiveUnitPrice(item) * item.quantity), 0);
   const calculatedItemsCount = items.reduce((sum, item) => sum + item.quantity, 0);
+  const calculatedSavings = items.reduce((sum, item) => {
+    const eff = getItemEffectiveUnitPrice(item);
+    const regular = item.originalPrice ?? (item.plant.prices?.retail ?? item.plant.price);
+    if (regular > eff) {
+      return sum + ((regular - eff) * item.quantity);
+    }
+    return sum;
+  }, 0);
 
   // Helper to switch or set price tier for a specific item in the order
   const handleUpdateItemPriceLevel = (plantId: string, levelKey: PriceLevelKey, newPrice: number) => {
@@ -929,6 +941,18 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               Unsaved Edits
             </span>
           )}
+          {onStartNewOrder && (
+            <button
+              type="button"
+              id="btn-top-next-customer"
+              onClick={onStartNewOrder}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0e6c4a] hover:bg-[#0b5338] text-white text-xs sm:text-sm font-extrabold shadow-sm transition-all cursor-pointer border border-[#a0f4c8]/30 active:scale-95"
+              title="Start a fresh order for the next customer"
+            >
+              <Plus className="w-4 h-4 text-[#a0f4c8]" />
+              <span>Next Customer</span>
+            </button>
+          )}
           <button
             type="button"
             id="btn-order-finalization-cancel-delete"
@@ -950,6 +974,42 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           </button>
         </div>
       </div>
+
+      {/* Fast-Track Immediate Order Banner */}
+      {(currentOrder.type === 'Take Now' || currentOrder.holdingLocation?.includes('Taken by Customer') || currentOrder.status === 'Completed') && (
+        <div className="p-3.5 sm:p-4 rounded-2xl bg-[#012d1d] border border-[#a0f4c8]/30 text-white flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 shadow-md animate-fade-in">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shrink-0 border border-[#a0f4c8]/30">
+              <Zap className="w-5 h-5 fill-[#a0f4c8]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <span className="font-black text-sm sm:text-base text-[#a0f4c8]">⚡ Immediate Hand-off / Take Now</span>
+                <span className="bg-[#0e6c4a] text-white text-[10px] font-extrabold px-2.5 py-0.5 rounded-full uppercase tracking-wider">
+                  No Staging Needed
+                </span>
+              </div>
+              <p className="text-xs text-emerald-100 mt-0.5">
+                Customer took all items. Use the buttons below to email or text their receipt, then start the next sale.
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            {onStartNewOrder && (
+              <button
+                type="button"
+                id="btn-take-now-next-customer"
+                onClick={onStartNewOrder}
+                className="w-full sm:w-auto px-4 py-2.5 bg-[#a0f4c8] hover:bg-white text-[#012d1d] font-black text-xs sm:text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                title="Finish and start a fresh order for the next customer"
+              >
+                <Plus className="w-4 h-4 text-[#012d1d]" />
+                <span>Next Customer</span>
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Order Header Card */}
       <div className="bg-white p-5 rounded-2xl border border-[#c1c8c2] shadow-xs flex flex-col gap-4">
@@ -1967,8 +2027,17 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
         <div className="pt-4 border-t border-[#f3f4f0] flex flex-col gap-1.5 text-xs">
           <div className="flex justify-between text-[#414844]">
             <span>Items Subtotal ({calculatedItemsCount} total qty):</span>
-            <span className="font-bold text-[#1a1c1a]">${calculatedTotal.toFixed(2)}</span>
+            <span className="font-bold text-[#1a1c1a]">${(calculatedTotal + calculatedSavings).toFixed(2)}</span>
           </div>
+          {calculatedSavings > 0 && (
+            <div className="flex justify-between text-rose-700 bg-rose-50 px-2.5 py-1 rounded-lg font-bold">
+              <span className="flex items-center gap-1">
+                <Flame className="w-3.5 h-3.5 text-rose-600" />
+                <span>Special Sale Savings:</span>
+              </span>
+              <span>-${calculatedSavings.toFixed(2)}</span>
+            </div>
+          )}
           <div className="flex justify-between text-[#414844]">
             <span>Estimated Sales Tax:</span>
             <span className="font-bold text-[#1a1c1a]">$0.00 (Exempt/Wholesale/Calculated at Register)</span>

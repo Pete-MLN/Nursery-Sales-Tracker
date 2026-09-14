@@ -79,7 +79,22 @@ export default function App() {
     };
   });
 
-  const [inventory, setInventory] = useState<PlantItem[]>(INITIAL_PLANTS);
+  const [inventory, setInventory] = useState<PlantItem[]>(() => {
+    return INITIAL_PLANTS.filter(p => {
+      const itemNo = (p.itemNo || '').trim().toUpperCase();
+      const id = (p.id || '').trim().toLowerCase();
+      return (
+        itemNo !== 'BLK-M1' &&
+        itemNo !== 'BLK-M2' &&
+        itemNo !== 'BLK-ST1' &&
+        itemNo !== 'BLK-ST2' &&
+        id !== 'blk-m1' &&
+        id !== 'blk-m2' &&
+        id !== 'blk-st1' &&
+        id !== 'blk-st2'
+      );
+    });
+  });
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [uploads, setUploads] = useState<RecentUpload[]>(INITIAL_UPLOADS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
@@ -171,11 +186,37 @@ export default function App() {
 
     const unsubPlants = subscribeToPlants((data) => {
       if (data && data.length > 0) {
+        // Explicitly exclude legacy default products ('BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2')
+        const cleanedData = data.filter(p => {
+          const itemNo = (p.itemNo || '').trim().toUpperCase();
+          const id = (p.id || '').trim().toLowerCase();
+          const barcode = (p.barcode || '').trim().toUpperCase();
+          const name = (p.name || '').trim().toLowerCase();
+          return !(
+            itemNo === 'BLK-M1' ||
+            itemNo === 'BLK-M2' ||
+            itemNo === 'BLK-ST1' ||
+            itemNo === 'BLK-ST2' ||
+            id === 'blk-m1' ||
+            id === 'blk-m2' ||
+            id === 'blk-st1' ||
+            id === 'blk-st2' ||
+            barcode === 'MULCH01' ||
+            barcode === 'MULCH02' ||
+            barcode === 'STONE01' ||
+            barcode === 'STONE02' ||
+            name.includes('round river gravel') ||
+            name.includes('crushed blue limestone') ||
+            (name.includes('dark shredded') && (itemNo === 'BLK-M1' || barcode === 'MULCH01')) ||
+            (name.includes('black dyed hardwood mulch') && (itemNo === 'BLK-M2' || barcode === 'MULCH02'))
+          );
+        });
+
         // Deduplicate plants to prevent duplicate entries from past imports or overlapping IDs
         const deduped: PlantItem[] = [];
         const seenKeys = new Set<string>();
 
-        for (const p of data) {
+        for (const p of cleanedData) {
           const itemNoKey = (p.itemNo || '').trim().toUpperCase();
           const nameKey = (p.name || '').trim().toUpperCase().replace(/\s+/g, ' ');
           const barcodeKey = (p.barcode || '').trim().toUpperCase();
@@ -354,6 +395,11 @@ export default function App() {
       setInventory(prev => prev.map(item => item.id === id ? newPlantItem : item));
       savePlantToFirestore(newPlantItem);
     }
+  };
+
+  const handleUpdatePlant = (updatedPlant: PlantItem) => {
+    setInventory(prev => prev.map(item => item.id === updatedPlant.id ? updatedPlant : item));
+    savePlantToFirestore(updatedPlant);
   };
 
   const navigateTo = (screen: ScreenType) => {
@@ -709,6 +755,7 @@ export default function App() {
             onDeleteOrder={handleDeleteOrder}
             cameraTimeout={cameraTimeout}
             onUpdateCameraTimeout={handleUpdateCameraTimeout}
+            onUpdatePlant={handleUpdatePlant}
           />
         )}
 
@@ -718,6 +765,7 @@ export default function App() {
             inventory={inventory}
             onUpdateStock={handleUpdateStock}
             stockAlertSettings={stockAlertSettings}
+            onUpdatePlant={handleUpdatePlant}
           />
         )}
 
@@ -756,6 +804,10 @@ export default function App() {
             holdingAreas={holdingAreas}
             onUpdateOrder={handleUpdateOrder}
             onDeleteOrder={handleDeleteOrder}
+            onStartNewOrder={() => {
+              setActiveOrder(null);
+              navigateTo('scan');
+            }}
           />
         )}
 

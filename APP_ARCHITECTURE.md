@@ -75,6 +75,9 @@ To ensure 100% aesthetic consistency across every view, modal, card, and button,
   - **Bulk Preset Chips**: Instant addition of bulk materials (Mulch, Top Soil, Stone) in 0.5 and 1.0 increments.
   - **4-Tier Price Level Engine**: Real-time selection among Retail (Tier 1), Landscape Contractor (Tier 2), Wholesale Nursery (Tier 3), and Elite Garden Center (Tier 4).
   - **Fulfillment Tagging**: Per-item toggle between "Take Now" and "Pick-up/Delivery".
+  - **Expedited "Take Now (Email/Text)" Checkout**:
+    - Dedicated emerald button in both top quick-bar (`btn-top-take-now-finalize`) and bottom checkout bar (`btn-customer-took-order`).
+    - Eliminates extra steps for walk-in buyers: auto-sets fulfillment to 'Take Now', marks location as 'Taken by Customer', skips holding bay selection, and lands directly on Order Finalization.
   - **GPS Yard Location Logging (MANDATORY FEATURE)**:
     - Dedicated **"Log GPS" / "Update GPS"** button on every cart item card.
     - Sub-meter device geolocation capture with fallback to nursery coordinates.
@@ -88,6 +91,12 @@ To ensure 100% aesthetic consistency across every view, modal, card, and button,
 #### 3. Order Finalization Screen (`finalization`) - `OrderFinalizationScreen.tsx`
 - **Purpose**: Review complete order details, set fulfillment schedule, assign staging bays, and save/print.
 - **Workflow & Features**:
+  - **Fast-Track Immediate Take-Now Banner**:
+    - Automatically displays for orders marked "Take Now" or "Completed" with "⚡ Immediate Hand-off / Take Now — No Staging Needed" badge.
+    - Quick-dispatch buttons: "Email Receipt", "Email Office" (`pete@maplelanenursery.com`), and "Text Employee (SMS)".
+  - **"Next Customer" Button**:
+    - Integrated in both the screen header and the Immediate Hand-off banner.
+    - One-tap action that clears active order state and routes directly back to `scan` screen for line-busting speed.
   - **Customer Profile**: Editable customer name, phone, and email.
   - **Holding Bay Assignment**: Dropdown selector for Holding Bays 1 through 20, or "Take Now".
   - **Fulfillment Scheduling**: Date and time selector for customer pickup or delivery.

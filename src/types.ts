@@ -22,6 +22,17 @@ export interface GPSLocationEntry {
   quantity?: number; // Optional count at this specific spot
 }
 
+export type DiscountType = 'fixed_price' | 'percentage';
+
+export interface PlantSaleDiscount {
+  type: DiscountType; // 'fixed_price' (e.g. $29.99 specific lower price) or 'percentage' (e.g. 20% off)
+  value: number; // Specific sale price in dollars OR discount percentage (1-100)
+  salePrice?: number; // Precalculated unit sale price
+  saleLabel?: string; // Optional label/tag e.g. "Fall Special", "Clearance", "Overstock"
+  active: boolean; // Whether the sale is currently enabled
+  appliedAt?: string; // ISO date timestamp
+}
+
 export interface PlantItem {
   id: string;
   name: string; // Common name or description
@@ -38,6 +49,7 @@ export interface PlantItem {
     gardenCenter?: number; // INV_PRC_4
     elite?: number; // INV_PRC_5
   };
+  saleDiscount?: PlantSaleDiscount; // Sale pricing discount (specific lower price or % off)
   image: string;
   stock: number; // QTY_AVAIL
   quantityCommitted?: number; // QTY_COMMIT
@@ -62,6 +74,8 @@ export interface OrderCartItem {
   quantity: number;
   selectedPriceLevel?: 'retail' | 'wholesale' | 'gardenCenter' | 'elite';
   selectedPrice?: number;
+  saleDiscount?: PlantSaleDiscount; // Snapshot of discount applied to this line item
+  originalPrice?: number; // Base retail price prior to discount
   pickedUpQuantity?: number; // Number of units customer has taken (0 to quantity)
   gpsLocation?: {
     latitude: number;

@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { PlantItem, OrderCartItem, GPSLocationEntry } from '../types';
-import { PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
+import { PriceLevelKey, getPlantPriceTiers, isPlantOnSale, getPlantSaleSavings, getPlantSalePrice } from '../utils/pricingUtils';
 import { PricingDropdown } from './PricingDropdown';
+import { PlantSaleModal } from './PlantSaleModal';
 import { 
   acquireHighPrecisionGps, 
   formatGpsCoordinates, 
@@ -25,7 +26,9 @@ import {
   Radio,
   Trash2,
   FileText,
-  Layers
+  Layers,
+  Flame,
+  Percent
 } from 'lucide-react';
 
 interface PlantVerificationModalProps {
@@ -35,6 +38,7 @@ interface PlantVerificationModalProps {
   initialPriceLevel?: PriceLevelKey;
   existingCartItem?: OrderCartItem | null;
   customerType?: 'RETAIL' | 'WHOLESALE';
+  onUpdatePlant?: (updatedPlant: PlantItem) => void;
   onConfirm: (
     plant: PlantItem, 
     quantity: number, 
@@ -55,15 +59,27 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   initialPriceLevel,
   existingCartItem,
   customerType = 'RETAIL',
+  onUpdatePlant,
   onConfirm,
   onClose
 }) => {
-  const isBulk = Boolean(plant && ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
-    (plant.category || '').toUpperCase().includes(cat) || plant.name.toUpperCase().includes(cat)
+  const [activePlant, setActivePlant] = useState<PlantItem | null>(plant);
+  const [isSaleModalOpen, setIsSaleModalOpen] = useState<boolean>(false);
+
+  useEffect(() => {
+    setActivePlant(plant);
+  }, [plant]);
+
+  const currentPlant = activePlant || plant;
+  const catUpper = (currentPlant?.category || '').toUpperCase();
+  const isStone = Boolean(currentPlant && (catUpper.includes('STONE') || catUpper.includes('GRAVEL')));
+  const isBulk = Boolean(currentPlant && (
+    ['MULCH', 'STONE', 'TOP SOIL'].some(cat => catUpper.includes(cat)) ||
+    (currentPlant?.name || '').toUpperCase().includes('MULCH') ||
+    (currentPlant?.name || '').toUpperCase().includes('TOP SOIL')
   ));
-  const isStone = Boolean(plant && ((plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE')));
-  const unitLabel = plant?.size && plant.size.length < 10 
-    ? plant.size 
+  const unitLabel = currentPlant?.size && currentPlant.size.length < 10 
+    ? currentPlant.size 
     : (isStone ? 'Ton' : (isBulk ? 'Yard' : 'Plant'));
 
   // Determine initial pricing tier and price
@@ -71,8 +87,10 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
     || initialPriceLevel
     || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
   
-  const tiers = plant ? getPlantPriceTiers(plant) : [];
+  const tiers = currentPlant ? getPlantPriceTiers(currentPlant) : [];
   const matchedTier = tiers.find(t => t.key === defaultTier) || tiers[0] || { price: 0 };
+  const currentSalePrice = isPlantOnSale(currentPlant) ? getPlantSalePrice(currentPlant) : null;
+  const saleSavings = currentPlant ? getPlantSaleSavings(currentPlant) : null;
 
   const [quantity, setQuantity] = useState<number>(() => {
     if (existingCartItem) return existingCartItem.quantity;
@@ -90,6 +108,9 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   const [selectedUnitPrice, setSelectedUnitPrice] = useState<number>(() => {
     if (existingCartItem && existingCartItem.selectedPrice !== undefined) {
       return existingCartItem.selectedPrice;
+    }
+    if (currentSalePrice !== null && defaultTier === 'retail') {
+      return currentSalePrice;
     }
     return matchedTier.price;
   });
@@ -161,7 +182,10 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
       const plantTiers = getPlantPriceTiers(plant);
       const match = plantTiers.find(t => t.key === tierKey) || plantTiers[0];
-      setSelectedUnitPrice(existingCartItem?.selectedPrice ?? match.price);
+      const salePrc = isPlantOnSale(plant) ? getPlantSalePrice(plant) : null;
+      const initialEffectivePrice = existingCartItem?.selectedPrice 
+        ?? (salePrc !== null && tierKey === 'retail' ? salePrc : match.price);
+      setSelectedUnitPrice(initialEffectivePrice);
 
       // Initialize multiple GPS locations
       let initialLocs: GPSLocationEntry[] = [];
@@ -360,6 +384,20 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
   const subtotal = selectedUnitPrice * quantity;
 
+  const handleSaveSaleDiscount = (updatedPlant: PlantItem) => {
+    setActivePlant(updatedPlant);
+    if (onUpdatePlant) {
+      onUpdatePlant(updatedPlant);
+    }
+    const newSalePrice = isPlantOnSale(updatedPlant) ? getPlantSalePrice(updatedPlant) : null;
+    if (newSalePrice !== null && selectedPriceLevel === 'retail') {
+      setSelectedUnitPrice(newSalePrice);
+    } else if (!isPlantOnSale(updatedPlant) && selectedPriceLevel === 'retail') {
+      const regular = updatedPlant.prices?.retail ?? updatedPlant.price;
+      setSelectedUnitPrice(regular);
+    }
+  };
+
   const handleConfirm = () => {
     const finalQty = Math.max(isBulk ? 0.1 : 1, quantity);
     const primaryGps = gpsLocations.length > 0 
@@ -372,7 +410,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       : gpsLocation;
 
     onConfirm(
-      plant, 
+      currentPlant, 
       finalQty, 
       selectedPriceLevel, 
       selectedUnitPrice, 
@@ -542,7 +580,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
             <div className="flex items-center gap-1.5 shrink-0">
               <PricingDropdown
-                plant={plant}
+                plant={currentPlant}
                 currentPrice={selectedUnitPrice}
                 selectedLevelKey={selectedPriceLevel}
                 onSelectPriceLevel={handlePriceChange}
@@ -556,6 +594,53 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
               </span>
             </div>
           </div>
+
+          {/* Active Sale Banner or Quick Sale Trigger */}
+          {saleSavings ? (
+            <div className="mt-2 bg-rose-50 border border-rose-200 rounded-xl p-2.5 flex items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <Flame className="w-3.5 h-3.5 text-amber-300" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-[10px] font-black uppercase tracking-wider bg-rose-600 text-white px-1.5 py-0.2 rounded">
+                      SALE ACTIVE
+                    </span>
+                    {saleSavings.label && (
+                      <span className="text-xs font-extrabold text-rose-950 truncate">
+                        {saleSavings.label}
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[11px] text-rose-800 font-semibold mt-0.5">
+                    Regular: <span className="line-through">${saleSavings.regularPrice.toFixed(2)}</span> · <span className="font-extrabold text-rose-950">Save ${saleSavings.savingsAmount.toFixed(2)} ({saleSavings.savingsPercent}% OFF)</span>
+                  </div>
+                </div>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setIsSaleModalOpen(true)}
+                className="px-2.5 py-1 rounded-lg border border-rose-300 bg-white hover:bg-rose-100 text-rose-800 text-xs font-extrabold transition-colors cursor-pointer shrink-0 shadow-2xs"
+                title="Adjust or edit sale discount"
+              >
+                Edit Sale
+              </button>
+            </div>
+          ) : (
+            <div className="mt-1.5 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setIsSaleModalOpen(true)}
+                className="text-xs font-bold text-[#0e6c4a] hover:text-[#012d1d] flex items-center gap-1 cursor-pointer transition-colors px-1 py-0.5"
+                title="Apply a special discount or sale price to this plant"
+              >
+                <Flame className="w-3.5 h-3.5 text-rose-600" />
+                <span>+ Set Sale / Discount</span>
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Confirmation & Cancel Action Buttons - Moved to directly below the Plant Information Card */}
@@ -963,6 +1048,16 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
             </span>
           </div>
         </div>
+
+        {/* Plant Sale / Discount Modal */}
+        {isSaleModalOpen && currentPlant && (
+          <PlantSaleModal
+            isOpen={isSaleModalOpen}
+            plant={currentPlant}
+            onSaveDiscount={handleSaveSaleDiscount}
+            onClose={() => setIsSaleModalOpen(false)}
+          />
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { ScreenType, PlantItem, StockAlertSettings } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
+import { isPlantOnSale, getPlantSaleSavings } from '../utils/pricingUtils';
+import { PlantSaleModal } from './PlantSaleModal';
 import { 
   AlertTriangle, 
   Search, 
@@ -18,13 +20,16 @@ import {
   Layers,
   ChevronDown,
   ChevronUp,
-  ClipboardList
+  ClipboardList,
+  Flame,
+  Percent
 } from 'lucide-react';
 
 interface InventoryScreenProps {
   onNavigate: (screen: ScreenType) => void;
   inventory: PlantItem[];
   onUpdateStock: (id: string, newStock: number) => void;
+  onUpdatePlant?: (updatedPlant: PlantItem) => void;
   stockAlertSettings?: StockAlertSettings;
 }
 
@@ -32,12 +37,14 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   onNavigate,
   inventory,
   onUpdateStock,
+  onUpdatePlant,
   stockAlertSettings
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy' | 'sale'>('all');
   const [minQtyOneOnly, setMinQtyOneOnly] = useState<boolean>(true);
   const [expandedPricesItemId, setExpandedPricesItemId] = useState<string | null>(null);
+  const [saleModalPlant, setSaleModalPlant] = useState<PlantItem | null>(null);
 
   const critThreshold = stockAlertSettings?.criticalThreshold ?? 0;
   const warnThreshold = stockAlertSettings?.warningThreshold ?? 5;
@@ -51,6 +58,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const criticalCount = inventory.filter(i => getItemStatus(i) === 'critical').length;
   const warningCount = inventory.filter(i => getItemStatus(i) === 'warning').length;
   const healthyCount = inventory.filter(i => getItemStatus(i) === 'healthy').length;
+  const saleCount = inventory.filter(i => isPlantOnSale(i)).length;
 
   const filteredInventory = inventory.filter(item => {
     if (minQtyOneOnly && item.stock < 1) {
@@ -58,11 +66,13 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     }
 
     const searchTerms = searchTerm.trim().toLowerCase().split(/\s+/).filter(Boolean);
-    const searchable = `${item.name} ${item.botanicalName || ''} ${item.commonName || ''} ${item.itemNo || ''} ${item.size || ''} ${item.category || ''} ${item.holdingLocation || ''} ${item.barcode || ''} ${item.lightRequirement || ''}`.toLowerCase();
+    const saleTag = item.saleDiscount?.saleLabel || '';
+    const searchable = `${item.name} ${item.botanicalName || ''} ${item.commonName || ''} ${item.itemNo || ''} ${item.size || ''} ${item.category || ''} ${item.holdingLocation || ''} ${item.barcode || ''} ${item.lightRequirement || ''} ${saleTag} ${isPlantOnSale(item) ? 'sale discount on-sale' : ''}`.toLowerCase();
     
     const matchesSearch = searchTerms.length === 0 || searchTerms.every(t => searchable.includes(t));
     
     if (statusFilter === 'all') return matchesSearch;
+    if (statusFilter === 'sale') return matchesSearch && isPlantOnSale(item);
     return matchesSearch && getItemStatus(item) === statusFilter;
   });
 
@@ -214,6 +224,23 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             >
               All ({inventory.length})
             </button>
+
+            {/* On Sale Filter Chip */}
+            <button
+              onClick={() => setStatusFilter(statusFilter === 'sale' ? 'all' : 'sale')}
+              className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+                statusFilter === 'sale'
+                  ? 'bg-rose-600 text-white border-rose-600 shadow-xs ring-2 ring-rose-300'
+                  : saleCount > 0
+                  ? 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'
+                  : 'bg-[#f3f4f0] text-[#717973] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+              }`}
+              title="Filter inventory to only show plants currently on sale"
+            >
+              <Flame className={`w-3.5 h-3.5 ${statusFilter === 'sale' ? 'text-amber-300' : 'text-rose-600'}`} />
+              <span>On Sale ({saleCount})</span>
+            </button>
+
             <button
               onClick={() => setStatusFilter('critical')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
@@ -241,7 +268,11 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
         <div className="flex flex-col gap-3">
           {filteredInventory.length === 0 ? (
             <div className="p-8 text-center bg-[#f3f4f0] rounded-xl text-[#717973] border border-dashed border-[#c1c8c2]">
-              <p className="text-xs font-medium">No plant stock matches your search filter.</p>
+              <p className="text-xs font-medium">
+                {statusFilter === 'sale' 
+                  ? 'No plants are currently configured with an active sale discount.' 
+                  : 'No plant stock matches your search filter.'}
+              </p>
               <button
                 onClick={() => { setSearchTerm(''); setStatusFilter('all'); setMinQtyOneOnly(false); }}
                 className="mt-2 text-xs font-bold text-[#0e6c4a] hover:underline"
@@ -260,25 +291,35 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   : { label: 'IN STOCK', bg: 'bg-[#a0f4c8] text-[#0e6c4a] border-[#0e6c4a]/30' };
 
               const isPricesExpanded = expandedPricesItemId === item.id;
+              const saleSavings = getPlantSaleSavings(item);
 
               return (
                 <div
                   key={item.id}
                   className={`p-3.5 rounded-xl border transition-all flex flex-col gap-3 ${
-                    currentStatus === 'critical' 
+                    saleSavings
+                      ? 'bg-[#fffaf9] border-rose-200 hover:border-rose-400 shadow-2xs'
+                      : currentStatus === 'critical' 
                       ? 'bg-[#fff5f5] border-[#ba1a1a]/40' 
                       : 'bg-[#f9faf6] border-[#c1c8c2]/80 hover:border-[#012d1d]'
                   }`}
                 >
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div className="flex items-start gap-3 min-w-0">
-                      <img
-                        src={item.image || DEFAULT_PLANT_IMAGE}
-                        alt={item.name}
-                        className="w-14 h-14 rounded-xl object-cover shrink-0 border border-[#c1c8c2]/50 shadow-2xs mt-0.5"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                      />
+                      <div className="relative shrink-0">
+                        <img
+                          src={item.image || DEFAULT_PLANT_IMAGE}
+                          alt={item.name}
+                          className="w-14 h-14 rounded-xl object-cover shrink-0 border border-[#c1c8c2]/50 shadow-2xs mt-0.5"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                        />
+                        {saleSavings && (
+                          <div className="absolute -top-1.5 -right-1.5 bg-rose-600 text-white rounded-full p-1 shadow-xs animate-bounce-subtle">
+                            <Flame className="w-3 h-3 text-amber-300" />
+                          </div>
+                        )}
+                      </div>
 
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
@@ -296,6 +337,15 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                           <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${statusBadge.bg}`}>
                             {statusBadge.label}
                           </span>
+                          {saleSavings && (
+                            <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                              <Flame className="w-3 h-3 text-amber-300" />
+                              <span>SALE {saleSavings.savingsPercent}% OFF</span>
+                              {item.saleDiscount?.saleLabel && (
+                                <span className="hidden sm:inline font-normal">· {item.saleDiscount.saleLabel}</span>
+                              )}
+                            </span>
+                          )}
                         </div>
 
                         {item.botanicalName && item.botanicalName !== item.name && (
@@ -317,13 +367,45 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                             </span>
                           )}
                           <span className="font-mono text-[#717973]">UPC: #{item.barcode}</span>
-                          <span className="font-bold text-[#012d1d] text-sm">${item.price.toFixed(2)} <span className="text-[10px] font-normal text-[#717973]">(Retail)</span></span>
+
+                          {/* Pricing Display with Sale Support */}
+                          {saleSavings ? (
+                            <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
+                              <span className="line-through text-[#717973] text-xs font-semibold">
+                                ${saleSavings.regularPrice.toFixed(2)}
+                              </span>
+                              <span className="font-black text-rose-700 text-sm flex items-center gap-0.5">
+                                ${saleSavings.salePrice.toFixed(2)}
+                              </span>
+                              <span className="text-[10px] font-bold text-rose-600">
+                                (Save ${saleSavings.savingsAmount.toFixed(2)})
+                              </span>
+                            </div>
+                          ) : (
+                            <span className="font-bold text-[#012d1d] text-sm">
+                              ${item.price.toFixed(2)} <span className="text-[10px] font-normal text-[#717973]">(Retail)</span>
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
                     {/* Stock & Pricing Actions */}
                     <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-0 border-[#e2e3df]">
+                      {/* Sale / Discount Button */}
+                      <button
+                        onClick={() => setSaleModalPlant(item)}
+                        className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                          saleSavings
+                            ? 'bg-rose-600 text-white border-rose-600 hover:bg-rose-700 shadow-2xs'
+                            : 'bg-white text-[#012d1d] border-[#c1c8c2] hover:bg-[#f3f4f0]'
+                        }`}
+                        title={saleSavings ? 'Edit active sale discount' : 'Set a specific sale price or percentage discount'}
+                      >
+                        <Flame className={`w-3.5 h-3.5 ${saleSavings ? 'text-amber-300' : 'text-rose-600'}`} />
+                        <span>{saleSavings ? 'Edit Sale' : 'Sale'}</span>
+                      </button>
+
                       <button
                         onClick={() => setExpandedPricesItemId(isPricesExpanded ? null : item.id)}
                         className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
@@ -365,11 +447,20 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   {/* Collapsible Pricing Tiers Display */}
                   {isPricesExpanded && (
                     <div className="bg-white border border-[#c1c8c2] rounded-xl p-3 grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs animate-fade-in">
-                      <div className="bg-[#f9faf6] p-2 rounded-lg border border-[#e2e3df]">
-                        <span className="block text-[10px] font-bold text-[#717973] uppercase">Level 1 - Retail</span>
-                        <span className="font-bold text-sm text-[#012d1d]">
-                          {item.prices?.retail !== undefined ? `$${item.prices.retail.toFixed(2)}` : `$${item.price.toFixed(2)}`}
+                      <div className={`p-2 rounded-lg border ${saleSavings ? 'bg-rose-50 border-rose-200' : 'bg-[#f9faf6] border-[#e2e3df]'}`}>
+                        <span className="block text-[10px] font-bold text-[#717973] uppercase">
+                          Level 1 - Retail {saleSavings ? '(On Sale)' : ''}
                         </span>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          {saleSavings && (
+                            <span className="line-through text-xs text-[#717973]">
+                              ${saleSavings.regularPrice.toFixed(2)}
+                            </span>
+                          )}
+                          <span className={`font-bold text-sm ${saleSavings ? 'text-rose-700 font-black' : 'text-[#012d1d]'}`}>
+                            ${(saleSavings ? saleSavings.salePrice : (item.prices?.retail ?? item.price)).toFixed(2)}
+                          </span>
+                        </div>
                       </div>
                       <div className="bg-[#f9faf6] p-2 rounded-lg border border-[#e2e3df]">
                         <span className="block text-[10px] font-bold text-[#717973] uppercase">Level 3 - Wholesale</span>
@@ -397,6 +488,20 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           )}
         </div>
       </section>
+
+      {/* Sale / Discount Configuration Modal */}
+      {saleModalPlant && (
+        <PlantSaleModal
+          isOpen={Boolean(saleModalPlant)}
+          plant={saleModalPlant}
+          onSaveDiscount={(updatedPlant) => {
+            if (onUpdatePlant) {
+              onUpdatePlant(updatedPlant);
+            }
+          }}
+          onClose={() => setSaleModalPlant(null)}
+        />
+      )}
     </div>
   );
 };

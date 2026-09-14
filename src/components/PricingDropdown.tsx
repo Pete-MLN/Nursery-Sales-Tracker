@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PlantItem } from '../types';
-import { getPlantPriceTiers, PriceLevelKey, PriceTierInfo } from '../utils/pricingUtils';
-import { ChevronDown, Check, Tag, DollarSign, Layers } from 'lucide-react';
+import { getPlantPriceTiers, PriceLevelKey, PriceTierInfo, isPlantOnSale, getPlantSaleSavings } from '../utils/pricingUtils';
+import { ChevronDown, Check, Tag, DollarSign, Layers, Flame } from 'lucide-react';
 
 interface PricingDropdownProps {
   plant: PlantItem;
@@ -32,6 +32,7 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
   const dropdownRef = useRef<HTMLDivElement | null>(null);
 
   const priceTiers = getPlantPriceTiers(plant);
+  const saleSavings = getPlantSaleSavings(plant);
 
   // Determine which price level is currently active
   const activeLevel: PriceTierInfo = (() => {
@@ -46,7 +47,9 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
     return priceTiers[0]; // Level 1 Retail default
   })();
 
-  const displayPrice = currentPrice !== undefined ? currentPrice : activeLevel.price;
+  const displayPrice = currentPrice !== undefined 
+    ? currentPrice 
+    : (activeLevel.key === 'retail' && saleSavings ? saleSavings.salePrice : activeLevel.price);
 
   // Close dropdown on outside click
   useEffect(() => {
@@ -66,7 +69,8 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
 
   const handleSelect = (tier: PriceTierInfo) => {
     if (onSelectPriceLevel) {
-      onSelectPriceLevel(tier.key, tier.price);
+      const effectivePrice = (tier.key === 'retail' && saleSavings) ? saleSavings.salePrice : tier.price;
+      onSelectPriceLevel(tier.key, effectivePrice);
     }
     setIsOpen(false);
   };
@@ -118,21 +122,30 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
         } ${
           isOpen
             ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-sm ring-2 ring-[#a0f4c8]/50'
+            : saleSavings && activeLevel.key === 'retail'
+            ? 'bg-rose-50 hover:bg-rose-100 text-rose-900 border-rose-300 shadow-2xs'
             : 'bg-white hover:bg-[#f9faf6] text-[#012d1d] border-[#c1c8c2] shadow-2xs hover:border-[#0e6c4a]'
         } ${buttonClassName}`}
         title="Click to view and switch between all 4 POS price levels"
       >
-        <span className={`font-extrabold text-[#012d1d] group-hover:text-[#0e6c4a] ${priceClassName}`}>
+        <span className={`font-extrabold ${saleSavings && activeLevel.key === 'retail' ? 'text-rose-700' : 'text-[#012d1d]'} group-hover:text-[#0e6c4a] ${priceClassName}`}>
           ${displayPrice.toFixed(2)}
         </span>
 
-        <span
-          className={`text-[10px] uppercase tracking-wider font-extrabold px-1.5 py-0.2 rounded border ${
-            isOpen ? 'bg-[#a0f4c8] text-[#002113] border-transparent' : getTierBadgeStyle(activeLevel.key, false)
-          }`}
-        >
-          {activeLevel.shortLabel}
-        </span>
+        {saleSavings && activeLevel.key === 'retail' ? (
+          <span className="bg-rose-600 text-white text-[9px] uppercase tracking-wider font-black px-1.5 py-0.2 rounded flex items-center gap-0.5">
+            <Flame className="w-2.5 h-2.5 text-amber-300" />
+            <span>SALE</span>
+          </span>
+        ) : (
+          <span
+            className={`text-[10px] uppercase tracking-wider font-extrabold px-1.5 py-0.2 rounded border ${
+              isOpen ? 'bg-[#a0f4c8] text-[#002113] border-transparent' : getTierBadgeStyle(activeLevel.key, false)
+            }`}
+          >
+            {activeLevel.shortLabel}
+          </span>
+        )}
 
         {isInteractive && (
           <ChevronDown
@@ -158,15 +171,20 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
                 4 Price Levels
               </span>
             </div>
-            <span className="text-[11px] font-medium text-[#717973]">
-              Select to apply
-            </span>
+            {saleSavings && (
+              <span className="bg-rose-100 text-rose-800 text-[10px] font-black px-1.5 py-0.5 rounded flex items-center gap-1">
+                <Flame className="w-3 h-3 text-rose-600" />
+                <span>Sale Active</span>
+              </span>
+            )}
           </div>
 
           {/* 4 Price Level Options */}
           <div className="p-1.5 flex flex-col gap-1">
             {priceTiers.map((tier) => {
               const isSelected = activeLevel.key === tier.key;
+              const isTierOnSale = tier.key === 'retail' && Boolean(saleSavings);
+              const effectiveTierPrice = isTierOnSale ? saleSavings!.salePrice : tier.price;
 
               return (
                 <button
@@ -176,22 +194,29 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
                   className={`w-full p-2.5 rounded-xl text-left flex items-center justify-between transition-all cursor-pointer ${
                     isSelected
                       ? 'bg-[#e7f8ef] text-[#012d1d] border border-[#a0f4c8] font-bold shadow-2xs'
+                      : isTierOnSale
+                      ? 'bg-rose-50/50 hover:bg-rose-50 text-[#1a1c1a] border border-rose-100'
                       : 'hover:bg-[#f3f4f0] text-[#1a1c1a] border border-transparent'
                   }`}
                 >
                   <div className="flex items-center gap-2.5 min-w-0">
-                    <div className={`w-2.5 h-2.5 rounded-full ${getLevelDotColor(tier.key)} shrink-0`} />
+                    <div className={`w-2.5 h-2.5 rounded-full ${isTierOnSale ? 'bg-rose-600' : getLevelDotColor(tier.key)} shrink-0`} />
                     <div className="min-w-0">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         <span className="text-xs font-extrabold text-[#1a1c1a]">
                           {tier.fullLabel}
                         </span>
+                        {isTierOnSale && (
+                          <span className="bg-rose-600 text-white font-black text-[9px] px-1 py-0.2 rounded">
+                            SALE
+                          </span>
+                        )}
                         <span className="text-[10px] font-mono text-[#717973]">
                           ({tier.posField})
                         </span>
                       </div>
                       <span className="text-[11px] text-[#717973] block truncate">
-                        {tier.key === 'retail' && 'Standard Retail Walk-in Rate'}
+                        {tier.key === 'retail' && (isTierOnSale ? `Sale: Save ${saleSavings!.savingsPercent}% off regular $${saleSavings!.regularPrice.toFixed(2)}` : 'Standard Retail Walk-in Rate')}
                         {tier.key === 'wholesale' && 'Landscaper & Commercial Rate'}
                         {tier.key === 'gardenCenter' && 'Garden Center Reseller Rate'}
                         {tier.key === 'elite' && 'Elite High-Volume Preferred Rate'}
@@ -200,9 +225,16 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
                   </div>
 
                   <div className="flex items-center gap-2 shrink-0 ml-2">
-                    <span className="text-sm font-extrabold text-[#012d1d]">
-                      ${tier.price.toFixed(2)}
-                    </span>
+                    <div className="text-right">
+                      {isTierOnSale && (
+                        <span className="text-[10px] line-through text-[#717973] block">
+                          ${tier.price.toFixed(2)}
+                        </span>
+                      )}
+                      <span className={`text-sm font-extrabold ${isTierOnSale ? 'text-rose-700 font-black' : 'text-[#012d1d]'}`}>
+                        ${effectiveTierPrice.toFixed(2)}
+                      </span>
+                    </div>
                     {isSelected ? (
                       <div className="w-5 h-5 rounded-full bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center">
                         <Check className="w-3 h-3" />
@@ -226,3 +258,4 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
     </div>
   );
 };
+

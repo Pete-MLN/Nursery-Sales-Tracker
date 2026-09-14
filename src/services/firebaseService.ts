@@ -62,6 +62,9 @@ export function cleanForFirestore<T>(obj: T): T {
  */
 export async function seedInitialFirestoreData() {
   try {
+    // Purge unwanted legacy default products ('BLK-M1' and 'BLK-M2') from Firestore if present
+    await purgeUnwantedDefaultProductsFromFirestore();
+
     const plantsSnap = await getDocs(collection(db, PLANTS_COL));
     if (plantsSnap.empty) {
       const batch = writeBatch(db);
@@ -152,10 +155,40 @@ export async function seedInitialFirestoreData() {
 /* --- Real-Time Subscriptions --- */
 
 export function subscribeToPlants(callback: (plants: PlantItem[]) => void) {
+  const targetItemNos = ['BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2'];
+  const targetIds = ['blk-m1', 'blk-m2', 'blk-st1', 'blk-st2'];
+  const targetBarcodes = ['MULCH01', 'MULCH02', 'STONE01', 'STONE02'];
+
   return onSnapshot(collection(db, PLANTS_COL), (snapshot) => {
     const items: PlantItem[] = [];
-    snapshot.forEach((doc) => {
-      items.push(doc.data() as PlantItem);
+    snapshot.forEach((docSnap) => {
+      const plant = docSnap.data() as PlantItem;
+      const itemNo = (plant.itemNo || '').trim().toUpperCase();
+      const barcode = (plant.barcode || '').trim().toUpperCase();
+      const docId = docSnap.id.toLowerCase();
+      const name = (plant.name || '').trim().toLowerCase();
+
+      // Check if this is one of the legacy unwanted default products
+      const isUnwantedDefault =
+        targetItemNos.includes(itemNo) ||
+        targetIds.includes(docId) ||
+        targetBarcodes.includes(barcode) ||
+        itemNo === 'BLK-ST1' ||
+        itemNo === 'BLK-ST2' ||
+        docId === 'blk-st1' ||
+        docId === 'blk-st2' ||
+        name.includes('round river gravel') ||
+        name.includes('crushed blue limestone') ||
+        (name.includes('dark shredded') && (itemNo === 'BLK-M1' || barcode === 'MULCH01')) ||
+        (name.includes('black dyed hardwood mulch') && (itemNo === 'BLK-M2' || barcode === 'MULCH02'));
+
+      if (isUnwantedDefault) {
+        // Auto-purge from Firestore so it never returns
+        deleteDoc(docSnap.ref).catch(() => {});
+        return;
+      }
+
+      items.push(plant);
     });
     callback(items);
   }, (err) => handleSnapshotError(PLANTS_COL, err));
@@ -228,6 +261,76 @@ export function subscribeToAuditSessions(callback: (audits: InventoryAuditSessio
 
 export async function savePlantToFirestore(plant: PlantItem) {
   await setDoc(doc(db, PLANTS_COL, plant.id), cleanForFirestore(plant), { merge: true });
+}
+
+export async function deletePlantFromFirestore(id: string) {
+  try {
+    await deleteDoc(doc(db, PLANTS_COL, id));
+  } catch (err) {
+    console.error('Error deleting plant from Firestore:', err);
+  }
+}
+
+/**
+ * Cleanly purge legacy default bulk products ('BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2') from Firestore
+ */
+export async function purgeUnwantedDefaultProductsFromFirestore() {
+  try {
+    const targetItemNos = ['BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2'];
+    const targetIds = ['blk-m1', 'blk-m2', 'blk-st1', 'blk-st2'];
+    const targetBarcodes = ['MULCH01', 'MULCH02', 'STONE01', 'STONE02'];
+
+    // Direct deletion of known default IDs
+    for (const id of targetIds) {
+      try {
+        const plantRef = doc(db, PLANTS_COL, id);
+        const plantDoc = await getDoc(plantRef);
+        if (plantDoc.exists()) {
+          await deleteDoc(plantRef);
+          console.log(`Purged default product ${id} from Firestore`);
+        }
+      } catch (e) {
+        // Continue with others
+      }
+    }
+
+    // Query scan to ensure any variant or duplicate of these products is purged
+    const plantsSnap = await getDocs(collection(db, PLANTS_COL));
+    const batch = writeBatch(db);
+    let count = 0;
+
+    plantsSnap.forEach((docSnap) => {
+      const data = docSnap.data() as PlantItem;
+      const itemNo = (data.itemNo || '').trim().toUpperCase();
+      const barcode = (data.barcode || '').trim().toUpperCase();
+      const docId = docSnap.id.toLowerCase();
+      const name = (data.name || '').trim().toLowerCase();
+
+      if (
+        targetItemNos.includes(itemNo) ||
+        targetIds.includes(docId) ||
+        targetBarcodes.includes(barcode) ||
+        itemNo === 'BLK-ST1' ||
+        itemNo === 'BLK-ST2' ||
+        docId === 'blk-st1' ||
+        docId === 'blk-st2' ||
+        name.includes('round river gravel') ||
+        name.includes('crushed blue limestone') ||
+        (name.includes('dark shredded') && (itemNo === 'BLK-M1' || barcode === 'MULCH01')) ||
+        (name.includes('black dyed hardwood mulch') && (itemNo === 'BLK-M2' || barcode === 'MULCH02'))
+      ) {
+        batch.delete(docSnap.ref);
+        count++;
+      }
+    });
+
+    if (count > 0) {
+      await batch.commit();
+      console.log(`Batch purged ${count} unwanted default bulk items from Firestore`);
+    }
+  } catch (err) {
+    console.warn('Could not complete default bulk products purge from Firestore:', err);
+  }
 }
 
 export async function batchSavePlantsToFirestore(plants: PlantItem[]) {

@@ -1,11 +1,11 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer, Order, GPSLocationEntry } from '../types';
 import { DEFAULT_PLANT_IMAGE, DEFAULT_CUSTOMER } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink, Square } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink, Square, Flame } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode, isValidBarcodeString } from '../utils/barcodeUtils';
 import { PricingDropdown } from './PricingDropdown';
-import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
+import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers, isPlantOnSale, getPlantSalePrice } from '../utils/pricingUtils';
 import { PlantVerificationModal } from './PlantVerificationModal';
 import { PlantMapModal } from './PlantMapModal';
 import { AutoSaveBadge } from './AutoSaveBadge';
@@ -31,6 +31,7 @@ interface ScanScreenProps {
   onDeleteOrder?: (orderId: string) => void;
   cameraTimeout?: number;
   onUpdateCameraTimeout?: (seconds: number) => void;
+  onUpdatePlant?: (updatedPlant: PlantItem) => void;
 }
 
 export const ScanScreen: React.FC<ScanScreenProps> = ({
@@ -43,7 +44,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   onStartNewOrder,
   onDeleteOrder,
   cameraTimeout = 15,
-  onUpdateCameraTimeout
+  onUpdateCameraTimeout,
+  onUpdatePlant
 }) => {
   // Check if an uncommitted draft exists in localStorage
   const initialDraft = (!activeOrder ? getActiveDraft() : getDraftForOrderId(activeOrder.id));
@@ -360,9 +362,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   // Open the plant verification and quantity pop-up
   const openPlantVerification = (plant: PlantItem, defaultQty?: number, priceLevel?: PriceLevelKey) => {
     const existing = cartItems.find(i => i.plant.id === plant.id) || null;
-    const isBulkItem = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
-      (plant.category || '').toUpperCase().includes(cat) || plant.name.toUpperCase().includes(cat)
-    );
+    const catUpper = (plant.category || '').toUpperCase();
+    const isBulkItem = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => catUpper.includes(cat)) ||
+      (plant.name || '').toUpperCase().includes('MULCH') ||
+      (plant.name || '').toUpperCase().includes('TOP SOIL');
     setVerifyingPlant({
       plant,
       initialQty: defaultQty !== undefined ? defaultQty : (existing ? existing.quantity : (isBulkItem ? 1.0 : 1)),
@@ -388,13 +391,18 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
     setCartItems(prev => {
       const existingIndex = prev.findIndex(i => i.plant.id === plant.id);
+      const isSale = Boolean(plant.saleDiscount?.active);
+      const regPrice = plant.prices?.retail ?? plant.price;
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex] = {
           ...updated[existingIndex],
+          plant,
           quantity: quantity,
           selectedPriceLevel: priceLevel,
           selectedPrice: unitPrice,
+          originalPrice: isSale ? regPrice : undefined,
+          saleDiscount: plant.saleDiscount,
           gpsLocation: resolvedGps || updated[existingIndex].gpsLocation,
           gpsLocations: resolvedGpsList || updated[existingIndex].gpsLocations,
           itemNotes: notes !== undefined ? notes : updated[existingIndex].itemNotes
@@ -408,6 +416,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             quantity,
             selectedPriceLevel: priceLevel,
             selectedPrice: unitPrice,
+            originalPrice: isSale ? regPrice : undefined,
+            saleDiscount: plant.saleDiscount,
             gpsLocation: resolvedGps,
             gpsLocations: resolvedGpsList,
             itemNotes: notes
@@ -448,10 +458,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       try { navigator.vibrate(100); } catch (e) {}
     }
 
-    const isBulk = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => 
-      (plant.category || '').toUpperCase().includes(cat) || plant.name.toUpperCase().includes(cat)
-    );
-    const isStone = (plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE');
+    const catUpper = (plant.category || '').toUpperCase();
+    const isBulk = ['MULCH', 'STONE', 'TOP SOIL'].some(cat => catUpper.includes(cat)) ||
+      (plant.name || '').toUpperCase().includes('MULCH') ||
+      (plant.name || '').toUpperCase().includes('TOP SOIL');
+    const isStone = catUpper.includes('STONE') || catUpper.includes('GRAVEL');
     const unitLabel = plant.size && plant.size.length < 10 ? plant.size : (isStone ? 'Ton' : (isBulk ? 'Yard' : 'Plant'));
     const itemNumDisplay = plant.itemNo || plant.barcode || 'N/A';
     const sizeDisplay = plant.size || (isBulk ? unitLabel : 'Standard');
@@ -1223,12 +1234,34 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const bulkItems = useMemo(() => {
     const rawMatches = inventory.filter(p => {
       if (p.statusActive === false) return false;
-      const cat = (p.category || '').toUpperCase();
+
+      const itemNo = (p.itemNo || '').trim().toUpperCase();
+      const id = (p.id || '').trim().toLowerCase();
+      const barcode = (p.barcode || '').trim().toUpperCase();
+      const nameUpper = (p.name || '').trim().toUpperCase();
+
+      // Exclude legacy mock default items (mulch & stone)
+      if (
+        itemNo === 'BLK-M1' || itemNo === 'BLK-M2' ||
+        itemNo === 'BLK-ST1' || itemNo === 'BLK-ST2' ||
+        id === 'blk-m1' || id === 'blk-m2' ||
+        id === 'blk-st1' || id === 'blk-st2' ||
+        barcode === 'MULCH01' || barcode === 'MULCH02' ||
+        barcode === 'STONE01' || barcode === 'STONE02' ||
+        nameUpper.includes('ROUND RIVER GRAVEL') ||
+        nameUpper.includes('CRUSHED BLUE LIMESTONE')
+      ) {
+        return false;
+      }
+
+      const cat = (p.category || '').toUpperCase().trim();
+      const cleanedCat = cat.replace(/[/\\]+$/, '').trim();
       const name = (p.name || '').toUpperCase();
       const descr = (p.descr || '').toUpperCase();
-      const isMulch = cat.includes('MULCH') || name.includes('MULCH') || descr.includes('MULCH');
-      const isStone = cat.includes('STONE') || cat.includes('GRAVEL') || name.includes('STONE') || name.includes('GRAVEL') || descr.includes('STONE') || descr.includes('GRAVEL');
-      const isSoil = cat.includes('SOIL') || cat.includes('DIRT') || name.includes('SOIL') || name.includes('TOP SOIL') || name.includes('COMPOST') || descr.includes('SOIL') || descr.includes('TOP SOIL');
+      const isMulch = cleanedCat === 'MULCH' || cleanedCat === 'BULK MULCH' || (cleanedCat.startsWith('MULCH') && !cleanedCat.includes('PLANT')) || name.includes('MULCH') || descr.includes('MULCH');
+      // Strictly limit Bulk Stone list to items in Category 'STONE' (never matching plant names or plant categories like stonecrop)
+      const isStone = cleanedCat === 'STONE' || cleanedCat === 'BULK STONE';
+      const isSoil = cleanedCat.includes('SOIL') || cleanedCat.includes('DIRT') || name.includes('TOP SOIL') || descr.includes('TOP SOIL');
       
       if (bulkTab === 'MULCH') return isMulch;
       if (bulkTab === 'STONE') return isStone;
@@ -1609,7 +1642,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               ) : (
                 bulkItems.map((plant) => {
                   const inCart = cartItems.find(i => i.plant.id === plant.id);
-                  const isStone = (plant.category || '').toUpperCase().includes('STONE') || plant.name.toUpperCase().includes('STONE');
+                  const isStone = (plant.category || '').toUpperCase().includes('STONE') || (plant.category || '').toUpperCase().includes('GRAVEL');
                   const unitLabel = plant.size && plant.size.length < 8 ? plant.size : (isStone ? 'Ton' : 'Yard');
 
                   return (
@@ -1704,7 +1737,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
             <button
               type="button"
               id="btn-top-save-in-place"
@@ -1725,9 +1758,22 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               ) : (
                 <>
                   <Save className="w-4 h-4 text-[#0e6c4a]" />
-                  <span>Quick Save</span>
+                  <span className="hidden xs:inline">Quick</span> <span>Save</span>
                 </>
               )}
+            </button>
+
+            {/* Expedited Button for Customers taking order immediately */}
+            <button
+              type="button"
+              id="btn-top-take-now-finalize"
+              onClick={handleCustomerTookOrder}
+              disabled={cartItems.length === 0}
+              className="flex-1 sm:flex-none bg-[#0e6c4a] hover:bg-[#084b33] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold text-xs sm:text-sm py-2 px-3 sm:px-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-1.5 cursor-pointer border border-[#a0f4c8]/50 ring-1 ring-[#a0f4c8]/30"
+              title="Customer is taking order immediately — skip staging and go directly to Order Finalization to email/text receipt and finish sale"
+            >
+              <Zap className="w-4 h-4 text-[#a0f4c8] fill-[#a0f4c8] shrink-0" />
+              <span className="whitespace-nowrap">Take Now (Email/Text)</span>
             </button>
 
             <button
@@ -1735,11 +1781,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               id="btn-top-finish-sale"
               onClick={handleComplete}
               disabled={cartItems.length === 0}
-              className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-[#a0f4c8] hover:text-white font-extrabold text-xs sm:text-sm py-2 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer border border-[#a0f4c8]/30"
-              title="Finish sale and proceed to order review/finalization"
+              className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed text-[#a0f4c8] hover:text-white font-extrabold text-xs sm:text-sm py-2 px-3 sm:px-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-1.5 cursor-pointer border border-[#a0f4c8]/30"
+              title="Finish sale and proceed to staging or order review"
             >
-              <CheckCircle className="w-4 h-4 text-[#a0f4c8]" />
-              <span>Finish Sale</span>
+              <CheckCircle className="w-4 h-4 text-[#a0f4c8] shrink-0" />
+              <span className="whitespace-nowrap">Stage / Finish</span>
             </button>
           </div>
         </div>
@@ -1761,6 +1807,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           </div>
 
           <form
+            ref={searchContainerRef}
             onSubmit={(e) => {
               e.preventDefault();
               if (manualBarcodeInput.trim()) {
@@ -1769,9 +1816,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 setShowPlantSuggestions(false);
               }
             }}
-            className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
+            className="relative flex flex-col sm:flex-row items-stretch sm:items-center gap-2"
           >
-            <div className="relative flex-1" ref={searchContainerRef}>
+            <div className="relative flex-1">
               <div className="absolute left-3.5 top-1/2 -translate-y-1/2 flex items-center gap-1 text-[#0e6c4a] pointer-events-none">
                 <Leaf className="w-4 h-4" />
               </div>
@@ -1800,93 +1847,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   <X className="w-4 h-4" />
                 </button>
               )}
-
-              {/* Live Autocomplete Suggestions Popover */}
-              {showPlantSuggestions && manualBarcodeInput.trim().length > 0 && (
-                <div className="absolute left-0 right-0 top-full mt-1.5 bg-white border border-[#c1c8c2] rounded-2xl shadow-2xl z-40 max-h-80 overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
-                  {(() => {
-                    const q = manualBarcodeInput.trim().toLowerCase();
-                    const searchTerms = q.split(/\s+/).filter(Boolean);
-                    const matches = inventory.filter(p => {
-                      const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
-                      return searchTerms.every(term => searchable.includes(term));
-                    }).slice(0, 8);
-
-                    if (matches.length === 0) {
-                      return (
-                        <div className="p-4 text-center text-[20px] text-[#717973]">
-                          No exact plant matches for "{manualBarcodeInput}". Press Enter or Browse Catalog to search all inventory.
-                        </div>
-                      );
-                    }
-
-                    return matches.map((plant) => (
-                      <button
-                        key={plant.id}
-                        type="button"
-                        onClick={() => {
-                          addPlantToCart(plant);
-                          setManualBarcodeInput('');
-                          setShowPlantSuggestions(false);
-                        }}
-                        className="w-full p-3 hover:bg-[#a0f4c8]/20 text-left flex items-center justify-between gap-3 transition-colors cursor-pointer group"
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          <img
-                            src={plant.image || DEFAULT_PLANT_IMAGE}
-                            alt={plant.name}
-                            className="w-14 h-14 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
-                            referrerPolicy="no-referrer"
-                            onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                          />
-                          <div className="min-w-0">
-                            <p className="text-[22px] sm:text-[24px] font-extrabold text-[#012d1d] truncate group-hover:text-[#0e6c4a] leading-tight">
-                              {plant.name}
-                            </p>
-                            <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                              <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[19px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 leading-tight">
-                                <Tag className="w-3.5 h-3.5 text-[#a0f4c8]" />
-                                #{plant.itemNo || plant.barcode || 'N/A'}
-                              </span>
-                              <span className="bg-[#461702] text-amber-100 text-[19px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 leading-tight">
-                                <Package className="w-3.5 h-3.5 text-amber-300" />
-                                SIZE: {plant.size || 'Standard'}
-                              </span>
-                              <span className={`text-[20px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1.5 leading-tight ${
-                                plant.stock < 0
-                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
-                                  : plant.stock === 0
-                                  ? 'bg-red-100 text-red-700 border border-red-200'
-                                  : plant.stock < 5
-                                  ? 'bg-amber-100 text-amber-800'
-                                  : 'bg-[#f3f4f0] text-[#414844]'
-                              }`}>
-                                Avail: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
-                                {plant.stock < 0 ? <span className="text-[18px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[18px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
-                              </span>
-                            </div>
-                            {(plant.botanicalName || plant.commonName) && (
-                              <p className="text-[20px] text-[#414844] truncate italic mt-1 leading-snug">
-                                {plant.botanicalName || plant.commonName}
-                              </p>
-                            )}
-                          </div>
-                        </div>
-
-                        <div className="flex items-center gap-2.5 shrink-0">
-                          <span className="text-[24px] font-extrabold text-[#012d1d]">
-                            ${plant.price.toFixed(2)}
-                          </span>
-                          <span className="bg-[#012d1d] text-[#a0f4c8] text-[20px] font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 group-hover:bg-[#0e6c4a] shadow-2xs">
-                            <Plus className="w-5 h-5" />
-                            <span>Add</span>
-                          </span>
-                        </div>
-                      </button>
-                    ));
-                  })()}
-                </div>
-              )}
             </div>
 
             <div className="flex items-center gap-2">
@@ -1911,6 +1871,126 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 <span className="hidden xs:inline">Browse Catalog</span>
               </button>
             </div>
+
+            {/* Live Autocomplete Suggestions Popover - Full width of search bar and action buttons */}
+            {showPlantSuggestions && manualBarcodeInput.trim().length > 0 && (
+              <div className="absolute left-0 right-0 top-full mt-1.5 w-full bg-white border border-[#c1c8c2] rounded-2xl shadow-2xl z-40 max-h-96 overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
+                {(() => {
+                  const q = manualBarcodeInput.trim().toLowerCase();
+                  const searchTerms = q.split(/\s+/).filter(Boolean);
+                  const matches = inventory.filter(p => {
+                    const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
+                    return searchTerms.every(term => searchable.includes(term));
+                  }).slice(0, 8);
+
+                  if (matches.length === 0) {
+                    return (
+                      <div className="p-4 text-center text-sm font-medium text-[#717973]">
+                        No exact plant matches for "{manualBarcodeInput}". Press Enter or Browse Catalog to search all inventory.
+                      </div>
+                    );
+                  }
+
+                  return matches.map((plant) => {
+                    const cleanName = (plant.name || '').replace(/\uFFFD/g, '®');
+                    const cleanBotanical = (plant.botanicalName || '').replace(/\uFFFD/g, '®');
+                    const cleanCommon = (plant.commonName || '').replace(/\uFFFD/g, '®');
+                    const onSale = isPlantOnSale(plant);
+                    const regularPrice = plant.prices?.retail !== undefined ? plant.prices.retail : (plant.price || 0);
+                    const salePrice = onSale ? (getPlantSalePrice(plant) ?? regularPrice) : regularPrice;
+
+                    return (
+                      <button
+                        key={plant.id}
+                        type="button"
+                        onClick={() => {
+                          addPlantToCart(plant);
+                          setManualBarcodeInput('');
+                          setShowPlantSuggestions(false);
+                        }}
+                        className="w-full p-3.5 hover:bg-[#a0f4c8]/20 text-left flex flex-col gap-2 transition-colors cursor-pointer group"
+                      >
+                        {/* Full width Plant Name row across the dropdown item */}
+                        <div className="w-full flex items-start justify-between gap-3">
+                          <div className="min-w-0 flex-1">
+                            <h4 className="w-full text-base sm:text-[18px] font-black text-[#012d1d] group-hover:text-[#0e6c4a] leading-snug break-words whitespace-normal">
+                              {cleanName}
+                            </h4>
+                            {(cleanBotanical || cleanCommon) && (cleanBotanical !== cleanName || cleanCommon !== cleanName) && (
+                              <p className="w-full text-xs sm:text-sm text-[#414844] italic mt-0.5 leading-snug break-words whitespace-normal">
+                                {cleanBotanical || cleanCommon}
+                              </p>
+                            )}
+                          </div>
+                          {onSale && (
+                            <span className="bg-rose-100 text-rose-800 text-[11px] font-black px-2 py-0.5 rounded-md border border-rose-200 flex items-center gap-1 shrink-0">
+                              <Flame className="w-3.5 h-3.5 text-rose-600" />
+                              <span>SALE</span>
+                            </span>
+                          )}
+                        </div>
+
+                        {/* Detail row: Thumbnail, SKU/Size/Stock badges, Price & Add button */}
+                        <div className="w-full flex items-center justify-between gap-3 pt-0.5">
+                          <div className="flex items-center gap-2.5 min-w-0 flex-1 flex-wrap">
+                            <img
+                              src={plant.image || DEFAULT_PLANT_IMAGE}
+                              alt={cleanName}
+                              className="w-11 h-11 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]"
+                              referrerPolicy="no-referrer"
+                              onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                            />
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 leading-tight">
+                                <Tag className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                                #{plant.itemNo || plant.barcode || 'N/A'}
+                              </span>
+                              <span className="bg-[#461702] text-amber-100 text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 leading-tight">
+                                <Package className="w-3.5 h-3.5 text-amber-300" />
+                                SIZE: {plant.size || 'Standard'}
+                              </span>
+                              <span className={`text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 leading-tight ${
+                                plant.stock < 0
+                                  ? 'bg-rose-100 text-rose-800 border border-rose-200'
+                                  : plant.stock === 0
+                                  ? 'bg-red-100 text-red-700 border border-red-200'
+                                  : plant.stock < 5
+                                  ? 'bg-amber-100 text-amber-800'
+                                  : 'bg-[#f3f4f0] text-[#414844]'
+                              }`}>
+                                Avail: <strong className={plant.stock < 0 ? 'text-rose-900' : plant.stock === 0 ? 'text-red-700' : 'text-[#012d1d]'}>{plant.stock}</strong>
+                                {plant.stock < 0 ? <span className="text-[11px] text-rose-700 font-extrabold">(Backorder)</span> : plant.stock === 0 ? <span className="text-[11px] text-red-600 font-extrabold">(Out of stock)</span> : ''}
+                              </span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2.5 shrink-0">
+                            {onSale ? (
+                              <div className="flex flex-col items-end leading-tight">
+                                <span className="text-[11px] text-[#717973] line-through font-semibold">
+                                  ${regularPrice.toFixed(2)}
+                                </span>
+                                <span className="text-lg sm:text-xl font-black text-rose-700">
+                                  ${salePrice.toFixed(2)}
+                                </span>
+                              </div>
+                            ) : (
+                              <span className="text-lg sm:text-xl font-black text-[#012d1d]">
+                                ${regularPrice.toFixed(2)}
+                              </span>
+                            )}
+                            <span className="bg-[#012d1d] text-[#a0f4c8] text-xs sm:text-sm font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1 group-hover:bg-[#0e6c4a] shadow-2xs">
+                              <Plus className="w-4 h-4" />
+                              <span>Add</span>
+                            </span>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  });
+                })()}
+              </div>
+            )}
           </form>
         </div>
 
@@ -2681,11 +2761,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 id="btn-customer-took-order-active"
                 onClick={handleCustomerTookOrder}
                 disabled={cartItems.length === 0}
-                className="bg-[#0e6c4a] hover:bg-[#0b5338] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 px-3 rounded-xl shadow-md transition-all flex justify-center items-center gap-1.5 cursor-pointer text-sm shrink-0 border border-[#a0f4c8]/30"
-                title="Customer took all items now - skip staging holding area"
+                className="bg-[#0e6c4a] hover:bg-[#0b5338] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 px-3.5 rounded-xl shadow-md transition-all flex justify-center items-center gap-1.5 cursor-pointer text-sm shrink-0 border border-[#a0f4c8]/40"
+                title="Customer took all items now - skip staging holding area and proceed to email/text receipt"
               >
-                <CheckCircle2 className="w-4 h-4 text-[#a0f4c8]" />
-                <span>Customer Took All</span>
+                <Zap className="w-4 h-4 text-[#a0f4c8] fill-[#a0f4c8]" />
+                <span>Take Now (Email/Text)</span>
               </button>
 
               <button
@@ -2742,11 +2822,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 id="btn-customer-took-order"
                 onClick={handleCustomerTookOrder}
                 disabled={cartItems.length === 0}
-                className="flex-1 bg-[#0e6c4a] hover:bg-[#0b5338] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base border border-[#a0f4c8]/30"
-                title="Customer took the entire order with them now - skips holding area staging"
+                className="flex-1 bg-[#0e6c4a] hover:bg-[#0b5338] active:scale-[0.99] disabled:opacity-50 text-white font-extrabold py-3.5 px-4 rounded-xl shadow-md transition-all flex justify-center items-center gap-2 cursor-pointer text-sm sm:text-base border border-[#a0f4c8]/40"
+                title="Customer took the entire order with them now - skips holding area staging and goes directly to Order Finalization to email/text receipt"
               >
-                <CheckCircle2 className="w-5 h-5 text-[#a0f4c8]" />
-                <span>Customer Took All</span>
+                <Zap className="w-5 h-5 text-[#a0f4c8] fill-[#a0f4c8]" />
+                <span>Take Now (Email/Text)</span>
               </button>
 
               <button
@@ -3180,6 +3260,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         initialPriceLevel={verifyingPlant?.initialPriceLevel}
         existingCartItem={verifyingPlant?.existingCartItem}
         customerType={customerType}
+        onUpdatePlant={onUpdatePlant}
         onConfirm={(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes) => {
           handleConfirmPlantVerification(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes);
           setVerifyingPlant(null);

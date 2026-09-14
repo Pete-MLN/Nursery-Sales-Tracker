@@ -1,4 +1,4 @@
-import { PlantItem, OrderCartItem } from '../types';
+import { PlantItem, OrderCartItem, PlantSaleDiscount, DiscountType } from '../types';
 
 export type PriceLevelKey = 'retail' | 'wholesale' | 'gardenCenter' | 'elite';
 
@@ -11,6 +11,78 @@ export interface PriceTierInfo {
   posField: string; // "INV_PRC_1", "INV_PRC_3", "INV_PRC_4", "INV_PRC_5"
   price: number;
   hasCustomConfiguredPrice: boolean;
+}
+
+/**
+ * Checks whether a plant item has an active sale discount
+ */
+export function isPlantOnSale(plant?: PlantItem | null): boolean {
+  if (!plant || !plant.saleDiscount) return false;
+  return plant.saleDiscount.active !== false && plant.saleDiscount.value > 0;
+}
+
+/**
+ * Computes exact sale price, savings dollar amount, and savings percentage
+ */
+export function calculateSalePrice(
+  basePrice: number, 
+  discount: { type: DiscountType; value: number }
+): {
+  salePrice: number;
+  savingsAmount: number;
+  savingsPercent: number;
+} {
+  const safeBase = Math.max(0, Number(basePrice) || 0);
+  let salePrice = safeBase;
+
+  if (discount.type === 'fixed_price') {
+    salePrice = Math.max(0, Number(discount.value) || 0);
+  } else if (discount.type === 'percentage') {
+    const pct = Math.max(0, Math.min(100, Number(discount.value) || 0));
+    const savings = Number((safeBase * (pct / 100)).toFixed(2));
+    salePrice = Math.max(0, Number((safeBase - savings).toFixed(2)));
+  }
+
+  const savingsAmount = Math.max(0, Number((safeBase - salePrice).toFixed(2)));
+  const savingsPercent = safeBase > 0 ? Math.round((savingsAmount / safeBase) * 100) : 0;
+
+  return {
+    salePrice,
+    savingsAmount,
+    savingsPercent
+  };
+}
+
+/**
+ * Returns the active sale price for a plant, or null if not on sale
+ */
+export function getPlantSalePrice(plant?: PlantItem | null): number | null {
+  if (!isPlantOnSale(plant)) return null;
+  const baseRetail = plant!.prices?.retail !== undefined ? plant!.prices.retail : (plant!.price || 0);
+  const { salePrice } = calculateSalePrice(baseRetail, plant!.saleDiscount!);
+  return salePrice;
+}
+
+/**
+ * Returns savings details for a plant on sale
+ */
+export function getPlantSaleSavings(plant?: PlantItem | null): {
+  salePrice: number;
+  regularPrice: number;
+  savingsAmount: number;
+  savingsPercent: number;
+  label?: string;
+} | null {
+  if (!isPlantOnSale(plant)) return null;
+  const baseRetail = plant!.prices?.retail !== undefined ? plant!.prices.retail : (plant!.price || 0);
+  const { salePrice, savingsAmount, savingsPercent } = calculateSalePrice(baseRetail, plant!.saleDiscount!);
+  return {
+    salePrice,
+    regularPrice: baseRetail,
+    savingsAmount,
+    savingsPercent,
+    label: plant!.saleDiscount!.saleLabel || `${savingsPercent}% OFF`
+  };
 }
 
 /**
@@ -79,11 +151,19 @@ export function getPlantPriceTiers(plant: PlantItem): PriceTierInfo[] {
 }
 
 /**
- * Calculates the exact effective unit price for a cart item based on selected level
+ * Calculates the exact effective unit price for a cart item based on selected level and sale status
  */
 export function getItemEffectiveUnitPrice(item: OrderCartItem): number {
   if (item.selectedPrice !== undefined && item.selectedPrice > 0) {
     return item.selectedPrice;
+  }
+
+  // If item or plant has an active sale discount and no custom non-retail level was selected
+  const activeSale = item.saleDiscount || item.plant.saleDiscount;
+  if (activeSale && activeSale.active !== false && (!item.selectedPriceLevel || item.selectedPriceLevel === 'retail')) {
+    const baseRetail = item.originalPrice ?? (item.plant.prices?.retail !== undefined ? item.plant.prices.retail : item.plant.price);
+    const { salePrice } = calculateSalePrice(baseRetail, activeSale);
+    return salePrice;
   }
 
   if (item.selectedPriceLevel) {

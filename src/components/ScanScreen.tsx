@@ -17,7 +17,7 @@ import {
   OrderDraft, 
   getDraftForOrderId 
 } from '../services/orderAutoSaveService';
-import { savePlantToFirestore, saveOrderToFirestore } from '../services/firebaseService';
+import { savePlantToFirestore, saveOrderToFirestore, isDefaultMockItem } from '../services/firebaseService';
 import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
 
 interface ScanScreenProps {
@@ -1234,25 +1234,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const bulkItems = useMemo(() => {
     const rawMatches = inventory.filter(p => {
       if (p.statusActive === false) return false;
-
-      const itemNo = (p.itemNo || '').trim().toUpperCase();
-      const id = (p.id || '').trim().toLowerCase();
-      const barcode = (p.barcode || '').trim().toUpperCase();
-      const nameUpper = (p.name || '').trim().toUpperCase();
-
-      // Exclude legacy mock default items (mulch & stone)
-      if (
-        itemNo === 'BLK-M1' || itemNo === 'BLK-M2' ||
-        itemNo === 'BLK-ST1' || itemNo === 'BLK-ST2' ||
-        id === 'blk-m1' || id === 'blk-m2' ||
-        id === 'blk-st1' || id === 'blk-st2' ||
-        barcode === 'MULCH01' || barcode === 'MULCH02' ||
-        barcode === 'STONE01' || barcode === 'STONE02' ||
-        nameUpper.includes('ROUND RIVER GRAVEL') ||
-        nameUpper.includes('CRUSHED BLUE LIMESTONE')
-      ) {
-        return false;
-      }
+      if (isDefaultMockItem(p.id, p.itemNo, p.barcode, p.name)) return false;
 
       const cat = (p.category || '').toUpperCase().trim();
       const cleanedCat = cat.replace(/[/\\]+$/, '').trim();
@@ -1994,30 +1976,33 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           </form>
         </div>
 
-        {/* Quick Test Barcode Presets */}
-        <div className="flex items-center gap-1.5 overflow-x-auto text-[11px]">
-          <span className="text-[#717973] font-bold uppercase tracking-wider shrink-0 text-[10px]">
-            Test Barcodes:
-          </span>
-          {[
-            { code: '41796', label: 'Arborvitae' },
-            { code: '041796', label: 'iPhone Lead Zero' },
-            { code: '41198', label: 'Blue Prince' },
-            { code: '41688', label: 'Kickin Aster' },
-            { code: '10008', label: 'Black-Eyed Susan' }
-          ].map((preset) => (
-            <button
-              key={preset.code}
-              type="button"
-              onClick={() => handleScannedBarcode(preset.code, true)}
-              className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] font-mono font-semibold px-2.5 py-1 rounded-lg border border-[#c1c8c2] shrink-0 cursor-pointer transition-all active:scale-95 flex items-center gap-1"
-            >
-              <QrCode className="w-3 h-3 text-[#0e6c4a]" />
-              <span>{preset.code}</span>
-              <span className="text-[#717973] font-sans font-normal">({preset.label})</span>
-            </button>
-          ))}
-        </div>
+        {/* Quick Test Barcode Presets - dynamically derived from loaded inventory */}
+        {inventory.some(p => p.barcode && p.barcode.trim().length > 0) && (
+          <div className="flex items-center gap-1.5 overflow-x-auto text-[11px]">
+            <span className="text-[#717973] font-bold uppercase tracking-wider shrink-0 text-[10px]">
+              Test Barcodes:
+            </span>
+            {inventory
+              .filter(p => p.barcode && p.barcode.trim().length > 0)
+              .slice(0, 5)
+              .map((p) => {
+                const code = p.barcode!.trim();
+                const label = (p.commonName || p.name).slice(0, 16);
+                return (
+                  <button
+                    key={code}
+                    type="button"
+                    onClick={() => handleScannedBarcode(code, true)}
+                    className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] font-mono font-semibold px-2.5 py-1 rounded-lg border border-[#c1c8c2] shrink-0 cursor-pointer transition-all active:scale-95 flex items-center gap-1"
+                  >
+                    <QrCode className="w-3 h-3 text-[#0e6c4a]" />
+                    <span>{code}</span>
+                    <span className="text-[#717973] font-sans font-normal">({label})</span>
+                  </button>
+                );
+              })}
+          </div>
+        )}
       </section>
 
       {/* Live Scanned Feedback Banner */}

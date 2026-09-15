@@ -62,19 +62,7 @@ export function cleanForFirestore<T>(obj: T): T {
  */
 export async function seedInitialFirestoreData() {
   try {
-    // Purge unwanted legacy default products ('BLK-M1' and 'BLK-M2') from Firestore if present
-    await purgeUnwantedDefaultProductsFromFirestore();
-
-    const plantsSnap = await getDocs(collection(db, PLANTS_COL));
-    if (plantsSnap.empty) {
-      const batch = writeBatch(db);
-      INITIAL_PLANTS.forEach((plant) => {
-        const ref = doc(db, PLANTS_COL, plant.id);
-        batch.set(ref, cleanForFirestore(plant));
-      });
-      await batch.commit();
-      console.log('Firestore: Plants initialized');
-    }
+    // NEVER seed default plants into Firestore. Inventory is populated exclusively by user CSV/Excel uploads or user-created records.
 
     const customersSnap = await getDocs(collection(db, CUSTOMERS_COL));
     if (customersSnap.empty) {
@@ -154,36 +142,56 @@ export async function seedInitialFirestoreData() {
 
 /* --- Real-Time Subscriptions --- */
 
-export function subscribeToPlants(callback: (plants: PlantItem[]) => void) {
-  const targetItemNos = ['BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2'];
-  const targetIds = ['blk-m1', 'blk-m2', 'blk-st1', 'blk-st2'];
-  const targetBarcodes = ['MULCH01', 'MULCH02', 'STONE01', 'STONE02'];
+// Default mock inventory item IDs, item numbers, barcodes, and names to permanently exclude
+export const DEFAULT_MOCK_PLANT_IDS = new Set([
+  'p1', 'p2', 'p3', 'p4', 'p5', 'p6', 'p7',
+  'p1000', 'p10006', 'p10007', 'p10007-neg', 'p10008', 'p10009', 'p1001', 'p41796',
+  'blk-ts1', 'blk-ts2', 'blk-m1', 'blk-m2', 'blk-st1', 'blk-st2'
+]);
 
+export const DEFAULT_MOCK_ITEM_NOS = new Set([
+  'BLK-TS1', 'BLK-TS2', 'BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2', '10007-NEG'
+]);
+
+export const DEFAULT_MOCK_BARCODES = new Set([
+  'SOIL01', 'SOIL02', 'MULCH01', 'MULCH02', 'STONE01', 'STONE02'
+]);
+
+export function isDefaultMockItem(docId: string, itemNo?: string, barcode?: string, name?: string): boolean {
+  const normId = (docId || '').trim().toLowerCase();
+  const normItemNo = (itemNo || '').trim().toUpperCase();
+  const normBarcode = (barcode || '').trim().toUpperCase();
+  const normName = (name || '').trim().toLowerCase();
+
+  if (DEFAULT_MOCK_PLANT_IDS.has(normId)) return true;
+  if (normItemNo && DEFAULT_MOCK_ITEM_NOS.has(normItemNo)) return true;
+  if (normBarcode && DEFAULT_MOCK_BARCODES.has(normBarcode)) return true;
+
+  if (
+    normId.startsWith('blk-') ||
+    normItemNo.startsWith('BLK-') ||
+    normName.includes('round river gravel') ||
+    normName.includes('crushed blue limestone') ||
+    normName.includes('premium screened topsoil') ||
+    normName.includes('enriched compost & topsoil mix') ||
+    (normName.includes('dark shredded') && (normItemNo === 'BLK-M1' || normBarcode === 'MULCH01')) ||
+    (normName.includes('black dyed hardwood mulch') && (normItemNo === 'BLK-M2' || normBarcode === 'MULCH02'))
+  ) {
+    return true;
+  }
+
+  return false;
+}
+
+export function subscribeToPlants(callback: (plants: PlantItem[]) => void) {
   return onSnapshot(collection(db, PLANTS_COL), (snapshot) => {
     const items: PlantItem[] = [];
     snapshot.forEach((docSnap) => {
       const plant = docSnap.data() as PlantItem;
-      const itemNo = (plant.itemNo || '').trim().toUpperCase();
-      const barcode = (plant.barcode || '').trim().toUpperCase();
-      const docId = docSnap.id.toLowerCase();
-      const name = (plant.name || '').trim().toLowerCase();
+      const docId = docSnap.id;
 
-      // Check if this is one of the legacy unwanted default products
-      const isUnwantedDefault =
-        targetItemNos.includes(itemNo) ||
-        targetIds.includes(docId) ||
-        targetBarcodes.includes(barcode) ||
-        itemNo === 'BLK-ST1' ||
-        itemNo === 'BLK-ST2' ||
-        docId === 'blk-st1' ||
-        docId === 'blk-st2' ||
-        name.includes('round river gravel') ||
-        name.includes('crushed blue limestone') ||
-        (name.includes('dark shredded') && (itemNo === 'BLK-M1' || barcode === 'MULCH01')) ||
-        (name.includes('black dyed hardwood mulch') && (itemNo === 'BLK-M2' || barcode === 'MULCH02'));
-
-      if (isUnwantedDefault) {
-        // Auto-purge from Firestore so it never returns
+      if (isDefaultMockItem(docId, plant.itemNo, plant.barcode, plant.name)) {
+        // Auto-purge default mock item from Firestore so it never returns
         deleteDoc(docSnap.ref).catch(() => {});
         return;
       }
@@ -272,53 +280,34 @@ export async function deletePlantFromFirestore(id: string) {
 }
 
 /**
- * Cleanly purge legacy default bulk products ('BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2') from Firestore
+ * Permanently purge all default/mock inventory items from Firestore
  */
-export async function purgeUnwantedDefaultProductsFromFirestore() {
+export async function purgeAllDefaultInventoryItemsFromFirestore() {
   try {
-    const targetItemNos = ['BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2'];
-    const targetIds = ['blk-m1', 'blk-m2', 'blk-st1', 'blk-st2'];
-    const targetBarcodes = ['MULCH01', 'MULCH02', 'STONE01', 'STONE02'];
-
-    // Direct deletion of known default IDs
-    for (const id of targetIds) {
+    // 1. Direct deletion of known default mock IDs
+    for (const id of DEFAULT_MOCK_PLANT_IDS) {
       try {
         const plantRef = doc(db, PLANTS_COL, id);
         const plantDoc = await getDoc(plantRef);
         if (plantDoc.exists()) {
           await deleteDoc(plantRef);
-          console.log(`Purged default product ${id} from Firestore`);
+          console.log(`Permanently purged default plant doc ${id} from Firestore`);
         }
       } catch (e) {
-        // Continue with others
+        // Continue
       }
     }
 
-    // Query scan to ensure any variant or duplicate of these products is purged
+    // 2. Query scan to catch any documents matching default mock criteria
     const plantsSnap = await getDocs(collection(db, PLANTS_COL));
     const batch = writeBatch(db);
     let count = 0;
 
     plantsSnap.forEach((docSnap) => {
       const data = docSnap.data() as PlantItem;
-      const itemNo = (data.itemNo || '').trim().toUpperCase();
-      const barcode = (data.barcode || '').trim().toUpperCase();
-      const docId = docSnap.id.toLowerCase();
-      const name = (data.name || '').trim().toLowerCase();
+      const docId = docSnap.id;
 
-      if (
-        targetItemNos.includes(itemNo) ||
-        targetIds.includes(docId) ||
-        targetBarcodes.includes(barcode) ||
-        itemNo === 'BLK-ST1' ||
-        itemNo === 'BLK-ST2' ||
-        docId === 'blk-st1' ||
-        docId === 'blk-st2' ||
-        name.includes('round river gravel') ||
-        name.includes('crushed blue limestone') ||
-        (name.includes('dark shredded') && (itemNo === 'BLK-M1' || barcode === 'MULCH01')) ||
-        (name.includes('black dyed hardwood mulch') && (itemNo === 'BLK-M2' || barcode === 'MULCH02'))
-      ) {
+      if (isDefaultMockItem(docId, data.itemNo, data.barcode, data.name)) {
         batch.delete(docSnap.ref);
         count++;
       }
@@ -326,12 +315,15 @@ export async function purgeUnwantedDefaultProductsFromFirestore() {
 
     if (count > 0) {
       await batch.commit();
-      console.log(`Batch purged ${count} unwanted default bulk items from Firestore`);
+      console.log(`Batch permanently purged ${count} default mock items from Firestore`);
     }
   } catch (err) {
-    console.warn('Could not complete default bulk products purge from Firestore:', err);
+    console.warn('Could not complete default items purge from Firestore:', err);
   }
 }
+
+// Alias for backwards compatibility
+export const purgeUnwantedDefaultProductsFromFirestore = purgeAllDefaultInventoryItemsFromFirestore;
 
 export async function batchSavePlantsToFirestore(plants: PlantItem[]) {
   try {
@@ -348,6 +340,67 @@ export async function batchSavePlantsToFirestore(plants: PlantItem[]) {
     }
   } catch (err) {
     console.error('Error batch saving plants to Firestore:', err);
+  }
+}
+
+/**
+ * Fully synchronizes imported inventory from a CSV/Excel file with Firestore:
+ * 1. Writes/updates all plants present in the uploaded dataset.
+ * 2. Deletes any legacy or previous plant documents in Firestore that are NOT present in this upload.
+ */
+export async function syncImportedInventoryToFirestore(newPlants: PlantItem[]) {
+  try {
+    const validIds = new Set(newPlants.map(p => p.id));
+    const validItemNos = new Set(newPlants.filter(p => p.itemNo).map(p => p.itemNo!.trim().toUpperCase()));
+    const validBarcodes = new Set(newPlants.filter(p => p.barcode && p.barcode.length > 2).map(p => p.barcode!.trim().toUpperCase()));
+
+    // 1. Fetch all existing plants in Firestore to identify any obsolete or removed items
+    const snapshot = await getDocs(collection(db, PLANTS_COL));
+    const toDelete: string[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data() as PlantItem;
+      const docId = docSnap.id;
+      const itemNo = (data.itemNo || '').trim().toUpperCase();
+      const barcode = (data.barcode || '').trim().toUpperCase();
+
+      // Always mark default mock items for deletion
+      if (isDefaultMockItem(docId, itemNo, barcode, data.name)) {
+        toDelete.push(docId);
+        return;
+      }
+
+      const existsInUpload =
+        validIds.has(docId) ||
+        (itemNo && validItemNos.has(itemNo)) ||
+        (barcode && validBarcodes.has(barcode));
+
+      if (!existsInUpload) {
+        toDelete.push(docId);
+      }
+    });
+
+    // 2. Batch delete docs that are not in the uploaded CSV
+    if (toDelete.length > 0) {
+      console.log(`Deleting ${toDelete.length} non-CSV / obsolete plant records from Firestore...`);
+      const deleteChunkSize = 400;
+      for (let i = 0; i < toDelete.length; i += deleteChunkSize) {
+        const chunk = toDelete.slice(i, i + deleteChunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((id) => {
+          batch.delete(doc(db, PLANTS_COL, id));
+        });
+        await batch.commit();
+      }
+    }
+
+    // 3. Batch save all plants from the uploaded CSV
+    await batchSavePlantsToFirestore(newPlants);
+    console.log(`Successfully synced ${newPlants.length} uploaded plants to Firestore.`);
+  } catch (err) {
+    console.error('Error syncing imported inventory to Firestore:', err);
+    // Fallback: at least save the new plants
+    await batchSavePlantsToFirestore(newPlants);
   }
 }
 

@@ -14,6 +14,7 @@ import { OrdersScreen } from './components/OrdersScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { InstructionsScreen } from './components/InstructionsScreen';
 import { LoginScreen } from './components/LoginScreen';
+import { AppStartupProgressRing } from './components/AppStartupProgressRing';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import {
@@ -27,6 +28,8 @@ import {
   subscribeToAuditSessions,
   savePlantToFirestore,
   batchSavePlantsToFirestore,
+  syncImportedInventoryToFirestore,
+  isDefaultMockItem,
   saveCustomerToFirestore,
   batchSaveCustomersToFirestore,
   deleteCustomerFromFirestore,
@@ -79,22 +82,7 @@ export default function App() {
     };
   });
 
-  const [inventory, setInventory] = useState<PlantItem[]>(() => {
-    return INITIAL_PLANTS.filter(p => {
-      const itemNo = (p.itemNo || '').trim().toUpperCase();
-      const id = (p.id || '').trim().toLowerCase();
-      return (
-        itemNo !== 'BLK-M1' &&
-        itemNo !== 'BLK-M2' &&
-        itemNo !== 'BLK-ST1' &&
-        itemNo !== 'BLK-ST2' &&
-        id !== 'blk-m1' &&
-        id !== 'blk-m2' &&
-        id !== 'blk-st1' &&
-        id !== 'blk-st2'
-      );
-    });
-  });
+  const [inventory, setInventory] = useState<PlantItem[]>([]);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
   const [uploads, setUploads] = useState<RecentUpload[]>(INITIAL_UPLOADS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
@@ -128,6 +116,13 @@ export default function App() {
   const [activeOrder, setActiveOrder] = useState<Order | null>(null);
   const [screenHistory, setScreenHistory] = useState<ScreenType[]>(['home']);
   const [isCloudConnected, setIsCloudConnected] = useState<boolean>(true);
+
+  // App startup loading & synchronization progress
+  const [isAppStarting, setIsAppStarting] = useState<boolean>(true);
+  const [syncProgress, setSyncProgress] = useState<number>(18);
+  const [syncStatusText, setSyncStatusText] = useState<string>('Connecting to database...');
+  const [syncSubStatusText, setSyncSubStatusText] = useState<string>('Initializing Maple Lane database & pricing...');
+  const [isSyncReady, setIsSyncReady] = useState<boolean>(false);
 
   // Global Stock Alert Thresholds State with local persistence
   const [stockAlertSettings, setStockAlertSettings] = useState<StockAlertSettings>(() => {
@@ -182,35 +177,50 @@ export default function App() {
 
   // Initialize and subscribe to real-time Firestore updates for multi-device syncing
   useEffect(() => {
+    let plantsReceived = false;
+    let customersReceived = false;
+    let holdingReceived = false;
+    let isCompleted = false;
+
+    // Smooth progress tick while waiting for network handshake
+    const progressInterval = setInterval(() => {
+      setSyncProgress((prev) => {
+        if (prev < 42) return prev + 4;
+        if (prev < 68 && !plantsReceived) return prev + 1.5;
+        return prev;
+      });
+    }, 150);
+
+    const finishStartup = () => {
+      if (isCompleted) return;
+      isCompleted = true;
+      clearInterval(progressInterval);
+      setSyncProgress(100);
+      setIsSyncReady(true);
+      setSyncStatusText('System Ready to Start Orders');
+      setSyncSubStatusText('Catalog, pricing, and staging locations synchronized.');
+      setTimeout(() => {
+        setIsAppStarting(false);
+      }, 550);
+    };
+
+    const checkReadiness = () => {
+      if (plantsReceived && (customersReceived || holdingReceived)) {
+        finishStartup();
+      }
+    };
+
+    // Safety fallback: if network is slow or offline, complete cleanly within 3.5s
+    const safetyTimeout = setTimeout(() => {
+      finishStartup();
+    }, 3500);
+
     seedInitialFirestoreData();
 
     const unsubPlants = subscribeToPlants((data) => {
       if (data && data.length > 0) {
-        // Explicitly exclude legacy default products ('BLK-M1', 'BLK-M2', 'BLK-ST1', 'BLK-ST2')
-        const cleanedData = data.filter(p => {
-          const itemNo = (p.itemNo || '').trim().toUpperCase();
-          const id = (p.id || '').trim().toLowerCase();
-          const barcode = (p.barcode || '').trim().toUpperCase();
-          const name = (p.name || '').trim().toLowerCase();
-          return !(
-            itemNo === 'BLK-M1' ||
-            itemNo === 'BLK-M2' ||
-            itemNo === 'BLK-ST1' ||
-            itemNo === 'BLK-ST2' ||
-            id === 'blk-m1' ||
-            id === 'blk-m2' ||
-            id === 'blk-st1' ||
-            id === 'blk-st2' ||
-            barcode === 'MULCH01' ||
-            barcode === 'MULCH02' ||
-            barcode === 'STONE01' ||
-            barcode === 'STONE02' ||
-            name.includes('round river gravel') ||
-            name.includes('crushed blue limestone') ||
-            (name.includes('dark shredded') && (itemNo === 'BLK-M1' || barcode === 'MULCH01')) ||
-            (name.includes('black dyed hardwood mulch') && (itemNo === 'BLK-M2' || barcode === 'MULCH02'))
-          );
-        });
+        // Exclude any default mock items
+        const cleanedData = data.filter(p => !isDefaultMockItem(p.id, p.itemNo, p.barcode, p.name));
 
         // Deduplicate plants to prevent duplicate entries from past imports or overlapping IDs
         const deduped: PlantItem[] = [];
@@ -250,6 +260,11 @@ export default function App() {
           }
         }
         setInventory(deduped);
+        plantsReceived = true;
+        setSyncProgress((prev) => Math.max(prev, 72));
+        setSyncStatusText('Syncing plant catalog & pricing...');
+        setSyncSubStatusText(`Loaded ${deduped.length} plant varieties and multi-tier pricing`);
+        checkReadiness();
       }
     });
     const unsubCustomers = subscribeToCustomers((data) => {
@@ -264,6 +279,9 @@ export default function App() {
       } else {
         setCustomers(INITIAL_CUSTOMERS);
       }
+      customersReceived = true;
+      setSyncProgress((prev) => Math.max(prev, 88));
+      checkReadiness();
     });
     const unsubEmployees = subscribeToEmployees((data) => {
       if (data && data.length > 0) setEmployees(data);
@@ -302,6 +320,9 @@ export default function App() {
         localStorage.setItem('nursery_holding_areas', JSON.stringify(ordered));
         batchSaveHoldingLocationsToFirestore(ordered);
       }
+      holdingReceived = true;
+      setSyncProgress((prev) => Math.max(prev, 96));
+      checkReadiness();
     });
     const unsubAudits = subscribeToAuditSessions((data) => {
       if (data && data.length > 0) {
@@ -310,6 +331,8 @@ export default function App() {
     });
 
     return () => {
+      clearInterval(progressInterval);
+      clearTimeout(safetyTimeout);
       unsubPlants();
       unsubCustomers();
       unsubEmployees();
@@ -690,7 +713,7 @@ export default function App() {
     }
 
     setInventory(mergedList);
-    batchSavePlantsToFirestore(mergedList);
+    syncImportedInventoryToFirestore(mergedList);
   };
 
   const handleImportCustomers = (newCustomers: Customer[]) => {
@@ -723,6 +746,23 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#f9faf6] text-[#1a1c1a] flex flex-col font-sans">
+      {/* Animated Startup Progress Ring Overlay */}
+      {isAppStarting && (
+        <AppStartupProgressRing
+          progress={syncProgress}
+          statusText={syncStatusText}
+          subStatusText={syncSubStatusText}
+          isReady={isSyncReady}
+          canSkip={true}
+          onSkip={() => setIsAppStarting(false)}
+          itemCounts={{
+            plants: inventory.length,
+            customers: customers.length,
+            holdingAreas: holdingAreas.length
+          }}
+        />
+      )}
+
       {/* Dynamic Top App Bar */}
       <Header
         currentScreen={currentScreen}

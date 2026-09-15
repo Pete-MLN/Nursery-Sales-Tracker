@@ -266,7 +266,24 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
         {/* Plant List */}
         <div className="flex flex-col gap-3">
-          {filteredInventory.length === 0 ? (
+          {inventory.length === 0 ? (
+            <div className="p-8 text-center bg-[#f3f4f0] rounded-2xl text-[#717973] border border-dashed border-[#c1c8c2] flex flex-col items-center gap-3">
+              <Package className="w-10 h-10 text-[#0e6c4a]/50" />
+              <div>
+                <p className="text-sm font-bold text-[#012d1d]">No inventory items loaded</p>
+                <p className="text-xs text-[#717973] mt-1 max-w-sm">
+                  Upload your nursery inventory spreadsheet (.csv or .xlsx) in Data Management to populate your plant catalog and pricing.
+                </p>
+              </div>
+              <button
+                onClick={() => onNavigate('data')}
+                className="mt-2 px-4 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-bold rounded-xl transition-all shadow-sm flex items-center gap-1.5 cursor-pointer"
+              >
+                <ClipboardList className="w-4 h-4" />
+                Go to Data Management
+              </button>
+            </div>
+          ) : filteredInventory.length === 0 ? (
             <div className="p-8 text-center bg-[#f3f4f0] rounded-xl text-[#717973] border border-dashed border-[#c1c8c2]">
               <p className="text-xs font-medium">
                 {statusFilter === 'sale' 

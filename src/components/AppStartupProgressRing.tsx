@@ -139,17 +139,20 @@ export const AppStartupProgressRing: React.FC<AppStartupProgressRingProps> = ({
 
             {/* Inner Content of Ring */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
-              {isReady || clampedProgress >= 100 ? (
+              {isReady && clampedProgress >= 100 ? (
                 <motion.div
-                  initial={{ scale: 0.5, opacity: 0 }}
+                  initial={{ scale: 0.8, opacity: 0 }}
                   animate={{ scale: 1, opacity: 1 }}
                   transition={{ type: 'spring', stiffness: 300, damping: 20 }}
                   className="flex flex-col items-center"
                 >
-                  <div className="w-12 h-12 rounded-full bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shadow-md mb-1">
-                    <Check className="w-7 h-7 stroke-[3]" />
+                  <div className="w-10 h-10 rounded-full bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shadow-md mb-0.5">
+                    <Check className="w-6 h-6 stroke-[3]" />
                   </div>
-                  <span className="text-xs font-black tracking-wide text-[#012d1d] uppercase">
+                  <span className="text-2xl font-black tracking-tight text-[#012d1d] font-mono leading-none">
+                    100%
+                  </span>
+                  <span className="text-[10px] font-black tracking-wide text-[#0e6c4a] uppercase mt-0.5">
                     Ready
                   </span>
                 </motion.div>

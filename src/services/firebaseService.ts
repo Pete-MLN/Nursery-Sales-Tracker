@@ -354,7 +354,8 @@ export async function syncImportedInventoryToFirestore(newPlants: PlantItem[]) {
     const validItemNos = new Set(newPlants.filter(p => p.itemNo).map(p => p.itemNo!.trim().toUpperCase()));
     const validBarcodes = new Set(newPlants.filter(p => p.barcode && p.barcode.length > 2).map(p => p.barcode!.trim().toUpperCase()));
 
-    // 1. Fetch all existing plants in Firestore to identify any obsolete or removed items
+    // 1. Purge ONLY confirmed mock demo items (e.g., BLK-TS1, SOIL01).
+    // NEVER purge real nursery inventory records, previously uploaded stock, or plants referenced in orders!
     const snapshot = await getDocs(collection(db, PLANTS_COL));
     const toDelete: string[] = [];
 
@@ -364,25 +365,15 @@ export async function syncImportedInventoryToFirestore(newPlants: PlantItem[]) {
       const itemNo = (data.itemNo || '').trim().toUpperCase();
       const barcode = (data.barcode || '').trim().toUpperCase();
 
-      // Always mark default mock items for deletion
+      // Only mark default mock demo items for deletion
       if (isDefaultMockItem(docId, itemNo, barcode, data.name)) {
-        toDelete.push(docId);
-        return;
-      }
-
-      const existsInUpload =
-        validIds.has(docId) ||
-        (itemNo && validItemNos.has(itemNo)) ||
-        (barcode && validBarcodes.has(barcode));
-
-      if (!existsInUpload) {
         toDelete.push(docId);
       }
     });
 
-    // 2. Batch delete docs that are not in the uploaded CSV
+    // 2. Batch delete confirmed mock items
     if (toDelete.length > 0) {
-      console.log(`Deleting ${toDelete.length} non-CSV / obsolete plant records from Firestore...`);
+      console.log(`Deleting ${toDelete.length} mock demo items from Firestore...`);
       const deleteChunkSize = 400;
       for (let i = 0; i < toDelete.length; i += deleteChunkSize) {
         const chunk = toDelete.slice(i, i + deleteChunkSize);

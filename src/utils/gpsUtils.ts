@@ -169,13 +169,11 @@ export async function acquireHighPrecisionGps(options?: AcquireGpsOptions): Prom
       ? Math.min(TARGET_ACCURACY_FEET, metersToFeet(options.targetAccuracyMeters)) 
       : TARGET_ACCURACY_FEET);
 
-  const maxAttempts = options?.maxAttempts ?? 3;
-  const passWaitMs = options?.passWaitMs ?? 4500;
+  const maxAttempts = options?.maxAttempts ?? 4;
+  const passWaitMs = options?.passWaitMs ?? 1800;
   
-  // Total max wait defaults to 3 passes of 4.5s (~13.5s) unless explicitly provided with a longer time
-  const totalMaxWaitMs = options?.maxWaitMs && options.maxWaitMs > (passWaitMs * 2)
-    ? options.maxWaitMs
-    : (passWaitMs * maxAttempts);
+  // Total max wait defaults to ~6.5s across auto-retry passes
+  const totalMaxWaitMs = options?.maxWaitMs ?? 6500;
 
   const onProgress = options?.onProgress;
 

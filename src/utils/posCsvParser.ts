@@ -34,7 +34,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
       normalizedRow[cleanKey] = row[k];
     });
 
-    const itemNo = normalizedRow['ITEM_NO'] || normalizedRow['ITEM_NUMBER'] || normalizedRow['ITEM NO'] || normalizedRow['SKU'] || `POS-${idx + 1}`;
+    const itemNo = normalizedRow['ITEM_NO'] || normalizedRow['ITEM_NUMBER'] || normalizedRow['ITEM NO'] || normalizedRow['ITEM'] || normalizedRow['ITEM_ID'] || normalizedRow['SKU'] || `POS-${idx + 1}`;
     const descr = normalizedRow['DESCR'] || normalizedRow['DESCRIPTION'] || normalizedRow['BOTANICAL_NAME'] || '';
     const addlDescr1 = normalizedRow['ADDL_DESCR_1'] || normalizedRow['ADDITIONAL_DESCRIPTION'] || normalizedRow['COMMON_NAME'] || '';
     const stkUnit = normalizedRow['STK_UNIT'] || normalizedRow['SIZE'] || normalizedRow['UNIT'] || '';
@@ -53,7 +53,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
     const categSubcat = normalizedRow['CATEG_SUBCAT'] || normalizedRow['CATEGORY'] || '';
     const addlDescr2 = normalizedRow['ADDL_DESCR_2'] || normalizedRow['LOCATION'] || normalizedRow['PLANT_LOCATION'] || '';
     const subcatCod = normalizedRow['SUBCAT_COD'] || normalizedRow['SUB_CATEGORY'] || '';
-    const barcode = normalizedRow['BARCOD'] || normalizedRow['BARCODE'] || normalizedRow['UPC'] || itemNo;
+    const barcode = normalizedRow['BARCOD'] || normalizedRow['BARCODE'] || normalizedRow['BARCOD_NO'] || normalizedRow['BARCODE_NO'] || normalizedRow['UPC'] || normalizedRow['UPC_NO'] || normalizedRow['ALTR_BARCOD'] || normalizedRow['ALT_BARCOD'] || normalizedRow['ALT_BARCODE'] || normalizedRow['TAG_NO'] || normalizedRow['TAG_BARCODE'] || itemNo;
     const stat = normalizedRow['STAT'] || normalizedRow['STATUS'] || 'A';
     const locId = normalizedRow['LOC_ID'] || normalizedRow['STORE_ID'] || '101';
 

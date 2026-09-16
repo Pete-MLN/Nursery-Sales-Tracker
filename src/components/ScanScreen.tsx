@@ -208,6 +208,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
   const [manualBarcodeInput, setManualBarcodeInput] = useState<string>('');
   const [unrecognizedCode, setUnrecognizedCode] = useState<string | null>(null);
+  const [unrecognizedSearch, setUnrecognizedSearch] = useState<string>('');
 
   // Helper to show scan feedback banner with 3x extended duration (10.5s default)
   const triggerScannedFeedback = (message: string, type: 'success' | 'warning' = 'success', durationMs: number = 10500) => {
@@ -894,12 +895,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
     try {
       const fix = await acquireHighPrecisionGps({
-        targetAccuracyFeet: 14,
-        onProgress: (status) => {
-          if (status.phase === 'waking_gps' || status.phase === 'locking_satellites') {
-            triggerScannedFeedback(status.message, 'warning', 3000);
-          }
-        }
+        targetAccuracyFeet: 14
       });
 
       const nowIso = new Date().toISOString();
@@ -3115,14 +3111,42 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               This barcode isn't assigned to a plant in your catalog yet. Select a plant below to pair this barcode and add it to the order:
             </p>
 
+            {/* Quick search input to easily find plants by name, item #, or botanical name */}
+            <div className="relative">
+              <input
+                type="text"
+                value={unrecognizedSearch}
+                onChange={(e) => setUnrecognizedSearch(e.target.value)}
+                placeholder="Search catalog by name or item #..."
+                className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3 py-2 text-xs text-[#012d1d] placeholder:text-[#717973] font-medium outline-hidden focus:border-[#0e6c4a] focus:ring-1 focus:ring-[#0e6c4a]"
+              />
+              {unrecognizedSearch && (
+                <button
+                  type="button"
+                  onClick={() => setUnrecognizedSearch('')}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-xs text-[#717973] hover:text-[#012d1d] font-bold cursor-pointer"
+                >
+                  ✕
+                </button>
+              )}
+            </div>
+
             <div className="max-h-60 overflow-y-auto flex flex-col gap-2 border border-[#c1c8c2] rounded-xl p-2 bg-[#f3f4f0]">
-              {inventory.slice(0, 15).map((plant) => (
+              {(unrecognizedSearch.trim()
+                ? inventory.filter(p => 
+                    p.name.toLowerCase().includes(unrecognizedSearch.toLowerCase().trim()) ||
+                    (p.itemNo && p.itemNo.toLowerCase().includes(unrecognizedSearch.toLowerCase().trim())) ||
+                    (p.botanicalName && p.botanicalName.toLowerCase().includes(unrecognizedSearch.toLowerCase().trim()))
+                  ).slice(0, 25)
+                : inventory.slice(0, 15)
+              ).map((plant) => (
                 <button
                   key={plant.id}
                   type="button"
                   onClick={() => {
                     plant.barcode = unrecognizedCode;
                     setHasUnsavedChanges(true);
+                    savePlantToFirestore({ ...plant, barcode: unrecognizedCode });
                     setCartItems(prev => {
                       const existing = prev.find(i => i.plant.id === plant.id);
                       if (existing) {
@@ -3137,6 +3161,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       10500
                     );
                     setUnrecognizedCode(null);
+                    setUnrecognizedSearch('');
                   }}
                   className="p-2.5 bg-white hover:bg-[#a0f4c8]/30 rounded-xl border border-[#c1c8c2] text-left flex items-center justify-between gap-2 transition-colors group cursor-pointer"
                 >
@@ -3162,7 +3187,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <div className="flex justify-end gap-2 pt-1 border-t border-[#c1c8c2]">
               <button
                 type="button"
-                onClick={() => setUnrecognizedCode(null)}
+                onClick={() => {
+                  setUnrecognizedCode(null);
+                  setUnrecognizedSearch('');
+                }}
                 className="px-4 py-2 bg-[#e2e3df] hover:bg-[#c1c8c2] text-[#1a1c1a] text-xs font-bold rounded-xl cursor-pointer"
               >
                 Cancel

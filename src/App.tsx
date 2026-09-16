@@ -273,13 +273,24 @@ export default function App() {
       if (isCompleted) return;
       isCompleted = true;
       clearInterval(progressInterval);
-      setSyncProgress(100);
-      setIsSyncReady(true);
-      setSyncStatusText('System Ready to Start Orders');
-      setSyncSubStatusText('Catalog, pricing, and staging locations synchronized.');
+
+      // Smoothly advance progress indicator through to 100% so percentage never freezes or disappears
+      setSyncProgress((prev) => Math.max(prev, 78));
+      
       setTimeout(() => {
-        setIsAppStarting(false);
-      }, 550);
+        setSyncProgress((prev) => Math.max(prev, 94));
+      }, 120);
+
+      setTimeout(() => {
+        setSyncProgress(100);
+        setIsSyncReady(true);
+        setSyncStatusText('System Ready to Start Orders');
+        setSyncSubStatusText('Catalog, pricing, and staging locations synchronized.');
+        
+        setTimeout(() => {
+          setIsAppStarting(false);
+        }, 650);
+      }, 260);
     };
 
     const checkReadiness = () => {
@@ -765,67 +776,64 @@ export default function App() {
   };
 
   const handleImportInventoryPlants = (newPlants: PlantItem[]) => {
-    // Preserve existing plant IDs, GPS coordinates, and holding locations across inventory updates
-    const mergedList: PlantItem[] = [];
-    const seenImportKeys = new Set<string>();
+    // Preserve existing inventory, plant IDs, GPS coordinates, and holding locations across inventory updates
+    const mergedMap = new Map<string, PlantItem>();
 
-    for (const newPlant of newPlants) {
-      // Find matching existing plant by itemNo, barcode, id, or normalized name
-      const existingMatch = inventory.find(existing => 
-        (newPlant.itemNo && existing.itemNo && newPlant.itemNo.trim().toUpperCase() === existing.itemNo.trim().toUpperCase()) ||
-        (newPlant.barcode && existing.barcode && newPlant.barcode.trim().toUpperCase() === existing.barcode.trim().toUpperCase()) ||
-        (newPlant.id && existing.id && newPlant.id === existing.id) ||
-        (newPlant.name && existing.name && newPlant.name.toLowerCase().trim() === existing.name.toLowerCase().trim())
-      );
-
-      const resolvedPlant: PlantItem = existingMatch ? {
-        ...newPlant,
-        // Crucial: preserve existing ID so Firestore updates the existing document instead of duplicating!
-        id: existingMatch.id,
-        // If the uploaded file didn't supply new GPS coordinates, preserve existing logged GPS
-        gpsLocation: newPlant.gpsLocation || existingMatch.gpsLocation || undefined,
-        gpsLocations: newPlant.gpsLocations || existingMatch.gpsLocations || undefined,
-        // Preserve holding location if existing has one and uploaded is empty
-        holdingLocation: newPlant.holdingLocation || existingMatch.holdingLocation || undefined,
-        // Preserve descr / botanicalName
-        descr: newPlant.descr || existingMatch.descr || undefined,
-        botanicalName: newPlant.botanicalName || existingMatch.botanicalName || undefined,
-        // Preserve custom sale prices and active discounts configured in the app
-        saleDiscount: newPlant.saleDiscount || existingMatch.saleDiscount || undefined
-      } : newPlant;
-
-      const itemNoKey = (resolvedPlant.itemNo || '').trim().toUpperCase();
-      const nameKey = (resolvedPlant.name || '').trim().toUpperCase().replace(/\s+/g, ' ');
-      const barcodeKey = (resolvedPlant.barcode || '').trim().toUpperCase();
-
-      const isDup =
-        (itemNoKey && seenImportKeys.has(`item:${itemNoKey}`)) ||
-        (nameKey && seenImportKeys.has(`name:${nameKey}`)) ||
-        (barcodeKey && barcodeKey.length > 2 && seenImportKeys.has(`barcode:${barcodeKey}`)) ||
-        seenImportKeys.has(`id:${resolvedPlant.id}`);
-
-      if (!isDup) {
-        if (itemNoKey) seenImportKeys.add(`item:${itemNoKey}`);
-        if (nameKey) seenImportKeys.add(`name:${nameKey}`);
-        if (barcodeKey && barcodeKey.length > 2) seenImportKeys.add(`barcode:${barcodeKey}`);
-        seenImportKeys.add(`id:${resolvedPlant.id}`);
-        mergedList.push(resolvedPlant);
-      } else {
-        const existing = mergedList.find(u =>
-          (itemNoKey && (u.itemNo || '').trim().toUpperCase() === itemNoKey) ||
-          (nameKey && (u.name || '').trim().toUpperCase().replace(/\s+/g, ' ') === nameKey) ||
-          (barcodeKey && barcodeKey.length > 2 && (u.barcode || '').trim().toUpperCase() === barcodeKey) ||
-          u.id === resolvedPlant.id
-        );
-        if (existing) {
-          if (!existing.gpsLocation && resolvedPlant.gpsLocation) existing.gpsLocation = resolvedPlant.gpsLocation;
-          if ((!existing.holdingLocation || existing.holdingLocation === '') && resolvedPlant.holdingLocation) existing.holdingLocation = resolvedPlant.holdingLocation;
-          if (resolvedPlant.stock > existing.stock) existing.stock = resolvedPlant.stock;
-          if (!existing.saleDiscount && resolvedPlant.saleDiscount) existing.saleDiscount = resolvedPlant.saleDiscount;
-        }
+    // 1. Seed with current inventory so no previously cataloged plants or order items are lost!
+    for (const existing of inventory) {
+      if (!isDefaultMockItem(existing.id, existing.itemNo, existing.barcode, existing.name)) {
+        mergedMap.set(existing.id, { ...existing });
       }
     }
 
+    // 2. Merge or insert imported plants
+    for (const newPlant of newPlants) {
+      if (isDefaultMockItem(newPlant.id, newPlant.itemNo, newPlant.barcode, newPlant.name)) {
+        continue;
+      }
+
+      // Find matching existing plant by itemNo, barcode, ID, or name+size
+      let existingMatchKey: string | undefined;
+      for (const [key, existing] of mergedMap.entries()) {
+        const itemNoMatch = newPlant.itemNo && existing.itemNo && newPlant.itemNo.trim().toUpperCase() === existing.itemNo.trim().toUpperCase();
+        const barcodeMatch = newPlant.barcode && existing.barcode && newPlant.barcode.trim().toUpperCase() === existing.barcode.trim().toUpperCase();
+        const idMatch = newPlant.id && existing.id && newPlant.id === existing.id;
+        const nameAndSizeMatch = newPlant.name && existing.name && 
+          newPlant.name.toLowerCase().trim() === existing.name.toLowerCase().trim() &&
+          (!newPlant.size || !existing.size || newPlant.size.toUpperCase().trim() === existing.size.toUpperCase().trim());
+
+        if (itemNoMatch || barcodeMatch || idMatch || nameAndSizeMatch) {
+          existingMatchKey = key;
+          break;
+        }
+      }
+
+      if (existingMatchKey) {
+        const existing = mergedMap.get(existingMatchKey)!;
+        const updatedPlant: PlantItem = {
+          ...existing,
+          ...newPlant,
+          id: existing.id, // Preserve existing ID so Firestore document ID remains stable
+          // Preserve GPS locations
+          gpsLocation: newPlant.gpsLocation || existing.gpsLocation || undefined,
+          gpsLocations: newPlant.gpsLocations || existing.gpsLocations || undefined,
+          // Preserve holding location if uploaded is empty
+          holdingLocation: (newPlant.holdingLocation && newPlant.holdingLocation.trim()) ? newPlant.holdingLocation : (existing.holdingLocation || undefined),
+          descr: newPlant.descr || existing.descr || undefined,
+          botanicalName: newPlant.botanicalName || existing.botanicalName || undefined,
+          saleDiscount: newPlant.saleDiscount || existing.saleDiscount || undefined,
+          barcode: (newPlant.barcode && newPlant.barcode.trim().length > 1) ? newPlant.barcode : existing.barcode,
+          itemNo: (newPlant.itemNo && newPlant.itemNo.trim().length > 0) ? newPlant.itemNo : existing.itemNo,
+          prices: { ...(existing.prices || {}), ...(newPlant.prices || {}) },
+          stock: newPlant.stock !== undefined ? newPlant.stock : existing.stock
+        };
+        mergedMap.set(existingMatchKey, updatedPlant);
+      } else {
+        mergedMap.set(newPlant.id, newPlant);
+      }
+    }
+
+    const mergedList = Array.from(mergedMap.values());
     setInventory(mergedList);
     syncImportedInventoryToFirestore(mergedList);
   };

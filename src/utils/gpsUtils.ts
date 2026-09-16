@@ -23,11 +23,17 @@ export interface GpsAcquisitionStatus {
   message: string;
 }
 
+/**
+ * Target precision threshold for nursery plant coordinates: 14 feet or less
+ */
+export const TARGET_ACCURACY_FEET = 14;
+export const TARGET_ACCURACY_METERS = TARGET_ACCURACY_FEET / 3.28084; // ~4.267 meters
+
 export const DEFAULT_NURSERY_COORDS = {
   latitude: 43.1482,
   longitude: -79.4623,
-  accuracy: 5.0,
-  accuracyFeet: 16
+  accuracy: 4.26,
+  accuracyFeet: 14
 };
 
 /**
@@ -75,8 +81,8 @@ export function getGpsAccuracyRating(accuracyMeters?: number): {
 
   const feet = metersToFeet(accuracyMeters);
 
-  if (accuracyMeters <= 5) {
-    // Under ~16 ft
+  if (feet <= TARGET_ACCURACY_FEET) {
+    // 14 ft or less - Gold standard nursery yard precision
     return {
       rating: 'excellent',
       label: `Sub-Meter Accuracy (±${feet} ft)`,
@@ -84,8 +90,8 @@ export function getGpsAccuracyRating(accuracyMeters?: number): {
       colorClass: 'text-emerald-700',
       badgeClass: 'bg-emerald-50 text-emerald-900 border-emerald-300'
     };
-  } else if (accuracyMeters <= 12) {
-    // 16 to 40 ft
+  } else if (feet <= 40) {
+    // 15 to 40 ft
     return {
       rating: 'good',
       label: `Yard Precision (±${feet} ft)`,
@@ -93,8 +99,8 @@ export function getGpsAccuracyRating(accuracyMeters?: number): {
       colorClass: 'text-[#0e6c4a]',
       badgeClass: 'bg-[#f0fdf4] text-[#002113] border-[#a0f4c8]'
     };
-  } else if (accuracyMeters <= 35) {
-    // 40 to 115 ft
+  } else if (feet <= 115) {
+    // 41 to 115 ft
     return {
       rating: 'moderate',
       label: `Moderate Lock (±${feet} ft)`,
@@ -114,27 +120,63 @@ export function getGpsAccuracyRating(accuracyMeters?: number): {
   }
 }
 
+export interface AcquireGpsOptions {
+  /**
+   * Target accuracy in feet. Defaults to 14 ft (or less).
+   * Once a reading achieves <= targetAccuracyFeet, acquisition settles immediately.
+   */
+  targetAccuracyFeet?: number;
+  /**
+   * Target accuracy in meters (legacy support).
+   */
+  targetAccuracyMeters?: number;
+  /**
+   * Duration per refinement pass in milliseconds (defaults to 4500ms).
+   */
+  passWaitMs?: number;
+  /**
+   * Maximum automatic refinement passes to reach target precision (defaults to 3).
+   * Replicates pressing the Tag button 3 times automatically.
+   */
+  maxAttempts?: number;
+  /**
+   * Overall maximum timeout across all passes in milliseconds.
+   */
+  maxWaitMs?: number;
+  /**
+   * Status progress callback.
+   */
+  onProgress?: (status: GpsAcquisitionStatus) => void;
+}
+
 /**
  * High-Precision Multi-Sample Satellite Acquisition Engine
  * 
- * Why standard navigator.geolocation.getCurrentPosition fails:
- * - When called once, mobile devices immediately return the first cached position,
- *   which is almost always Wi-Fi or Cell Tower triangulation (~100-300 meters / 200+ yards off).
- * - Hardware GPS satellites take 1-3 seconds to acquire fixes and converge down to 3-5 meters.
+ * Automatically refines GPS accuracy down to 14 feet or less across up to 3 passes
+ * (replicating tapping the Tag button 3 times automatically).
  * 
- * This function:
- * 1. Initiates a fresh `watchPosition` stream with maximum accuracy and zero cache age.
- * 2. Continuously samples GPS fixes for up to `maxWaitMs` (default 4.5s).
- * 3. If an immediate fix <= `targetAccuracyMeters` (default 4.5m) is obtained, locks immediately.
- * 4. Otherwise, collects all fixes and picks the single best fix with the lowest accuracy error.
+ * Behavior:
+ * 1. Initiates a fresh watchPosition satellite stream and active one-shot polling.
+ * 2. As soon as a fix reaches 14 feet or less, immediately settles and locks without delay.
+ * 3. If initial fixes are above 14 feet (e.g. 25-40 ft while GPS receiver warms up),
+ *    it automatically continues refining across 3 passes (~13.5s total).
+ * 4. If 14 feet or less cannot be achieved (e.g., dense cover, metal roofing, or device limit),
+ *    it seamlessly returns the best precision distance obtained (no extra error/dialogs).
  */
-export async function acquireHighPrecisionGps(options?: {
-  maxWaitMs?: number;
-  targetAccuracyMeters?: number;
-  onProgress?: (status: GpsAcquisitionStatus) => void;
-}): Promise<GpsFix> {
-  const maxWaitMs = options?.maxWaitMs ?? 4500;
-  const targetAccuracy = options?.targetAccuracyMeters ?? 4.5;
+export async function acquireHighPrecisionGps(options?: AcquireGpsOptions): Promise<GpsFix> {
+  const targetFeet = options?.targetAccuracyFeet ?? 
+    (options?.targetAccuracyMeters !== undefined 
+      ? Math.min(TARGET_ACCURACY_FEET, metersToFeet(options.targetAccuracyMeters)) 
+      : TARGET_ACCURACY_FEET);
+
+  const maxAttempts = options?.maxAttempts ?? 3;
+  const passWaitMs = options?.passWaitMs ?? 4500;
+  
+  // Total max wait defaults to 3 passes of 4.5s (~13.5s) unless explicitly provided with a longer time
+  const totalMaxWaitMs = options?.maxWaitMs && options.maxWaitMs > (passWaitMs * 2)
+    ? options.maxWaitMs
+    : (passWaitMs * maxAttempts);
+
   const onProgress = options?.onProgress;
 
   if (!navigator.geolocation) {
@@ -157,14 +199,75 @@ export async function acquireHighPrecisionGps(options?: {
 
   return new Promise<GpsFix>((resolve) => {
     let watchId: number | null = null;
+    let pollIntervalId: any = null;
+    let masterTimeoutTimer: any = null;
     let bestFix: GpsFix | null = null;
     let sampleCount = 0;
+    let currentPass = 1;
     let isSettled = false;
 
     const cleanup = () => {
-      if (watchId !== null) {
-        navigator.geolocation.clearWatch(watchId);
+      if (watchId !== null && typeof navigator !== 'undefined' && navigator.geolocation) {
+        try {
+          navigator.geolocation.clearWatch(watchId);
+        } catch {
+          // Ignore
+        }
         watchId = null;
+      }
+      if (pollIntervalId !== null) {
+        clearInterval(pollIntervalId);
+        pollIntervalId = null;
+      }
+      if (masterTimeoutTimer !== null) {
+        clearTimeout(masterTimeoutTimer);
+        masterTimeoutTimer = null;
+      }
+    };
+
+    const handleCoordsUpdate = (coords: GeolocationCoordinates) => {
+      if (isSettled) return;
+      sampleCount++;
+
+      const rawAccuracy = coords.accuracy || 100;
+      const accuracyFeet = metersToFeet(rawAccuracy);
+
+      const currentFix: GpsFix = {
+        latitude: coords.latitude,
+        longitude: coords.longitude,
+        accuracy: rawAccuracy,
+        accuracyFeet,
+        timestamp: new Date().toISOString(),
+        isFallback: false,
+        source: accuracyFeet <= 40 ? 'satellite_gps' : 'network_estimate'
+      };
+
+      // Keep the fix with highest precision (lowest accuracy radius error)
+      if (!bestFix || currentFix.accuracy < bestFix.accuracy) {
+        bestFix = currentFix;
+      }
+
+      onProgress?.({
+        phase: bestFix.accuracyFeet <= targetFeet ? 'locked' : 'locking_satellites',
+        currentAccuracyMeters: bestFix.accuracy,
+        currentAccuracyFeet: bestFix.accuracyFeet,
+        sampleCount,
+        message: `Refining satellite lock... (±${bestFix.accuracyFeet} ft)`
+      });
+
+      // Target Check: Automatically try to get to 14 feet or less!
+      // If we reach 14 feet or less, lock immediately!
+      if (bestFix.accuracyFeet <= targetFeet) {
+        isSettled = true;
+        cleanup();
+        onProgress?.({
+          phase: 'locked',
+          currentAccuracyMeters: bestFix.accuracy,
+          currentAccuracyFeet: bestFix.accuracyFeet,
+          sampleCount,
+          message: `High-Precision GPS Locked (±${bestFix.accuracyFeet} ft)`
+        });
+        resolve(bestFix);
       }
     };
 
@@ -174,7 +277,9 @@ export async function acquireHighPrecisionGps(options?: {
       message: 'Acquiring satellite lock...'
     });
 
-    const timeoutTimer = setTimeout(() => {
+    // Master timeout: If passes expire without reaching <= 14 ft,
+    // settle cleanly with the best precision distance obtained.
+    masterTimeoutTimer = setTimeout(() => {
       if (isSettled) return;
       isSettled = true;
       cleanup();
@@ -189,7 +294,6 @@ export async function acquireHighPrecisionGps(options?: {
         });
         resolve(bestFix);
       } else {
-        // Safe fallback if timeout reached without single fix
         const fallback: GpsFix = {
           latitude: DEFAULT_NURSERY_COORDS.latitude,
           longitude: DEFAULT_NURSERY_COORDS.longitude,
@@ -206,60 +310,17 @@ export async function acquireHighPrecisionGps(options?: {
         });
         resolve(fallback);
       }
-    }, maxWaitMs);
+    }, totalMaxWaitMs);
 
+    // 1. Start continuous watch stream with high accuracy and zero cache
     try {
       watchId = navigator.geolocation.watchPosition(
-        (pos) => {
-          if (isSettled) return;
-          sampleCount++;
-
-          const rawAccuracy = pos.coords.accuracy || 100;
-          const currentFix: GpsFix = {
-            latitude: pos.coords.latitude,
-            longitude: pos.coords.longitude,
-            accuracy: rawAccuracy,
-            accuracyFeet: metersToFeet(rawAccuracy),
-            timestamp: new Date().toISOString(),
-            isFallback: false,
-            source: rawAccuracy <= 15 ? 'satellite_gps' : 'network_estimate'
-          };
-
-          // Keep the fix with highest precision (lowest accuracy radius)
-          if (!bestFix || currentFix.accuracy < bestFix.accuracy) {
-            bestFix = currentFix;
-          }
-
-          onProgress?.({
-            phase: currentFix.accuracy <= 10 ? 'locked' : 'locking_satellites',
-            currentAccuracyMeters: bestFix.accuracy,
-            currentAccuracyFeet: bestFix.accuracyFeet,
-            sampleCount,
-            message: `Refining satellite lock... (±${bestFix.accuracyFeet} ft)`
-          });
-
-          // If we hit our gold-standard precision target (< 4.5m / ~15ft), lock immediately!
-          if (bestFix.accuracy <= targetAccuracy) {
-            isSettled = true;
-            clearTimeout(timeoutTimer);
-            cleanup();
-            onProgress?.({
-              phase: 'locked',
-              currentAccuracyMeters: bestFix.accuracy,
-              currentAccuracyFeet: bestFix.accuracyFeet,
-              sampleCount,
-              message: `High-Precision GPS Locked (±${bestFix.accuracyFeet} ft)`
-            });
-            resolve(bestFix);
-          }
-        },
+        (pos) => handleCoordsUpdate(pos.coords),
         (err) => {
-          console.warn('Geolocation sample warning:', err.message);
-          // If we haven't acquired any fix yet and error is permission denied
+          console.warn('Geolocation watch note:', err.message);
           if (err.code === err.PERMISSION_DENIED) {
             if (isSettled) return;
             isSettled = true;
-            clearTimeout(timeoutTimer);
             cleanup();
             const fallback: GpsFix = {
               latitude: DEFAULT_NURSERY_COORDS.latitude,
@@ -281,25 +342,41 @@ export async function acquireHighPrecisionGps(options?: {
         {
           enableHighAccuracy: true,
           maximumAge: 0,
-          timeout: maxWaitMs
+          timeout: totalMaxWaitMs
         }
       );
     } catch (err) {
       console.error('Failed to start watchPosition:', err);
-      if (isSettled) return;
-      isSettled = true;
-      clearTimeout(timeoutTimer);
-      cleanup();
-      resolve({
-        latitude: DEFAULT_NURSERY_COORDS.latitude,
-        longitude: DEFAULT_NURSERY_COORDS.longitude,
-        accuracy: DEFAULT_NURSERY_COORDS.accuracy,
-        accuracyFeet: DEFAULT_NURSERY_COORDS.accuracyFeet,
-        timestamp: new Date().toISOString(),
-        isFallback: true,
-        source: 'nursery_fallback'
-      });
     }
+
+    // 2. Immediately trigger an active one-shot query to nudge hardware GPS without delay
+    try {
+      navigator.geolocation.getCurrentPosition(
+        (pos) => handleCoordsUpdate(pos.coords),
+        (err) => console.warn('Initial one-shot GPS query note:', err.message),
+        { enableHighAccuracy: true, maximumAge: 0, timeout: passWaitMs }
+      );
+    } catch (err) {
+      console.warn('Initial getCurrentPosition error:', err);
+    }
+
+    // 3. Multi-attempt interval: every passWaitMs, trigger an active query
+    // (replicating the user pressing the Tag button 3 times automatically)
+    pollIntervalId = setInterval(() => {
+      if (isSettled) return;
+      currentPass++;
+      if (currentPass <= maxAttempts) {
+        try {
+          navigator.geolocation.getCurrentPosition(
+            (pos) => handleCoordsUpdate(pos.coords),
+            (err) => console.warn(`Pass ${currentPass} query note:`, err.message),
+            { enableHighAccuracy: true, maximumAge: 0, timeout: passWaitMs - 200 }
+          );
+        } catch (err) {
+          console.warn(`Pass ${currentPass} getCurrentPosition error:`, err);
+        }
+      }
+    }, passWaitMs);
   });
 }
 

@@ -14,13 +14,15 @@ import {
   Package, 
   Sparkles,
   ArrowRight,
-  TrendingDown
+  TrendingDown,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
 
 interface PlantSaleModalProps {
   isOpen: boolean;
   plant: PlantItem | null;
-  onSaveDiscount: (updatedPlant: PlantItem) => void;
+  onSaveDiscount: (updatedPlant: PlantItem) => Promise<void> | void;
   onClose: () => void;
 }
 
@@ -57,6 +59,12 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
   const [isActive, setIsActive] = useState<boolean>(initialActive);
   const [errorText, setErrorText] = useState<string>('');
 
+  // Progress Loader State for updating and syncing sale
+  const [isUpdating, setIsUpdating] = useState<boolean>(false);
+  const [updateProgress, setUpdateProgress] = useState<number>(0);
+  const [updateStatusText, setUpdateStatusText] = useState<string>('');
+  const [isSuccess, setIsSuccess] = useState<boolean>(false);
+
   // Sync if plant changes while open
   useEffect(() => {
     if (plant) {
@@ -72,6 +80,9 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
         setIsActive(true);
       }
       setErrorText('');
+      setIsUpdating(false);
+      setIsSuccess(false);
+      setUpdateProgress(0);
     }
   }, [plant]);
 
@@ -83,7 +94,9 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
     ? calculateSalePrice(basePrice, { type: discountType, value: numericValue })
     : { salePrice: basePrice, savingsAmount: 0, savingsPercent: 0 };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    if (isUpdating) return;
+
     if (!isValidNumber) {
       setErrorText('Please enter a valid discount amount greater than 0.');
       return;
@@ -99,6 +112,14 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
       return;
     }
 
+    setIsUpdating(true);
+    setIsSuccess(false);
+    setErrorText('');
+
+    // Step 1: 15% - Validating parameters
+    setUpdateProgress(15);
+    setUpdateStatusText('Validating sale parameters & calculating profit margins...');
+
     const updatedDiscount: PlantSaleDiscount = {
       type: discountType,
       value: numericValue,
@@ -113,21 +134,102 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
       saleDiscount: updatedDiscount
     };
 
-    onSaveDiscount(updatedPlant);
-    onClose();
+    try {
+      await new Promise(r => setTimeout(r, 450));
+
+      // Step 2: 38% - Updating catalog & computing tiers
+      setUpdateProgress(38);
+      setUpdateStatusText('Updating plant item catalog & re-computing price tiers...');
+      await new Promise(r => setTimeout(r, 600));
+
+      // Step 3: 68% - Persisting to Firestore cloud database
+      setUpdateProgress(68);
+      setUpdateStatusText('Saving updated plant record to inventory catalog & Firestore database...');
+
+      const savePromise = Promise.resolve(onSaveDiscount(updatedPlant));
+      const minDatabaseDelay = new Promise(r => setTimeout(r, 900));
+      await Promise.all([savePromise, minDatabaseDelay]);
+
+      // Step 4: 88% - Syncing order
+      setUpdateProgress(88);
+      setUpdateStatusText('Synchronizing active order items, line subtotals & customer pricing...');
+      await new Promise(r => setTimeout(r, 650));
+
+      // Step 5: 100% - Success state
+      setUpdateProgress(100);
+      setIsSuccess(true);
+      setUpdateStatusText('Sale price successfully applied! Catalog & database updated.');
+
+      // Keep the success state visible for a comfortable duration so the user can clearly see 100% completion
+      await new Promise(r => setTimeout(r, 1200));
+      onClose();
+    } catch (err) {
+      console.error('Failed to update plant sale discount:', err);
+      setErrorText('An error occurred while saving the sale discount. Please try again.');
+      setIsUpdating(false);
+      setUpdateProgress(0);
+      setIsSuccess(false);
+    }
   };
 
-  const handleRemoveDiscount = () => {
+  const handleRemoveDiscount = async () => {
+    if (isUpdating) return;
+
+    setIsUpdating(true);
+    setIsSuccess(false);
+    setErrorText('');
+
+    // Step 1: 18% - Validating
+    setUpdateProgress(18);
+    setUpdateStatusText('Validating price reversion to standard retail catalog rate...');
+
     const updatedPlant: PlantItem = {
       ...plant,
       saleDiscount: undefined
     };
-    onSaveDiscount(updatedPlant);
-    onClose();
+
+    try {
+      await new Promise(r => setTimeout(r, 450));
+
+      // Step 2: 42% - Clearing discount
+      setUpdateProgress(42);
+      setUpdateStatusText('Clearing promotional flags & restoring standard price levels...');
+      await new Promise(r => setTimeout(r, 600));
+
+      // Step 3: 72% - Cloud database persistence
+      setUpdateProgress(72);
+      setUpdateStatusText('Updating plant item in inventory catalog & Firestore database...');
+
+      const savePromise = Promise.resolve(onSaveDiscount(updatedPlant));
+      const minDatabaseDelay = new Promise(r => setTimeout(r, 900));
+      await Promise.all([savePromise, minDatabaseDelay]);
+
+      // Step 4: 92% - Syncing order
+      setUpdateProgress(92);
+      setUpdateStatusText('Recalculating active order items & line subtotals...');
+      await new Promise(r => setTimeout(r, 600));
+
+      // Step 5: 100% - Done
+      setUpdateProgress(100);
+      setIsSuccess(true);
+      setUpdateStatusText('Sale removed. Plant item restored to standard pricing.');
+
+      await new Promise(r => setTimeout(r, 1200));
+      onClose();
+    } catch (err) {
+      console.error('Failed to remove discount:', err);
+      setErrorText('An error occurred while reverting sale price. Please try again.');
+      setIsUpdating(false);
+      setUpdateProgress(0);
+      setIsSuccess(false);
+    }
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in">
+    <div 
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
+      onClick={isUpdating ? undefined : onClose}
+    >
       <div 
         className="bg-white rounded-3xl border border-[#c1c8c2] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]"
         onClick={(e) => e.stopPropagation()}
@@ -148,8 +250,13 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
             </div>
           </div>
           <button
-            onClick={onClose}
-            className="w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-white flex items-center justify-center transition-colors cursor-pointer"
+            onClick={isUpdating ? undefined : onClose}
+            disabled={isUpdating}
+            className={`w-8 h-8 rounded-full flex items-center justify-center transition-colors ${
+              isUpdating 
+                ? 'opacity-30 cursor-not-allowed bg-white/5 text-white/40' 
+                : 'bg-white/10 hover:bg-white/20 text-white cursor-pointer'
+            }`}
             title="Close"
           >
             <X className="w-5 h-5" />
@@ -472,14 +579,61 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
           )}
         </div>
 
+        {/* Progress Loader Card during saving / update */}
+        {isUpdating && (
+          <div 
+            id="sale-discount-progress-loader" 
+            className="p-4 bg-emerald-50 border-t border-b border-emerald-200 flex flex-col gap-2.5 animate-fade-in"
+          >
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                {isSuccess ? (
+                  <div className="w-8 h-8 rounded-xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center shrink-0 shadow-2xs">
+                    <CheckCircle2 className="w-5 h-5 text-[#a0f4c8]" />
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-xl bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center shrink-0 shadow-2xs">
+                    <Loader2 className="w-5 h-5 animate-spin text-[#a0f4c8]" />
+                  </div>
+                )}
+                <div>
+                  <h4 className="text-xs font-black text-[#012d1d] uppercase tracking-wide">
+                    {isSuccess ? 'Sale Price Updated!' : 'Updating Plant Pricing...'}
+                  </h4>
+                  <p className="text-[11px] font-semibold text-[#0e6c4a]">
+                    {updateStatusText}
+                  </p>
+                </div>
+              </div>
+              <span className="text-xs font-black text-[#012d1d] font-mono bg-white px-2 py-0.5 rounded-md border border-emerald-300 shadow-2xs">
+                {updateProgress}%
+              </span>
+            </div>
+
+            {/* Visual Animated Progress Bar */}
+            <div className="w-full bg-emerald-200/80 rounded-full h-2.5 overflow-hidden border border-emerald-300/80">
+              <div 
+                className="h-full bg-gradient-to-r from-[#012d1d] via-[#0e6c4a] to-[#a0f4c8] rounded-full transition-all duration-300 ease-out"
+                style={{ width: `${updateProgress}%` }}
+              />
+            </div>
+          </div>
+        )}
+
         {/* Modal Footer Actions */}
         <div className="p-4 bg-[#f9faf6] border-t border-[#c1c8c2] flex flex-col sm:flex-row items-center justify-between gap-2.5">
           <div>
             {isPlantOnSale(plant) && (
               <button
+                id="btn-remove-sale-discount"
                 type="button"
+                disabled={isUpdating}
                 onClick={handleRemoveDiscount}
-                className="w-full sm:w-auto px-3.5 py-2.5 text-xs font-bold text-rose-700 hover:bg-rose-50 rounded-xl border border-rose-200 transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+                className={`w-full sm:w-auto px-3.5 py-2.5 text-xs font-bold rounded-xl border transition-colors flex items-center justify-center gap-1.5 ${
+                  isUpdating
+                    ? 'text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed'
+                    : 'text-rose-700 hover:bg-rose-50 border-rose-200 cursor-pointer'
+                }`}
               >
                 <Trash2 className="w-3.5 h-3.5" />
                 <span>Remove Sale / Revert to Regular</span>
@@ -489,19 +643,47 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
 
           <div className="flex items-center gap-2.5 w-full sm:w-auto">
             <button
+              id="btn-cancel-sale-discount"
               type="button"
+              disabled={isUpdating}
               onClick={onClose}
-              className="flex-1 sm:flex-none px-4 py-2.5 text-xs font-bold text-[#414844] bg-white border border-[#c1c8c2] hover:bg-[#f3f4f0] rounded-xl transition-colors cursor-pointer"
+              className={`flex-1 sm:flex-none px-4 py-2.5 text-xs font-bold rounded-xl border transition-colors ${
+                isUpdating
+                  ? 'text-gray-400 bg-gray-100 border-gray-200 cursor-not-allowed'
+                  : 'text-[#414844] bg-white border-[#c1c8c2] hover:bg-[#f3f4f0] cursor-pointer'
+              }`}
             >
               Cancel
             </button>
             <button
+              id="btn-apply-sale-discount"
               type="button"
+              disabled={isUpdating}
               onClick={handleSave}
-              className="flex-1 sm:flex-none px-5 py-2.5 text-xs font-extrabold text-[#002113] bg-[#a0f4c8] hover:bg-[#85e6b4] border border-[#0e6c4a] rounded-xl shadow-xs transition-colors flex items-center justify-center gap-1.5 cursor-pointer"
+              className={`flex-1 sm:flex-none px-5 py-2.5 text-xs font-extrabold rounded-xl shadow-xs transition-all flex items-center justify-center gap-1.5 ${
+                isUpdating
+                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-300 cursor-not-allowed'
+                  : isSuccess
+                  ? 'bg-[#012d1d] text-[#a0f4c8] border border-[#012d1d] cursor-default'
+                  : 'text-[#002113] bg-[#a0f4c8] hover:bg-[#85e6b4] border border-[#0e6c4a] cursor-pointer active:scale-95'
+              }`}
             >
-              <Check className="w-4 h-4 font-black text-[#012d1d]" />
-              <span>Apply Sale Price</span>
+              {isUpdating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#012d1d]" />
+                  <span>Saving Updates...</span>
+                </>
+              ) : isSuccess ? (
+                <>
+                  <Check className="w-4 h-4 font-black text-[#a0f4c8]" />
+                  <span>Applied!</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4 font-black text-[#012d1d]" />
+                  <span>Apply Sale Price</span>
+                </>
+              )}
             </button>
           </div>
         </div>

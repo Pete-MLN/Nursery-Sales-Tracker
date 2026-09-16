@@ -148,8 +148,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
     try {
       showToast('Acquiring high-precision GPS satellite lock...');
       const fix = await acquireHighPrecisionGps({
-        maxWaitMs: 4500,
-        targetAccuracyMeters: 4.5
+        targetAccuracyFeet: 14
       });
 
       const timestamp = new Date().toISOString();

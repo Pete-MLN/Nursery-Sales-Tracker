@@ -876,8 +876,7 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
           onLogGPS={async (plantId) => {
             try {
               const fix = await acquireHighPrecisionGps({
-                maxWaitMs: 4500,
-                targetAccuracyMeters: 4.5
+                targetAccuracyFeet: 14
               });
               const timestamp = new Date().toISOString();
               const updatedItems = (activeOrder.items || []).map(item => {

@@ -28,7 +28,7 @@ import {
 interface DataManagementScreenProps {
   onNavigate: (screen: ScreenType) => void;
   uploads: RecentUpload[];
-  onAddUpload: (filename: string, size?: string, recordsCount?: number) => void;
+  onAddUpload: (filename: string, size?: string, recordsCount?: number, type?: 'inventory' | 'customer' | 'employee') => void;
   employees: Employee[];
   onAddEmployee: (employee: Omit<Employee, 'id'>) => void;
   onDeleteEmployee: (id: string) => void;
@@ -177,7 +177,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
         sizeStr = `${Math.max(1, Math.round(selectedFile.size / 1024))} KB`;
       }
 
-      onAddUpload(selectedFile.name, sizeStr, recCount);
+      onAddUpload(selectedFile.name, sizeStr, recCount, activeUploadModal || undefined);
       setIsUploading(false);
       setActiveUploadModal(null);
       setUploadSuccessMsg(

@@ -406,8 +406,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
 
     try {
       const fix = await acquireHighPrecisionGps({
-        maxWaitMs: 4500,
-        targetAccuracyMeters: 4.5,
+        targetAccuracyFeet: 14,
         onProgress: (status) => {
           if (status.phase === 'waking_gps' || status.phase === 'locking_satellites') {
             showToast(status.message);

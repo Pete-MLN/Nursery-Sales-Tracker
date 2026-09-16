@@ -25,7 +25,8 @@ import {
   deleteAuditSessionFromFirestore 
 } from '../services/firebaseService';
 import { PlantMapModal } from './PlantMapModal';
-import { BrowserMultiFormatReader } from '@zxing/library';
+import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
+import { findPlantByBarcode } from '../utils/barcodeUtils';
 import { 
   Plus, 
   Minus, 
@@ -296,8 +297,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
     setGpsStatusText('Acquiring high-precision satellite lock...');
     try {
       const fix = await acquireHighPrecisionGps({
-        maxWaitMs: 4500,
-        targetAccuracyMeters: 4.5,
+        targetAccuracyFeet: 14,
         onProgress: (status) => setGpsStatusText(status.message)
       });
       setGpsLocation({
@@ -321,7 +321,20 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
   const startCameraScanner = async () => {
     setIsCameraOpen(true);
     try {
-      const codeReader = new BrowserMultiFormatReader();
+      const hints = new Map();
+      hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+        BarcodeFormat.CODE_128,
+        BarcodeFormat.CODE_39,
+        BarcodeFormat.ITF,
+        BarcodeFormat.UPC_A,
+        BarcodeFormat.UPC_E,
+        BarcodeFormat.EAN_13,
+        BarcodeFormat.EAN_8,
+        BarcodeFormat.CODABAR,
+        BarcodeFormat.QR_CODE
+      ]);
+      hints.set(DecodeHintType.TRY_HARDER, true);
+      const codeReader = new BrowserMultiFormatReader(hints);
       codeReaderRef.current = codeReader;
       setTimeout(async () => {
         if (videoRef.current) {
@@ -334,11 +347,8 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                   const scannedText = result.getText();
                   stopCameraScanner();
                   
-                  // Match with inventory
-                  const matched = inventory.find(p => 
-                    (p.barcode && p.barcode.trim() === scannedText.trim()) ||
-                    (p.itemNo && p.itemNo.trim() === scannedText.trim())
-                  );
+                  // Match with inventory using Counterpoint and ITF support
+                  const matched = findPlantByBarcode(scannedText, inventory);
 
                   if (matched) {
                     handleSelectPlant(matched);

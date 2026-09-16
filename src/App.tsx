@@ -14,7 +14,7 @@ import { OrdersScreen } from './components/OrdersScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { InstructionsScreen } from './components/InstructionsScreen';
 import { LoginScreen } from './components/LoginScreen';
-import { AppStartupProgressRing } from './components/AppStartupProgressRing';
+import { AppStartupProgressRing, LastUploadDatesInfo } from './components/AppStartupProgressRing';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
 import {
@@ -45,6 +45,61 @@ import {
 } from './services/firebaseService';
 import { sanitizeCustomerName } from './utils/customerNameCleaner';
 import { flushOfflineSyncQueue, clearActiveDraft, OrderDraft } from './services/orderAutoSaveService';
+
+export function extractLastUploadDates(uploadsList: RecentUpload[]): LastUploadDatesInfo {
+  const getTimestamp = (u: RecentUpload): number => {
+    const match = (u.id || '').match(/^u-(\d+)$/);
+    if (match) return parseInt(match[1], 10);
+    const parsed = Date.parse(`${u.date} ${u.time || ''}`);
+    if (!isNaN(parsed)) return parsed;
+    return 0;
+  };
+
+  const isCustomerUpload = (u: RecentUpload): boolean => {
+    const fn = (u.filename || '').toLowerCase();
+    return u.type === 'customer' || fn.includes('cust') || fn.includes('client');
+  };
+
+  const isInventoryUpload = (u: RecentUpload): boolean => {
+    const fn = (u.filename || '').toLowerCase();
+    return u.type === 'inventory' || fn.includes('avail') || fn.includes('inv') || fn.includes('plant') || fn.includes('stock');
+  };
+
+  const sorted = [...uploadsList].sort((a, b) => getTimestamp(b) - getTimestamp(a));
+  const latestInv = sorted.find(isInventoryUpload);
+  const latestCust = sorted.find(isCustomerUpload);
+
+  const formatDisplay = (u?: RecentUpload) => {
+    if (!u) return {};
+    let dateStr = u.date;
+    if (dateStr === 'Today') {
+      const ts = getTimestamp(u);
+      if (ts > 0) {
+        dateStr = new Date(ts).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      }
+    }
+    return {
+      date: dateStr,
+      time: u.time,
+      filename: u.filename,
+      count: u.recordsCount
+    };
+  };
+
+  const inv = formatDisplay(latestInv);
+  const cust = formatDisplay(latestCust);
+
+  return {
+    inventoryDate: inv.date || 'Sep 14, 2026',
+    inventoryTime: inv.time || '11:26 AM',
+    inventoryFilename: inv.filename || 'Availability_Complete_101.csv',
+    inventoryCount: inv.count,
+    customerDate: cust.date || 'Sep 10, 2026',
+    customerTime: cust.time || '03:44 PM',
+    customerFilename: cust.filename || 'Customers.csv',
+    customerCount: cust.count
+  };
+}
 
 export default function App() {
   const [currentScreen, setCurrentScreen] = useState<ScreenType>('home');
@@ -123,6 +178,29 @@ export default function App() {
   const [syncStatusText, setSyncStatusText] = useState<string>('Connecting to database...');
   const [syncSubStatusText, setSyncSubStatusText] = useState<string>('Initializing Maple Lane database & pricing...');
   const [isSyncReady, setIsSyncReady] = useState<boolean>(false);
+
+  // Track last upload dates for Inventory and Customer datasets
+  const [lastUploads, setLastUploads] = useState<LastUploadDatesInfo>(() => {
+    const cached = localStorage.getItem('nursery_last_upload_dates');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (parsed && (parsed.inventoryDate || parsed.customerDate)) {
+          return parsed;
+        }
+      } catch (e) {}
+    }
+    return {
+      inventoryDate: 'Sep 14, 2026',
+      inventoryTime: '11:26 AM',
+      inventoryFilename: 'Availability_Complete_101.csv',
+      inventoryCount: 4134,
+      customerDate: 'Sep 10, 2026',
+      customerTime: '03:44 PM',
+      customerFilename: 'Customers.csv',
+      customerCount: 2399
+    };
+  });
 
   // Global Stock Alert Thresholds State with local persistence
   const [stockAlertSettings, setStockAlertSettings] = useState<StockAlertSettings>(() => {
@@ -306,7 +384,12 @@ export default function App() {
       }
     });
     const unsubUploads = subscribeToUploads((data) => {
-      if (data && data.length > 0) setUploads(data);
+      if (data && data.length > 0) {
+        setUploads(data);
+        const latest = extractLastUploadDates(data);
+        setLastUploads(latest);
+        localStorage.setItem('nursery_last_upload_dates', JSON.stringify(latest));
+      }
     });
     const unsubHoldingLocations = subscribeToHoldingLocations((data) => {
       if (data && data.length >= 100) {
@@ -420,9 +503,9 @@ export default function App() {
     }
   };
 
-  const handleUpdatePlant = (updatedPlant: PlantItem) => {
+  const handleUpdatePlant = async (updatedPlant: PlantItem) => {
     setInventory(prev => prev.map(item => item.id === updatedPlant.id ? updatedPlant : item));
-    savePlantToFirestore(updatedPlant);
+    await savePlantToFirestore(updatedPlant);
   };
 
   const navigateTo = (screen: ScreenType) => {
@@ -610,18 +693,49 @@ export default function App() {
   };
 
   // Handle uploading dataset in Data Management
-  const handleAddUpload = (filename: string, size?: string, recordsCount?: number) => {
+  const handleAddUpload = (
+    filename: string,
+    size?: string,
+    recordsCount?: number,
+    uploadType?: 'inventory' | 'customer' | 'employee'
+  ) => {
     const todayStr = new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const nowTime = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    const determinedType = uploadType || (
+      filename.toLowerCase().includes('cust') || filename.toLowerCase().includes('client')
+        ? 'customer'
+        : 'inventory'
+    );
     const newUpload: RecentUpload = {
       id: `u-${Date.now()}`,
       filename: filename,
       date: todayStr,
-      time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      time: nowTime,
       size: size || '1.2 MB',
-      recordsCount: recordsCount || Math.floor(100 + Math.random() * 500)
+      recordsCount: recordsCount || Math.floor(100 + Math.random() * 500),
+      type: determinedType
     };
     setUploads(prev => [newUpload, ...prev]);
     saveUploadToFirestore(newUpload);
+
+    setLastUploads(prev => {
+      const updated: LastUploadDatesInfo = {
+        ...prev,
+        ...(determinedType === 'customer' ? {
+          customerDate: todayStr,
+          customerTime: nowTime,
+          customerFilename: filename,
+          customerCount: recordsCount
+        } : {
+          inventoryDate: todayStr,
+          inventoryTime: nowTime,
+          inventoryFilename: filename,
+          inventoryCount: recordsCount
+        })
+      };
+      localStorage.setItem('nursery_last_upload_dates', JSON.stringify(updated));
+      return updated;
+    });
   };
 
   const handleLogin = (newUser: User, keepSignedIn: boolean = true) => {
@@ -760,6 +874,7 @@ export default function App() {
             customers: customers.length,
             holdingAreas: holdingAreas.length
           }}
+          lastUploads={lastUploads}
         />
       )}
 

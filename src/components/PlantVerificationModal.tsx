@@ -28,7 +28,8 @@ import {
   FileText,
   Layers,
   Flame,
-  Percent
+  Percent,
+  Loader2
 } from 'lucide-react';
 
 interface PlantVerificationModalProps {
@@ -38,7 +39,7 @@ interface PlantVerificationModalProps {
   initialPriceLevel?: PriceLevelKey;
   existingCartItem?: OrderCartItem | null;
   customerType?: 'RETAIL' | 'WHOLESALE';
-  onUpdatePlant?: (updatedPlant: PlantItem) => void;
+  onUpdatePlant?: (updatedPlant: PlantItem) => Promise<void> | void;
   onConfirm: (
     plant: PlantItem, 
     quantity: number, 
@@ -65,6 +66,10 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 }) => {
   const [activePlant, setActivePlant] = useState<PlantItem | null>(plant);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState<boolean>(false);
+  const [saleUpdateNotice, setSaleUpdateNotice] = useState<string | null>(null);
+  const [isUpdatingPlantRecord, setIsUpdatingPlantRecord] = useState<boolean>(false);
+  const [plantRecordProgress, setPlantRecordProgress] = useState<number>(0);
+  const [plantRecordStatus, setPlantRecordStatus] = useState<string>('');
 
   useEffect(() => {
     setActivePlant(plant);
@@ -253,8 +258,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
     setGpsStatusText('Acquiring satellite lock...');
     try {
       const fix = await acquireHighPrecisionGps({
-        maxWaitMs: 4500,
-        targetAccuracyMeters: 4.5,
+        targetAccuracyFeet: 14,
         onProgress: (status) => setGpsStatusText(status.message)
       });
 
@@ -384,11 +388,22 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
   const subtotal = selectedUnitPrice * quantity;
 
-  const handleSaveSaleDiscount = (updatedPlant: PlantItem) => {
+  const handleSaveSaleDiscount = async (updatedPlant: PlantItem) => {
+    setIsUpdatingPlantRecord(true);
+    setPlantRecordProgress(25);
+    setPlantRecordStatus('Saving discount & recalculating price levels...');
+
     setActivePlant(updatedPlant);
+
     if (onUpdatePlant) {
-      onUpdatePlant(updatedPlant);
+      setPlantRecordProgress(65);
+      setPlantRecordStatus('Syncing plant record with Firestore cloud database...');
+      await onUpdatePlant(updatedPlant);
     }
+
+    setPlantRecordProgress(90);
+    setPlantRecordStatus('Updating active item unit price & subtotal...');
+
     const newSalePrice = isPlantOnSale(updatedPlant) ? getPlantSalePrice(updatedPlant) : null;
     if (newSalePrice !== null && selectedPriceLevel === 'retail') {
       setSelectedUnitPrice(newSalePrice);
@@ -396,6 +411,19 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       const regular = updatedPlant.prices?.retail ?? updatedPlant.price;
       setSelectedUnitPrice(regular);
     }
+
+    setPlantRecordProgress(100);
+    setIsUpdatingPlantRecord(false);
+
+    if (isPlantOnSale(updatedPlant)) {
+      const saleVal = getPlantSalePrice(updatedPlant);
+      setSaleUpdateNotice(`Sale price applied: $${saleVal?.toFixed(2)} — Plant record saved & synchronized`);
+    } else {
+      setSaleUpdateNotice('Reverted to standard regular price — Plant record saved & synchronized');
+    }
+    setTimeout(() => {
+      setSaleUpdateNotice(null);
+    }, 5500);
   };
 
   const handleConfirm = () => {
@@ -641,6 +669,47 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
               </button>
             </div>
           )}
+
+          {/* Sale update progress indicator or confirmation notice */}
+          {isUpdatingPlantRecord && (
+            <div 
+              id="confirm-plant-sale-updating-banner"
+              className="mt-2.5 p-3 bg-emerald-50 border border-emerald-300 rounded-xl flex flex-col gap-2 animate-fade-in shadow-2xs"
+            >
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 text-[#0e6c4a] animate-spin shrink-0" />
+                  <span className="text-xs font-bold text-[#012d1d]">
+                    {plantRecordStatus || 'Updating plant record & Firestore...'}
+                  </span>
+                </div>
+                <span className="text-xs font-mono font-bold text-[#012d1d] bg-white px-2 py-0.5 rounded border border-emerald-300">
+                  {plantRecordProgress}%
+                </span>
+              </div>
+              <div className="w-full bg-emerald-200 rounded-full h-2 overflow-hidden">
+                <div 
+                  className="h-full bg-gradient-to-r from-[#012d1d] to-[#0e6c4a] rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${plantRecordProgress}%` }}
+                />
+              </div>
+            </div>
+          )}
+
+          {!isUpdatingPlantRecord && saleUpdateNotice && (
+            <div 
+              id="confirm-plant-sale-update-notice"
+              className="mt-2.5 p-2.5 bg-emerald-50 border border-emerald-300 rounded-xl flex items-center justify-between text-xs font-bold text-[#012d1d] animate-fade-in shadow-2xs"
+            >
+              <div className="flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-[#0e6c4a]" />
+                <span>{saleUpdateNotice}</span>
+              </div>
+              <span className="text-[10px] uppercase tracking-wider bg-[#012d1d] text-[#a0f4c8] px-2 py-0.5 rounded font-black">
+                Updated
+              </span>
+            </div>
+          )}
         </div>
 
         {/* Confirmation & Cancel Action Buttons - Moved to directly below the Plant Information Card */}
@@ -648,8 +717,13 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
           <button
             type="button"
             id="cancel-plant-selection-btn"
+            disabled={isUpdatingPlantRecord}
             onClick={onClose}
-            className="w-full sm:w-1/3 bg-[#f3f4f0] hover:bg-[#e2e3df] active:scale-[0.98] text-[#414844] font-extrabold py-4 px-5 rounded-2xl text-[22px] sm:text-[24px] transition-all cursor-pointer border border-[#c1c8c2] flex items-center justify-center gap-2 shadow-xs"
+            className={`w-full sm:w-1/3 py-4 px-5 rounded-2xl text-[22px] sm:text-[24px] transition-all border flex items-center justify-center gap-2 shadow-xs ${
+              isUpdatingPlantRecord
+                ? 'opacity-40 bg-gray-100 text-gray-400 border-gray-200 cursor-not-allowed'
+                : 'bg-[#f3f4f0] hover:bg-[#e2e3df] active:scale-[0.98] text-[#414844] font-extrabold cursor-pointer border-[#c1c8c2]'
+            }`}
           >
             <X className="w-6 h-6 shrink-0" />
             <span>Cancel</span>
@@ -658,13 +732,27 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
           <button
             type="button"
             id="add-to-order-btn"
+            disabled={isUpdatingPlantRecord}
             onClick={handleConfirm}
-            className="w-full sm:w-2/3 bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-[#a0f4c8] hover:text-white font-black py-4 px-5 rounded-2xl text-[22px] sm:text-[25px] transition-all cursor-pointer shadow-md flex items-center justify-center gap-2.5 border border-[#a0f4c8]/30"
+            className={`w-full sm:w-2/3 py-4 px-5 rounded-2xl text-[22px] sm:text-[25px] transition-all flex items-center justify-center gap-2.5 border shadow-md ${
+              isUpdatingPlantRecord
+                ? 'bg-[#0e6c4a]/60 text-emerald-200 border-emerald-500/30 cursor-not-allowed'
+                : 'bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-[#a0f4c8] hover:text-white font-black cursor-pointer border-[#a0f4c8]/30'
+            }`}
           >
-            <CheckCircle2 className="w-7 h-7 text-[#a0f4c8] shrink-0" />
-            <span>
-              {existingCartItem ? 'Update Order' : 'Add to Order'} ({quantity} {unitLabel}{quantity > 1 ? 's' : ''})
-            </span>
+            {isUpdatingPlantRecord ? (
+              <>
+                <Loader2 className="w-7 h-7 text-[#a0f4c8] animate-spin shrink-0" />
+                <span>Updating Record...</span>
+              </>
+            ) : (
+              <>
+                <CheckCircle2 className="w-7 h-7 text-[#a0f4c8] shrink-0" />
+                <span>
+                  {existingCartItem ? 'Update Order' : 'Add to Order'} ({quantity} {unitLabel}{quantity > 1 ? 's' : ''})
+                </span>
+              </>
+            )}
           </button>
         </div>
 

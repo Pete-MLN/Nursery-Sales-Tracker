@@ -958,8 +958,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
     setIsLocatingUser(true);
     try {
       const fix = await acquireHighPrecisionGps({
-        maxWaitMs: 5000,
-        targetAccuracyMeters: 4.5
+        targetAccuracyFeet: 14
       });
       setUserLocation({
         lat: fix.latitude,

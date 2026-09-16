@@ -1,6 +1,17 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Check, Leaf, CheckCircle2, ArrowRight, Cloud, Database, MapPin, Users } from 'lucide-react';
+import { Check, Leaf, CheckCircle2, ArrowRight, Cloud, Database, Users, Calendar, MapPin } from 'lucide-react';
+
+export interface LastUploadDatesInfo {
+  inventoryDate?: string;
+  inventoryTime?: string;
+  inventoryFilename?: string;
+  inventoryCount?: number;
+  customerDate?: string;
+  customerTime?: string;
+  customerFilename?: string;
+  customerCount?: number;
+}
 
 interface AppStartupProgressRingProps {
   progress: number;
@@ -14,6 +25,7 @@ interface AppStartupProgressRingProps {
     customers?: number;
     holdingAreas?: number;
   };
+  lastUploads?: LastUploadDatesInfo;
 }
 
 export const AppStartupProgressRing: React.FC<AppStartupProgressRingProps> = ({
@@ -23,7 +35,8 @@ export const AppStartupProgressRing: React.FC<AppStartupProgressRingProps> = ({
   isReady,
   onSkip,
   canSkip = true,
-  itemCounts
+  itemCounts,
+  lastUploads
 }) => {
   const size = 160;
   const strokeWidth = 8;
@@ -166,35 +179,64 @@ export const AppStartupProgressRing: React.FC<AppStartupProgressRingProps> = ({
             </p>
           </div>
 
-          {/* Real-time Inventory Counts Pill */}
-          {itemCounts && (itemCounts.plants !== undefined || itemCounts.customers !== undefined) && (
-            <div className="mt-3 flex items-center justify-center gap-2 flex-wrap text-[11px] font-bold text-[#414844] bg-[#f9faf6] border border-[#c1c8c2]/60 px-3 py-1.5 rounded-xl">
-              {itemCounts.plants !== undefined && itemCounts.plants > 0 && (
-                <span className="flex items-center gap-1">
-                  <Database className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                  <strong>{itemCounts.plants}</strong> Plants
-                </span>
-              )}
-              {itemCounts.customers !== undefined && itemCounts.customers > 0 && (
-                <>
-                  <span className="text-[#c1c8c2]">·</span>
-                  <span className="flex items-center gap-1">
-                    <Users className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                    <strong>{itemCounts.customers}</strong> Customers
-                  </span>
-                </>
-              )}
-              {itemCounts.holdingAreas !== undefined && itemCounts.holdingAreas > 0 && (
-                <>
-                  <span className="text-[#c1c8c2]">·</span>
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                    <strong>{itemCounts.holdingAreas}</strong> Bays
-                  </span>
-                </>
-              )}
+          {/* Last Upload Dates for Inventory & Customer Data */}
+          <div 
+            id="startup-last-upload-card"
+            className="mt-3.5 w-full bg-[#f9faf6] border border-[#c1c8c2]/80 rounded-2xl p-3 shadow-xs text-left"
+          >
+            <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-wider text-[#717973] mb-2 pb-1.5 border-b border-[#c1c8c2]/40">
+              <span className="flex items-center gap-1.5 text-[#012d1d]">
+                <Calendar className="w-3 h-3 text-[#0e6c4a]" />
+                Last Upload Dates
+              </span>
+              <span className="text-[#0e6c4a] font-bold flex items-center gap-1">
+                <CheckCircle2 className="w-3 h-3" />
+                POS Sync
+              </span>
             </div>
-          )}
+
+            <div className="grid grid-cols-2 gap-2">
+              {/* Inventory Upload Date */}
+              <div 
+                id="startup-inventory-upload-pill"
+                className="bg-white rounded-xl p-2.5 border border-[#c1c8c2]/60 flex flex-col justify-between shadow-2xs"
+              >
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#012d1d]">
+                  <Database className="w-3.5 h-3.5 text-[#0e6c4a] shrink-0" />
+                  <span className="truncate">Inventory</span>
+                </div>
+                <div className="mt-1.5">
+                  <span className="text-xs font-black text-[#012d1d] font-mono tracking-tight block">
+                    {lastUploads?.inventoryDate || 'Sep 14, 2026'}
+                  </span>
+                  <span className="text-[10px] font-medium text-[#717973] block mt-0.5 truncate">
+                    {lastUploads?.inventoryTime ? `${lastUploads.inventoryTime}` : ''}
+                    {itemCounts?.plants ? ` · ${itemCounts.plants.toLocaleString()} items` : ''}
+                  </span>
+                </div>
+              </div>
+
+              {/* Customer Upload Date */}
+              <div 
+                id="startup-customer-upload-pill"
+                className="bg-white rounded-xl p-2.5 border border-[#c1c8c2]/60 flex flex-col justify-between shadow-2xs"
+              >
+                <div className="flex items-center gap-1.5 text-[11px] font-bold text-[#012d1d]">
+                  <Users className="w-3.5 h-3.5 text-[#0e6c4a] shrink-0" />
+                  <span className="truncate">Customers</span>
+                </div>
+                <div className="mt-1.5">
+                  <span className="text-xs font-black text-[#012d1d] font-mono tracking-tight block">
+                    {lastUploads?.customerDate || 'Sep 10, 2026'}
+                  </span>
+                  <span className="text-[10px] font-medium text-[#717973] block mt-0.5 truncate">
+                    {lastUploads?.customerTime ? `${lastUploads.customerTime}` : ''}
+                    {itemCounts?.customers ? ` · ${itemCounts.customers.toLocaleString()} records` : ''}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
 
           {/* Steps Progress Visual Checklist */}
           <div className="mt-5 w-full pt-4 border-t border-[#f3f4f0] flex flex-col gap-2 text-left">

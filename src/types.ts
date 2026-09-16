@@ -142,6 +142,7 @@ export interface RecentUpload {
   time: string;
   size?: string;
   recordsCount?: number;
+  type?: 'inventory' | 'customer' | 'employee';
 }
 
 export interface User {

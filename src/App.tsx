@@ -786,29 +786,62 @@ export default function App() {
       }
     }
 
+    // Build fast lookup indexes to match existing records in O(1) time while preserving container sizes
+    const indexById = new Map<string, string>();
+    const indexByBarcode = new Map<string, string>();
+    const indexByItemNoAndSize = new Map<string, string>();
+    const indexByNameAndSize = new Map<string, string>();
+    const indexByItemNoOnly = new Map<string, string>();
+
+    for (const [id, plant] of mergedMap.entries()) {
+      indexById.set(id, id);
+      const cleanBarcode = (plant.barcode || '').trim().toUpperCase();
+      if (cleanBarcode && cleanBarcode.length > 2) {
+        indexByBarcode.set(cleanBarcode, id);
+      }
+      const cleanItemNo = (plant.itemNo || '').trim().toUpperCase();
+      const cleanSize = (plant.size || '').trim().toUpperCase();
+      const cleanName = (plant.name || '').trim().toLowerCase();
+
+      if (cleanItemNo) {
+        indexByItemNoAndSize.set(`${cleanItemNo}__${cleanSize}`, id);
+        if (!cleanSize) {
+          indexByItemNoOnly.set(cleanItemNo, id);
+        }
+      }
+      if (cleanName) {
+        indexByNameAndSize.set(`${cleanName}__${cleanSize}`, id);
+      }
+    }
+
     // 2. Merge or insert imported plants
     for (const newPlant of newPlants) {
       if (isDefaultMockItem(newPlant.id, newPlant.itemNo, newPlant.barcode, newPlant.name)) {
         continue;
       }
 
-      // Find matching existing plant by itemNo, barcode, ID, or name+size
-      let existingMatchKey: string | undefined;
-      for (const [key, existing] of mergedMap.entries()) {
-        const itemNoMatch = newPlant.itemNo && existing.itemNo && newPlant.itemNo.trim().toUpperCase() === existing.itemNo.trim().toUpperCase();
-        const barcodeMatch = newPlant.barcode && existing.barcode && newPlant.barcode.trim().toUpperCase() === existing.barcode.trim().toUpperCase();
-        const idMatch = newPlant.id && existing.id && newPlant.id === existing.id;
-        const nameAndSizeMatch = newPlant.name && existing.name && 
-          newPlant.name.toLowerCase().trim() === existing.name.toLowerCase().trim() &&
-          (!newPlant.size || !existing.size || newPlant.size.toUpperCase().trim() === existing.size.toUpperCase().trim());
+      const cleanId = (newPlant.id || '').trim();
+      const cleanBarcode = (newPlant.barcode || '').trim().toUpperCase();
+      const cleanItemNo = (newPlant.itemNo || '').trim().toUpperCase();
+      const cleanSize = (newPlant.size || '').trim().toUpperCase();
+      const cleanName = (newPlant.name || '').trim().toLowerCase();
 
-        if (itemNoMatch || barcodeMatch || idMatch || nameAndSizeMatch) {
-          existingMatchKey = key;
-          break;
-        }
+      // Find matching existing plant in priority order
+      let existingMatchKey: string | undefined = undefined;
+
+      if (cleanId && indexById.has(cleanId)) {
+        existingMatchKey = indexById.get(cleanId);
+      } else if (cleanBarcode && cleanBarcode.length > 2 && indexByBarcode.has(cleanBarcode)) {
+        existingMatchKey = indexByBarcode.get(cleanBarcode);
+      } else if (cleanItemNo && indexByItemNoAndSize.has(`${cleanItemNo}__${cleanSize}`)) {
+        existingMatchKey = indexByItemNoAndSize.get(`${cleanItemNo}__${cleanSize}`);
+      } else if (cleanName && indexByNameAndSize.has(`${cleanName}__${cleanSize}`)) {
+        existingMatchKey = indexByNameAndSize.get(`${cleanName}__${cleanSize}`);
+      } else if (cleanItemNo && !cleanSize && indexByItemNoOnly.has(cleanItemNo)) {
+        existingMatchKey = indexByItemNoOnly.get(cleanItemNo);
       }
 
-      if (existingMatchKey) {
+      if (existingMatchKey && mergedMap.has(existingMatchKey)) {
         const existing = mergedMap.get(existingMatchKey)!;
         const updatedPlant: PlantItem = {
           ...existing,
@@ -830,6 +863,11 @@ export default function App() {
         mergedMap.set(existingMatchKey, updatedPlant);
       } else {
         mergedMap.set(newPlant.id, newPlant);
+        // Register in index maps so subsequent duplicate rows in the same upload merge
+        indexById.set(newPlant.id, newPlant.id);
+        if (cleanBarcode && cleanBarcode.length > 2) indexByBarcode.set(cleanBarcode, newPlant.id);
+        if (cleanItemNo) indexByItemNoAndSize.set(`${cleanItemNo}__${cleanSize}`, newPlant.id);
+        if (cleanName) indexByNameAndSize.set(`${cleanName}__${cleanSize}`, newPlant.id);
       }
     }
 

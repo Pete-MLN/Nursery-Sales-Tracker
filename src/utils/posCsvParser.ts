@@ -25,6 +25,8 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
   if (!rows || rows.length === 0) return [];
 
   const plants: PlantItem[] = [];
+  const barcodeMap = new Map<string, number>();
+  const itemSizeMap = new Map<string, number>();
 
   rows.forEach((row, idx) => {
     // Normalize header keys to UPPERCASE with whitespace trimmed
@@ -147,10 +149,19 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
       };
     }
 
-    const existingIndex = plants.findIndex(p => 
-      (plantItem.itemNo && p.itemNo && plantItem.itemNo.trim().toUpperCase() === p.itemNo.trim().toUpperCase()) ||
-      (plantItem.barcode && p.barcode && plantItem.barcode.trim().toUpperCase() === p.barcode.trim().toUpperCase())
-    );
+    const cleanItemNo = (plantItem.itemNo || '').trim().toUpperCase();
+    const cleanSize = (plantItem.size || '').trim().toUpperCase();
+    const cleanBarcode = (plantItem.barcode || '').trim().toUpperCase();
+    const itemSizeKey = cleanItemNo ? `${cleanItemNo}__${cleanSize}` : '';
+
+    let existingIndex = -1;
+    // 1. If barcode exists and matches an already seen row, match it
+    if (cleanBarcode && barcodeMap.has(cleanBarcode)) {
+      existingIndex = barcodeMap.get(cleanBarcode)!;
+    } else if (itemSizeKey && itemSizeMap.has(itemSizeKey)) {
+      // 2. If same itemNo AND same container size, merge stock
+      existingIndex = itemSizeMap.get(itemSizeKey)!;
+    }
 
     if (existingIndex >= 0) {
       const existing = plants[existingIndex];
@@ -161,7 +172,10 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
       if (plantItem.descr && !existing.descr) existing.descr = plantItem.descr;
       if (plantItem.saleDiscount && !existing.saleDiscount) existing.saleDiscount = plantItem.saleDiscount;
     } else {
+      const newIndex = plants.length;
       plants.push(plantItem);
+      if (cleanBarcode) barcodeMap.set(cleanBarcode, newIndex);
+      if (itemSizeKey) itemSizeMap.set(itemSizeKey, newIndex);
     }
   });
 

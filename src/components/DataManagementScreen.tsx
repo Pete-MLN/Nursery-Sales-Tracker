@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import * as XLSX from 'xlsx';
 import { ScreenType, RecentUpload, Employee, PlantItem, Customer } from '../types';
 import { parsePosCsvToPlants, parsePosFileToPlants } from '../utils/posCsvParser';
 import { parseCustomerFileToCustomers } from '../utils/customerParser';
@@ -116,20 +117,39 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     setFileError(null);
     setSelectedFile(file);
 
-    // Attempt to estimate or parse records count
-    if (file.name.endsWith('.csv') || file.name.endsWith('.txt')) {
+    // Accurately count all records in the full file (no 100KB truncation)
+    const fileNameLower = file.name.toLowerCase();
+    if (fileNameLower.endsWith('.csv') || fileNameLower.endsWith('.txt')) {
       const reader = new FileReader();
       reader.onload = (e) => {
         const text = e.target?.result as string;
         if (text) {
-          const lines = text.split('\n').filter(line => line.trim().length > 0);
-          const count = Math.max(1, lines.length - 1); // Exclude header line if possible
+          const lines = text.split(/\r\n|\r|\n/).filter(line => line.trim().length > 0);
+          const count = Math.max(1, lines.length - 1); // Exclude header line
           setEstimatedRecords(count);
         }
       };
-      reader.readAsText(file.slice(0, 100000)); // Read first 100KB for quick preview
+      reader.readAsText(file); // Read full file to count all rows accurately
+    } else if (fileNameLower.endsWith('.xlsx') || fileNameLower.endsWith('.xls')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const buffer = e.target?.result as ArrayBuffer;
+          const workbook = XLSX.read(buffer, { type: 'array', sheetRows: 0 });
+          const firstSheet = workbook.SheetNames[0];
+          if (firstSheet) {
+            const worksheet = workbook.Sheets[firstSheet];
+            const range = XLSX.utils.decode_range(worksheet['!ref'] || 'A1:A1');
+            const totalRows = Math.max(1, range.e.r); // Exclude header row (row index 0)
+            setEstimatedRecords(totalRows);
+          }
+        } catch {
+          const count = Math.max(15, Math.floor(file.size / 110));
+          setEstimatedRecords(count);
+        }
+      };
+      reader.readAsArrayBuffer(file);
     } else {
-      // Excel files estimation based on file size
       const count = Math.max(15, Math.floor(file.size / 110));
       setEstimatedRecords(count);
     }
@@ -1151,7 +1171,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                     </p>
                     <p className="text-xs text-[#414844]">
                       {Math.max(1, Math.round(selectedFile.size / 1024))} KB
-                      {estimatedRecords > 0 && ` • ~${estimatedRecords} records detected`}
+                      {estimatedRecords > 0 && ` • ${estimatedRecords.toLocaleString()} records detected`}
                     </p>
                   </div>
                 </div>

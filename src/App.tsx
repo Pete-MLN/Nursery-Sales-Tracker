@@ -311,48 +311,41 @@ export default function App() {
         // Exclude any default mock items
         const cleanedData = data.filter(p => !isDefaultMockItem(p.id, p.itemNo, p.barcode, p.name));
 
-        // Deduplicate plants to prevent duplicate entries from past imports or overlapping IDs
-        const deduped: PlantItem[] = [];
-        const seenKeys = new Set<string>();
+        // Consolidate plants so that distinct items (different sizes, distinct varieties) are never discarded!
+        const consolidatedMap = new Map<string, PlantItem>();
 
         for (const p of cleanedData) {
-          const itemNoKey = (p.itemNo || '').trim().toUpperCase();
-          const nameKey = (p.name || '').trim().toUpperCase().replace(/\s+/g, ' ');
-          const barcodeKey = (p.barcode || '').trim().toUpperCase();
+          const itemNo = (p.itemNo || '').trim().toUpperCase();
+          const size = (p.size || '').trim().toUpperCase();
+          // Unique key: itemNo + size, or fallback to p.id
+          const key = itemNo ? `${itemNo}__${size}` : p.id;
 
-          const isDuplicate =
-            (itemNoKey && seenKeys.has(`item:${itemNoKey}`)) ||
-            (nameKey && seenKeys.has(`name:${nameKey}`)) ||
-            (barcodeKey && barcodeKey.length > 2 && seenKeys.has(`barcode:${barcodeKey}`)) ||
-            seenKeys.has(`id:${p.id}`);
-
-          if (!isDuplicate) {
-            if (itemNoKey) seenKeys.add(`item:${itemNoKey}`);
-            if (nameKey) seenKeys.add(`name:${nameKey}`);
-            if (barcodeKey && barcodeKey.length > 2) seenKeys.add(`barcode:${barcodeKey}`);
-            seenKeys.add(`id:${p.id}`);
-            deduped.push({ ...p });
+          if (!consolidatedMap.has(key)) {
+            consolidatedMap.set(key, { ...p });
           } else {
-            const existing = deduped.find(u =>
-              (itemNoKey && (u.itemNo || '').trim().toUpperCase() === itemNoKey) ||
-              (nameKey && (u.name || '').trim().toUpperCase().replace(/\s+/g, ' ') === nameKey) ||
-              (barcodeKey && barcodeKey.length > 2 && (u.barcode || '').trim().toUpperCase() === barcodeKey) ||
-              u.id === p.id
-            );
-            if (existing) {
-              if (!existing.gpsLocation && p.gpsLocation) existing.gpsLocation = p.gpsLocation;
-              if ((!existing.holdingLocation || existing.holdingLocation === '') && p.holdingLocation) existing.holdingLocation = p.holdingLocation;
-              if (p.stock > existing.stock) existing.stock = p.stock;
-              if (p.price && (!existing.price || existing.price === 0)) existing.price = p.price;
-              if (p.prices && (!existing.prices || Object.keys(existing.prices).length === 0)) existing.prices = p.prices;
+            const existing = consolidatedMap.get(key)!;
+            // Merge metadata cleanly preserving GPS and holding location
+            if (!existing.gpsLocation && p.gpsLocation) existing.gpsLocation = p.gpsLocation;
+            if (!existing.gpsLocations && p.gpsLocations) existing.gpsLocations = p.gpsLocations;
+            if ((!existing.holdingLocation || existing.holdingLocation === '') && p.holdingLocation) {
+              existing.holdingLocation = p.holdingLocation;
             }
+            if (p.stock !== undefined && (existing.stock === undefined || p.stock > existing.stock)) {
+              existing.stock = p.stock;
+            }
+            if (p.prices) {
+              existing.prices = { ...(existing.prices || {}), ...p.prices };
+            }
+            if (p.price && (!existing.price || existing.price === 0)) existing.price = p.price;
           }
         }
-        setInventory(deduped);
+
+        const plantList = Array.from(consolidatedMap.values());
+        setInventory(plantList);
         plantsReceived = true;
         setSyncProgress((prev) => Math.max(prev, 72));
         setSyncStatusText('Syncing plant catalog & pricing...');
-        setSyncSubStatusText(`Loaded ${deduped.length} plant varieties and multi-tier pricing`);
+        setSyncSubStatusText(`Loaded ${plantList.length} plant varieties and multi-tier pricing`);
         checkReadiness();
       }
     });
@@ -826,19 +819,13 @@ export default function App() {
       const cleanSize = (newPlant.size || '').trim().toUpperCase();
       const cleanName = (newPlant.name || '').trim().toLowerCase();
 
-      // Find matching existing plant in priority order
+      // Find matching existing plant strictly by ID or by unique (itemNo + size)
       let existingMatchKey: string | undefined = undefined;
 
       if (cleanId && indexById.has(cleanId)) {
         existingMatchKey = indexById.get(cleanId);
-      } else if (cleanBarcode && cleanBarcode.length > 2 && indexByBarcode.has(cleanBarcode)) {
-        existingMatchKey = indexByBarcode.get(cleanBarcode);
       } else if (cleanItemNo && indexByItemNoAndSize.has(`${cleanItemNo}__${cleanSize}`)) {
         existingMatchKey = indexByItemNoAndSize.get(`${cleanItemNo}__${cleanSize}`);
-      } else if (cleanName && indexByNameAndSize.has(`${cleanName}__${cleanSize}`)) {
-        existingMatchKey = indexByNameAndSize.get(`${cleanName}__${cleanSize}`);
-      } else if (cleanItemNo && !cleanSize && indexByItemNoOnly.has(cleanItemNo)) {
-        existingMatchKey = indexByItemNoOnly.get(cleanItemNo);
       }
 
       if (existingMatchKey && mergedMap.has(existingMatchKey)) {

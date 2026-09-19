@@ -196,7 +196,7 @@ export function subscribeToPlants(callback: (plants: PlantItem[]) => void) {
         return;
       }
 
-      items.push(plant);
+      items.push({ ...plant, id: plant.id || docId });
     });
     callback(items);
   }, (err) => handleSnapshotError(PLANTS_COL, err));

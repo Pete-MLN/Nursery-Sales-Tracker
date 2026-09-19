@@ -25,8 +25,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
   if (!rows || rows.length === 0) return [];
 
   const plants: PlantItem[] = [];
-  const barcodeMap = new Map<string, number>();
-  const itemSizeMap = new Map<string, number>();
+  const seenIdCounts = new Map<string, number>();
 
   rows.forEach((row, idx) => {
     // Normalize header keys to UPPERCASE with whitespace trimmed
@@ -55,7 +54,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
     const categSubcat = normalizedRow['CATEG_SUBCAT'] || normalizedRow['CATEGORY'] || '';
     const addlDescr2 = normalizedRow['ADDL_DESCR_2'] || normalizedRow['LOCATION'] || normalizedRow['PLANT_LOCATION'] || '';
     const subcatCod = normalizedRow['SUBCAT_COD'] || normalizedRow['SUB_CATEGORY'] || '';
-    const barcode = normalizedRow['BARCOD'] || normalizedRow['BARCODE'] || normalizedRow['BARCOD_NO'] || normalizedRow['BARCODE_NO'] || normalizedRow['UPC'] || normalizedRow['UPC_NO'] || normalizedRow['ALTR_BARCOD'] || normalizedRow['ALT_BARCOD'] || normalizedRow['ALT_BARCODE'] || normalizedRow['TAG_NO'] || normalizedRow['TAG_BARCODE'] || itemNo;
+    const rawBarcode = normalizedRow['BARCOD'] || normalizedRow['BARCODE'] || normalizedRow['BARCOD_NO'] || normalizedRow['BARCODE_NO'] || normalizedRow['UPC'] || normalizedRow['UPC_NO'] || normalizedRow['ALTR_BARCOD'] || normalizedRow['ALT_BARCOD'] || normalizedRow['ALT_BARCODE'] || normalizedRow['TAG_NO'] || normalizedRow['TAG_BARCODE'] || '';
     const stat = normalizedRow['STAT'] || normalizedRow['STATUS'] || 'A';
     const locId = normalizedRow['LOC_ID'] || normalizedRow['STORE_ID'] || '101';
 
@@ -100,9 +99,25 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
       }
     }
 
+    // Stable deterministic ID based on itemNo and container size
+    const itemNoClean = String(itemNo).trim().replace(/[^a-zA-Z0-9_-]/g, '_');
+    const sizeClean = stkUnit ? String(stkUnit).trim().replace(/[^a-zA-Z0-9_-]/g, '_') : '';
+    const baseId = `p-${itemNoClean}${sizeClean ? '-' + sizeClean : ''}`;
+
+    let plantId = baseId;
+    if (seenIdCounts.has(baseId)) {
+      const count = seenIdCounts.get(baseId)! + 1;
+      seenIdCounts.set(baseId, count);
+      plantId = `${baseId}-loc${locId}-${count}`;
+    } else {
+      seenIdCounts.set(baseId, 1);
+    }
+
+    const finalBarcode = rawBarcode ? String(rawBarcode).trim() : String(itemNo).trim();
+
     const plantItem: PlantItem = {
-      id: `p-${itemNo}-${idx}`,
-      itemNo: String(itemNo),
+      id: plantId,
+      itemNo: String(itemNo).trim(),
       name: primaryName,
       lightRequirement: 'FULL SUN',
       price: effectivePrice,
@@ -110,7 +125,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
       stock: qtyAvail,
       quantityCommitted: qtyCommit,
       status: stockStatus,
-      barcode: String(barcode),
+      barcode: finalBarcode,
       statusActive: String(stat).toUpperCase() === 'A',
       storeLocId: String(locId)
     };
@@ -149,34 +164,8 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
       };
     }
 
-    const cleanItemNo = (plantItem.itemNo || '').trim().toUpperCase();
-    const cleanSize = (plantItem.size || '').trim().toUpperCase();
-    const cleanBarcode = (plantItem.barcode || '').trim().toUpperCase();
-    const itemSizeKey = cleanItemNo ? `${cleanItemNo}__${cleanSize}` : '';
-
-    let existingIndex = -1;
-    // 1. If barcode exists and matches an already seen row, match it
-    if (cleanBarcode && barcodeMap.has(cleanBarcode)) {
-      existingIndex = barcodeMap.get(cleanBarcode)!;
-    } else if (itemSizeKey && itemSizeMap.has(itemSizeKey)) {
-      // 2. If same itemNo AND same container size, merge stock
-      existingIndex = itemSizeMap.get(itemSizeKey)!;
-    }
-
-    if (existingIndex >= 0) {
-      const existing = plants[existingIndex];
-      existing.stock = Math.max(existing.stock, plantItem.stock);
-      if (plantItem.gpsLocation && !existing.gpsLocation) existing.gpsLocation = plantItem.gpsLocation;
-      if (plantItem.holdingLocation && !existing.holdingLocation) existing.holdingLocation = plantItem.holdingLocation;
-      if (plantItem.prices) existing.prices = { ...(existing.prices || {}), ...plantItem.prices };
-      if (plantItem.descr && !existing.descr) existing.descr = plantItem.descr;
-      if (plantItem.saleDiscount && !existing.saleDiscount) existing.saleDiscount = plantItem.saleDiscount;
-    } else {
-      const newIndex = plants.length;
-      plants.push(plantItem);
-      if (cleanBarcode) barcodeMap.set(cleanBarcode, newIndex);
-      if (itemSizeKey) itemSizeMap.set(itemSizeKey, newIndex);
-    }
+    // Preserve every row from the uploaded file
+    plants.push(plantItem);
   });
 
   return plants;

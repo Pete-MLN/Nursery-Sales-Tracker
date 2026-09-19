@@ -42,7 +42,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy' | 'sale'>('all');
-  const [minQtyOneOnly, setMinQtyOneOnly] = useState<boolean>(true);
+  const [minQtyOneOnly, setMinQtyOneOnly] = useState<boolean>(false);
   const [expandedPricesItemId, setExpandedPricesItemId] = useState<string | null>(null);
   const [saleModalPlant, setSaleModalPlant] = useState<PlantItem | null>(null);
 

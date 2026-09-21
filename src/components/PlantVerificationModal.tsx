@@ -547,66 +547,57 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
             )}
           </div>
 
-          {/* Badges: High-Visibility Item Number, Container Size, Stock Availability */}
-          <div className="flex flex-wrap items-center gap-2 pt-1">
-            <span 
-              id="confirm-plant-itemno"
-              className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[22px] sm:text-[25px] font-black px-3.5 py-1.5 rounded-xl flex items-center gap-2 shadow-xs border border-[#a0f4c8]/30"
-              title="Item Number"
-            >
-              <Tag className="w-5 h-5 sm:w-6 sm:h-6 text-[#a0f4c8] shrink-0" />
-              <span>#{plant.itemNo || plant.barcode || 'N/A'}</span>
-            </span>
+          {/* Badges: High-Visibility Item Number, Container Size, Stock Availability, and Price Dropdown */}
+          <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+            <div className="flex flex-wrap items-center gap-2">
+              <span 
+                id="confirm-plant-itemno"
+                className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[22px] sm:text-[25px] font-black px-3.5 py-1.5 rounded-xl flex items-center gap-2 shadow-xs border border-[#a0f4c8]/30"
+                title="Item Number"
+              >
+                <Tag className="w-5 h-5 sm:w-6 sm:h-6 text-[#a0f4c8] shrink-0" />
+                <span>#{plant.itemNo || plant.barcode || 'N/A'}</span>
+              </span>
 
-            <span 
-              id="confirm-plant-size"
-              className="bg-[#461702] text-amber-100 text-[22px] sm:text-[25px] font-black px-3.5 py-1.5 rounded-xl flex items-center gap-2 shadow-xs border border-amber-400/30"
-              title="Item Size"
-            >
-              <Package className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300 shrink-0" />
-              <span>{plant.size ? `SIZE: ${plant.size}` : (isBulk ? `UNIT: ${unitLabel}` : 'Std Size')}</span>
-            </span>
+              <span 
+                id="confirm-plant-size"
+                className="bg-[#461702] text-amber-100 text-[22px] sm:text-[25px] font-black px-3.5 py-1.5 rounded-xl flex items-center gap-2 shadow-xs border border-amber-400/30"
+                title="Item Size"
+              >
+                <Package className="w-5 h-5 sm:w-6 sm:h-6 text-amber-300 shrink-0" />
+                <span>{plant.size ? `SIZE: ${plant.size}` : (isBulk ? `UNIT: ${unitLabel}` : 'Std Size')}</span>
+              </span>
 
-            <span className={`text-xs sm:text-sm font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs self-center ${
-              plant.stock < 0
-                ? 'bg-rose-100 text-rose-900 border border-rose-300'
-                : plant.stock === 0 
-                ? 'bg-red-100 text-red-800 border border-red-200' 
-                : plant.stock < 5 
-                ? 'bg-amber-100 text-amber-900 border border-amber-200' 
-                : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
-            }`}>
-              {plant.stock < 0 ? (
-                <>
-                  <AlertCircle className="w-3.5 h-3.5 text-rose-700" />
-                  <span>{plant.stock} Qty (Oversold)</span>
-                </>
-              ) : plant.stock === 0 ? (
-                <>
-                  <AlertCircle className="w-3.5 h-3.5 text-red-600" />
-                  <span>0 Qty (Out of Stock)</span>
-                </>
-              ) : (
-                <>
-                  <Check className="w-3.5 h-3.5 text-emerald-700" />
-                  <span>Qty: {plant.stock} In Stock</span>
-                </>
-              )}
-            </span>
-          </div>
-
-          {/* Line below 'item number', 'Size' and Quantity line: Price Dropdown */}
-          <div id="confirm-plant-pricing" className="pt-2 mt-0.5 border-t border-[#012d1d]/10 flex items-center justify-between gap-2 flex-nowrap">
-            <div className="flex items-center gap-1.5 min-w-0">
-              <div className="w-6 h-6 rounded-md bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center shrink-0 shadow-2xs">
-                <DollarSign className="w-3.5 h-3.5 text-[#a0f4c8]" />
-              </div>
-              <span className="text-xs sm:text-sm text-[#414844] font-bold whitespace-nowrap truncate">
-                Rate: <strong className="text-[#012d1d] font-black uppercase">{selectedPriceLevel === 'gardenCenter' ? 'GARDEN' : selectedPriceLevel}</strong>
+              <span className={`text-xs sm:text-sm font-extrabold px-3 py-1.5 rounded-xl flex items-center gap-1.5 shadow-2xs self-center ${
+                plant.stock < 0
+                  ? 'bg-rose-100 text-rose-900 border border-rose-300'
+                  : plant.stock === 0 
+                  ? 'bg-red-100 text-red-800 border border-red-200' 
+                  : plant.stock < 5 
+                  ? 'bg-amber-100 text-amber-900 border border-amber-200' 
+                  : 'bg-emerald-100 text-emerald-900 border border-emerald-200'
+              }`}>
+                {plant.stock < 0 ? (
+                  <>
+                    <AlertCircle className="w-3.5 h-3.5 text-rose-700" />
+                    <span>{plant.stock} Qty (Oversold)</span>
+                  </>
+                ) : plant.stock === 0 ? (
+                  <>
+                    <AlertCircle className="w-3.5 h-3.5 text-red-600" />
+                    <span>0 Qty (Out of Stock)</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5 text-emerald-700" />
+                    <span>Qty: {plant.stock} In Stock</span>
+                  </>
+                )}
               </span>
             </div>
 
-            <div className="flex items-center gap-1.5 shrink-0">
+            {/* Price Dropdown on the same line */}
+            <div id="confirm-plant-pricing" className="flex items-center gap-1.5 shrink-0 ml-auto">
               <PricingDropdown
                 plant={currentPlant}
                 currentPrice={selectedUnitPrice}

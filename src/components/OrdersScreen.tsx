@@ -80,6 +80,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       !q ||
       o.id.toLowerCase().includes(q) ||
       o.customerName.toLowerCase().includes(q) ||
+      (o.poNumber && o.poNumber.toLowerCase().includes(q)) ||
       (o.items && o.items.some(item => 
         (item.plant.name && item.plant.name.toLowerCase().includes(q)) ||
         (item.plant.botanicalName && item.plant.botanicalName.toLowerCase().includes(q)) ||
@@ -457,6 +458,11 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                       <span className="font-extrabold text-base sm:text-lg text-[#012d1d] group-hover:underline">
                         {order.customerName ? `${order.customerName} - ${order.id}` : order.id}
                       </span>
+                      {order.poNumber && (
+                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#f3f4f0] text-[#012d1d] border border-[#c1c8c2]">
+                          PO: {order.poNumber}
+                        </span>
+                      )}
                       {isCompleted ? (
                         <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
                           <CheckCircle className="w-3 h-3 text-emerald-700" />

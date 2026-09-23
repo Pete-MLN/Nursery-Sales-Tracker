@@ -14,6 +14,7 @@ export interface OrderDraft {
   scheduledTime?: string;
   holdingLocation?: string;
   notes?: string;
+  poNumber?: string;
   orderStatus?: Order['status'];
   remainingPickupDate?: string;
   partialPickupNotes?: string;

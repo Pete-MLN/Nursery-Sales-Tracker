@@ -834,52 +834,55 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
         <>
           {/* Counting Entry Form Card */}
           <section className="bg-white rounded-2xl p-4 sm:p-6 border border-[#c1c8c2] shadow-sm flex flex-col gap-5">
-            <div className="flex items-center justify-between border-b border-[#e2e3df] pb-3 gap-3 flex-wrap">
-              <div className="flex items-center gap-2 min-w-0">
-                <div className="w-7 h-7 rounded-lg bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold text-xs shrink-0">
-                  {editingItem ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
-                </div>
-                <div>
-                  <h2 className="text-base font-extrabold text-[#012d1d]">
+            <div className="border-b border-[#e2e3df] pb-3 flex flex-col gap-0.5">
+              {/* Line 1: Title and Finalize Button on the same line */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <div className="w-7 h-7 rounded-lg bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold text-xs shrink-0">
+                    {editingItem ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
+                  </div>
+                  <h2 className="text-base font-extrabold text-[#012d1d] truncate">
                     {editingItem ? 'Edit Recorded Inventory Count' : 'Record Plant Count Entry'}
                   </h2>
-                  <p className="text-[11px] text-[#525a55]">
-                    Independent snapshot: captured with size, location, GPS, and count mode.
-                  </p>
+                </div>
+
+                <div className="flex items-center gap-2 shrink-0">
+                  {editingItem && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setEditingItem(null);
+                        setSelectedPlant(null);
+                        setCountedQty(1);
+                        setQtyInputStr('1');
+                      }}
+                      className="text-xs font-bold text-[#ba1a1a] hover:underline cursor-pointer px-2 py-1"
+                    >
+                      Cancel Edit
+                    </button>
+                  )}
+
+                  <button
+                    type="button"
+                    onClick={handleOpenEmailModal}
+                    disabled={activeSession.items.length === 0}
+                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                      activeSession.items.length > 0
+                        ? 'bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] shadow-xs active:scale-95'
+                        : 'bg-[#c1c8c2] text-white opacity-60 cursor-not-allowed'
+                    }`}
+                    title={activeSession.items.length === 0 ? 'Log at least one plant to finalize' : 'Finalize session and email count report'}
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                    <span>Finalize & Email Report</span>
+                  </button>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
-                {editingItem && (
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setEditingItem(null);
-                      setSelectedPlant(null);
-                      setCountedQty(1);
-                      setQtyInputStr('1');
-                    }}
-                    className="text-xs font-bold text-[#ba1a1a] hover:underline cursor-pointer px-2 py-1"
-                  >
-                    Cancel Edit
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={handleOpenEmailModal}
-                  disabled={activeSession.items.length === 0}
-                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                    activeSession.items.length > 0
-                      ? 'bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] shadow-xs active:scale-95'
-                      : 'bg-[#c1c8c2] text-white opacity-60 cursor-not-allowed'
-                  }`}
-                  title={activeSession.items.length === 0 ? 'Log at least one plant to finalize' : 'Finalize session and email count report'}
-                >
-                  <Send className="w-3.5 h-3.5" />
-                  <span>Finalize & Email Report</span>
-                </button>
-              </div>
+              {/* Line 2: Description on line below with tight line spacing */}
+              <p className="text-[11px] text-[#525a55] pl-9 leading-tight">
+                Independent snapshot: captured with size, location, GPS, and count mode.
+              </p>
             </div>
 
             <form onSubmit={handleRecordCount} className="flex flex-col gap-5">

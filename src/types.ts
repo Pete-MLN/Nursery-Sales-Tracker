@@ -102,6 +102,7 @@ export interface Order {
   items?: OrderCartItem[];
   holdingLocation?: string;
   notes?: string;
+  poNumber?: string; // Optional PO Number or Job/Project Name
   hasPartialPickup?: boolean; // True if customer took only part of order
   remainingItemsCount?: number; // Number of items still awaiting pickup
   pickedUpItemsCount?: number; // Number of items already taken

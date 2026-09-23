@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import { ScreenType, PlantItem, OrderCartItem, Customer, Order, GPSLocationEntry } from '../types';
 import { DEFAULT_PLANT_IMAGE, DEFAULT_CUSTOMER } from '../data/mockData';
-import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink, Square, Flame } from 'lucide-react';
+import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink, Square, Flame, FileText } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode, isValidBarcodeString, cleanCounterpointBarcode } from '../utils/barcodeUtils';
 import { PricingDropdown } from './PricingDropdown';
@@ -66,6 +66,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const [customerSearch, setCustomerSearch] = useState<string>(
     activeOrder?.customerName || initialDraft?.customerName || DEFAULT_CUSTOMER.name
   );
+  const [poNumber, setPoNumber] = useState<string>(
+    activeOrder?.poNumber || initialDraft?.poNumber || ''
+  );
   const [isDropdownOpen, setIsDropdownOpen] = useState<boolean>(false);
   const [customerType, setCustomerType] = useState<'RETAIL' | 'WHOLESALE'>(
     initialDraft?.customerType || 'RETAIL'
@@ -95,6 +98,13 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           setSelectedCustomer(editDraft.customerName);
           setCustomerSearch(editDraft.customerName);
         }
+        if (editDraft.poNumber !== undefined) {
+          setPoNumber(editDraft.poNumber);
+        } else if (activeOrder.poNumber !== undefined) {
+          setPoNumber(activeOrder.poNumber);
+        } else {
+          setPoNumber('');
+        }
         if (editDraft.notes !== undefined) {
           setOrderNotes(editDraft.notes);
         } else if (activeOrder.notes !== undefined) {
@@ -104,10 +114,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       } else if (activeOrder.items && activeOrder.items.length > 0) {
         setCartItems(activeOrder.items.map(item => ({ ...item })));
         setOrderNotes(activeOrder.notes || '');
+        setPoNumber(activeOrder.poNumber || '');
         setHasUnsavedChanges(false);
       } else {
         setCartItems([]);
         setOrderNotes(activeOrder.notes || '');
+        setPoNumber(activeOrder.poNumber || '');
         setHasUnsavedChanges(false);
       }
       if (activeOrder.customerName && (!editDraft || !editDraft.customerName)) {
@@ -120,6 +132,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         setCartItems(activeDraft.cartItems.map(item => ({ ...item })));
         setSelectedCustomer(activeDraft.customerName || DEFAULT_CUSTOMER.name);
         setCustomerSearch(activeDraft.customerName || DEFAULT_CUSTOMER.name);
+        setPoNumber(activeDraft.poNumber || '');
         setItemFulfillmentMap(activeDraft.itemFulfillmentMap || {});
         setGpsLoggedMap(activeDraft.gpsLoggedMap || {});
         setCustomerType(activeDraft.customerType || 'RETAIL');
@@ -130,6 +143,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         setCartItems([]);
         setSelectedCustomer(DEFAULT_CUSTOMER.name);
         setCustomerSearch(DEFAULT_CUSTOMER.name);
+        setPoNumber('');
         setItemFulfillmentMap({});
         setGpsLoggedMap({});
         setCustomerType('RETAIL');
@@ -143,12 +157,13 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   useEffect(() => {
     if (!hasUnsavedChanges) return;
 
-    const hasData = cartItems.length > 0 || (selectedCustomer && selectedCustomer.trim().length > 0) || (customerSearch && customerSearch.trim().length > 0) || (orderNotes && orderNotes.trim().length > 0);
+    const hasData = cartItems.length > 0 || (selectedCustomer && selectedCustomer.trim().length > 0) || (customerSearch && customerSearch.trim().length > 0) || (poNumber && poNumber.trim().length > 0) || (orderNotes && orderNotes.trim().length > 0);
     if (hasData || activeOrder) {
       const draft: OrderDraft = {
         orderId: activeOrder?.id,
         isEditingExisting: Boolean(activeOrder),
         customerName: (selectedCustomer || customerSearch || '').trim(),
+        poNumber: poNumber.trim() || undefined,
         customerType: customerType,
         cartItems: cartItems,
         itemFulfillmentMap: itemFulfillmentMap,
@@ -163,18 +178,19 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       };
       autoSaveDraft(draft);
     }
-  }, [hasUnsavedChanges, cartItems, selectedCustomer, customerSearch, customerType, itemFulfillmentMap, gpsLoggedMap, orderNotes, activeOrder]);
+  }, [hasUnsavedChanges, cartItems, selectedCustomer, customerSearch, poNumber, customerType, itemFulfillmentMap, gpsLoggedMap, orderNotes, activeOrder]);
 
   // LIFECYCLE HOOKS: guarantee flush to local storage before browser close, backgrounding, or crash ONLY when there are unsaved changes
   useEffect(() => {
     const cleanup = initAutoSaveLifecycleListeners(() => {
       if (!hasUnsavedChanges) return null;
-      const hasData = cartItems.length > 0 || (selectedCustomer && selectedCustomer.trim().length > 0) || (customerSearch && customerSearch.trim().length > 0) || (orderNotes && orderNotes.trim().length > 0);
+      const hasData = cartItems.length > 0 || (selectedCustomer && selectedCustomer.trim().length > 0) || (customerSearch && customerSearch.trim().length > 0) || (poNumber && poNumber.trim().length > 0) || (orderNotes && orderNotes.trim().length > 0);
       if (!hasData && !activeOrder) return null;
       return {
         orderId: activeOrder?.id,
         isEditingExisting: Boolean(activeOrder),
         customerName: (selectedCustomer || customerSearch || '').trim(),
+        poNumber: poNumber.trim() || undefined,
         customerType: customerType,
         cartItems: cartItems,
         itemFulfillmentMap: itemFulfillmentMap,
@@ -189,7 +205,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       };
     });
     return cleanup;
-  }, [hasUnsavedChanges, cartItems, selectedCustomer, customerSearch, customerType, itemFulfillmentMap, gpsLoggedMap, orderNotes, activeOrder]);
+  }, [hasUnsavedChanges, cartItems, selectedCustomer, customerSearch, poNumber, customerType, itemFulfillmentMap, gpsLoggedMap, orderNotes, activeOrder]);
 
   const [cameraStream, setCameraStream] = useState<MediaStream | null>(null);
   const [videoDevices, setVideoDevices] = useState<MediaDeviceInfo[]>([]);
@@ -1219,6 +1235,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
+        poNumber: poNumber.trim() || undefined,
         items: cartItems,
         itemsCount: totalCount,
         total: totalAmt,
@@ -1228,7 +1245,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       clearActiveDraft(activeOrder.id);
       triggerScannedFeedback(`Order #${activeOrder.id} saved & held! Starting new order...`, 'success');
     } else {
-      onCompleteOrder(cartItems, finalCustomer, { notes: orderNotes });
+      onCompleteOrder(cartItems, finalCustomer, { poNumber: poNumber.trim() || undefined, notes: orderNotes });
       clearActiveDraft();
       triggerScannedFeedback(`Order for "${finalCustomer}" saved & held! Starting new order...`, 'success');
     }
@@ -1240,6 +1257,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     setCartItems([]);
     setSelectedCustomer(DEFAULT_CUSTOMER.name);
     setCustomerSearch(DEFAULT_CUSTOMER.name);
+    setPoNumber('');
     setItemFulfillmentMap({});
     setGpsLoggedMap({});
     setCustomerType('RETAIL');
@@ -1261,6 +1279,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
+        poNumber: poNumber.trim() || undefined,
         items: cartItems,
         itemsCount: totalCount,
         total: totalAmt,
@@ -1271,7 +1290,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       setHasUnsavedChanges(false);
       triggerScannedFeedback(`Saved changes to Order #${activeOrder.id}`, 'success');
     } else {
-      onCompleteOrder(cartItems, finalCustomer, { notes: orderNotes });
+      onCompleteOrder(cartItems, finalCustomer, { poNumber: poNumber.trim() || undefined, notes: orderNotes });
       clearActiveDraft();
       setHasUnsavedChanges(false);
       triggerScannedFeedback('Order saved successfully!', 'success');
@@ -1293,6 +1312,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
+        poNumber: poNumber.trim() || undefined,
         items: cartItems,
         itemsCount: totalCount,
         total: totalAmt,
@@ -1303,7 +1323,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       setHasUnsavedChanges(false);
       onNavigate('finalization');
     } else {
-      onCompleteOrder(cartItems, finalCustomer, { notes: orderNotes });
+      onCompleteOrder(cartItems, finalCustomer, { poNumber: poNumber.trim() || undefined, notes: orderNotes });
       clearActiveDraft();
       setHasUnsavedChanges(false);
       onNavigate('holding_location');
@@ -1326,6 +1346,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
+        poNumber: poNumber.trim() || undefined,
         items: itemsTaken,
         itemsCount: totalCount,
         total: totalAmt,
@@ -1339,6 +1360,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       setHasUnsavedChanges(false);
     } else {
       onCompleteOrder(itemsTaken, finalCustomer, {
+        poNumber: poNumber.trim() || undefined,
         type: 'Take Now',
         holdingLocation: 'Taken by Customer / No Staging',
         status: 'Completed',
@@ -1362,6 +1384,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
+        poNumber: poNumber.trim() || undefined,
         items: cartItems,
         itemsCount: totalCount,
         total: totalAmt,
@@ -1371,7 +1394,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       clearActiveDraft(activeOrder.id);
       setHasUnsavedChanges(false);
     } else {
-      onCompleteOrder(cartItems, finalCustomer, { notes: orderNotes });
+      onCompleteOrder(cartItems, finalCustomer, { poNumber: poNumber.trim() || undefined, notes: orderNotes });
       clearActiveDraft();
       setHasUnsavedChanges(false);
     }
@@ -1520,6 +1543,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   setCartItems([]);
                   setSelectedCustomer(DEFAULT_CUSTOMER.name);
                   setCustomerSearch(DEFAULT_CUSTOMER.name);
+                  setPoNumber('');
                   setCustomerType('RETAIL');
                   setHasUnsavedChanges(false);
                 }}
@@ -1599,26 +1623,35 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             </span>
           </div>
 
-          {selectedCustomer === 'Walk In Customer' ? (
-            <div className="flex items-center gap-1.5 bg-[#e7f8ef] text-[#012d1d] border border-[#a0f4c8] px-2.5 py-0.5 rounded-lg text-xs font-bold truncate max-w-[240px] sm:max-w-[320px]">
-              <span className="text-[10px] font-mono font-black bg-[#012d1d] text-[#a0f4c8] px-1.5 py-0.5 rounded">#CASH</span>
-              <span className="truncate">Walk In Customer (Default)</span>
-            </div>
-          ) : selectedCustomer ? (
-            <div className="flex items-center gap-1.5 bg-[#012d1d] text-[#a0f4c8] px-2.5 py-0.5 rounded-lg text-xs font-bold truncate max-w-[240px] sm:max-w-[320px]">
-              <Check className="w-3.5 h-3.5 shrink-0 text-[#a0f4c8]" />
-              <span className="truncate">{selectedCustomer}</span>
-            </div>
-          ) : (
-            <span className="text-xs text-[#717973] font-medium hidden sm:inline">
-              Select account or enter name
-            </span>
-          )}
+          <div className="flex items-center gap-2 flex-wrap justify-end">
+            {selectedCustomer === 'Walk In Customer' ? (
+              <div className="flex items-center gap-1.5 bg-[#e7f8ef] text-[#012d1d] border border-[#a0f4c8] px-2.5 py-0.5 rounded-lg text-xs font-bold truncate max-w-[200px] sm:max-w-[280px]">
+                <span className="text-[10px] font-mono font-black bg-[#012d1d] text-[#a0f4c8] px-1.5 py-0.5 rounded">#CASH</span>
+                <span className="truncate">Walk In Customer (Default)</span>
+              </div>
+            ) : selectedCustomer ? (
+              <div className="flex items-center gap-1.5 bg-[#012d1d] text-[#a0f4c8] px-2.5 py-0.5 rounded-lg text-xs font-bold truncate max-w-[200px] sm:max-w-[280px]">
+                <Check className="w-3.5 h-3.5 shrink-0 text-[#a0f4c8]" />
+                <span className="truncate">{selectedCustomer}</span>
+              </div>
+            ) : (
+              <span className="text-xs text-[#717973] font-medium hidden sm:inline">
+                Select account or enter name
+              </span>
+            )}
+
+            {poNumber.trim() && (
+              <div className="flex items-center gap-1 bg-[#f3f4f0] text-[#012d1d] border border-[#c1c8c2] px-2 py-0.5 rounded-lg text-xs font-mono font-bold truncate max-w-[160px] sm:max-w-[200px]" title={`PO Number / Name: ${poNumber}`}>
+                <FileText className="w-3.5 h-3.5 text-[#0e6c4a] shrink-0" />
+                <span className="truncate">PO: {poNumber}</span>
+              </div>
+            )}
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
           {/* Searchable Dropdown Container */}
-          <div className="relative flex-1" ref={dropdownRef}>
+          <div className="relative flex-1 min-w-0" ref={dropdownRef}>
             <div className="relative">
               <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none z-10">
                 <User className="w-5 h-5 text-[#012d1d]" />
@@ -1702,6 +1735,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     matchingCustomers.map((cust) => {
                       const isSelected = selectedCustomer === cust.name;
                       const isCash = cust.accountNo === 'CASH' || cust.name === 'Walk In Customer';
+                      const formattedType = cust.type
+                        ? cust.type.charAt(0).toUpperCase() + cust.type.slice(1).toLowerCase()
+                        : 'Retail';
+
                       return (
                         <button
                           key={cust.id}
@@ -1728,10 +1765,15 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                               <span className={`font-extrabold text-base sm:text-lg truncate ${isSelected ? 'text-white' : 'text-[#1a1c1a]'}`}>
                                 {cust.name}
                               </span>
-                              {cust.company && cust.company !== cust.name && (
-                                <span className={`text-xs sm:text-sm font-semibold truncate mt-0.5 ${isSelected ? 'text-[#a0f4c8]/80' : 'text-[#717973]'}`}>
-                                  {cust.company}
-                                </span>
+                              {((cust.company && cust.company !== cust.name) || (cust.accountNo && !isCash)) && (
+                                <div className={`text-xs sm:text-sm font-semibold truncate mt-0.5 flex items-center gap-2 ${isSelected ? 'text-[#a0f4c8]/80' : 'text-[#717973]'}`}>
+                                  {cust.company && cust.company !== cust.name && (
+                                    <span>{cust.company}</span>
+                                  )}
+                                  {cust.accountNo && !isCash && (
+                                    <span className="font-mono text-[11px] opacity-80">#{cust.accountNo}</span>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </div>
@@ -1744,16 +1786,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                                 DEFAULT
                               </span>
                             )}
-                            {cust.accountNo && (
-                              <span className="hidden sm:inline-block text-[11px] font-mono text-[#717973] bg-white border border-[#c1c8c2] px-1.5 py-0.5 rounded">
-                                #{cust.accountNo}
-                              </span>
-                            )}
-                            {cust.categoryCode && (
-                              <span className="text-[10px] sm:text-xs font-mono font-bold bg-[#012d1d] text-[#a0f4c8] px-2 py-0.5 rounded">
-                                {cust.categoryCode}
-                              </span>
-                            )}
                             <span
                               className={`text-xs sm:text-sm font-black px-2.5 py-1 rounded-md ${
                                 isSelected
@@ -1761,7 +1793,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                                   : 'bg-[#e2e3df] text-[#414844]'
                               }`}
                             >
-                              {cust.type}
+                              {formattedType}
                             </span>
                             {isSelected && <Check className="w-5 h-5 text-[#a0f4c8]" />}
                           </div>
@@ -1771,6 +1803,38 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   )}
                 </div>
               </div>
+            )}
+          </div>
+
+          {/* PO Number / Name Text Box to the right of Customer Name */}
+          <div className="relative w-full sm:w-48 md:w-56 lg:w-64 shrink-0">
+            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+              <FileText className="w-5 h-5 text-[#012d1d]" />
+            </div>
+            <input
+              id="scan-po-number-input"
+              type="text"
+              value={poNumber}
+              onChange={(e) => {
+                setPoNumber(e.target.value);
+                setHasUnsavedChanges(true);
+              }}
+              placeholder="PO Number / Name..."
+              className="w-full bg-[#f9faf6] border-2 border-[#012d1d] focus:border-[#012d1d] focus:bg-white focus:ring-4 focus:ring-[#012d1d]/15 rounded-xl pl-11 pr-9 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] transition-all shadow-sm placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
+              title="Purchase Order Number or Job/Project Name"
+            />
+            {poNumber && (
+              <button
+                type="button"
+                onClick={() => {
+                  setPoNumber('');
+                  setHasUnsavedChanges(true);
+                }}
+                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#717973] hover:text-[#ba1a1a] rounded-lg transition-colors cursor-pointer"
+                title="Clear PO Number"
+              >
+                <X className="w-4 h-4" />
+              </button>
             )}
           </div>
 
@@ -3089,6 +3153,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     setCartItems([]);
                     setSelectedCustomer(DEFAULT_CUSTOMER.name);
                     setCustomerSearch(DEFAULT_CUSTOMER.name);
+                    setPoNumber('');
                     setCustomerType('RETAIL');
                     setHasUnsavedChanges(false);
                     setIsCancelModalOpen(false);

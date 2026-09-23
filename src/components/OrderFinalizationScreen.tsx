@@ -130,11 +130,13 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       setItems(order.items ? order.items.map(item => ({ ...item })) : []);
       setRemainingPickupDate(order.remainingPickupDate || '');
       setPartialPickupNotes(order.partialPickupNotes || '');
+      setPoNumber(order.poNumber || '');
     }
   }, [order]);
 
   // Form Fields
   const [customerName, setCustomerName] = useState<string>(currentOrder.customerName);
+  const [poNumber, setPoNumber] = useState<string>(currentOrder.poNumber || '');
   const [isEditingCustomer, setIsEditingCustomer] = useState<boolean>(false);
   const [fulfillment, setFulfillment] = useState<'Take Now' | 'Pickup Later' | 'Delivery' | 'Pick-up/Delivery'>(currentOrder.type || 'Take Now');
   const [scheduledDate, setScheduledDate] = useState<string>(() => {
@@ -259,6 +261,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   useEffect(() => {
     const rawName = currentOrder.customerName || '';
     setCustomerName(rawName);
+    setPoNumber(currentOrder.poNumber || '');
     
     const matched = findMatchingCustomer(rawName, customers);
     if (matched?.email) {
@@ -283,12 +286,13 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
 
   // LIVE AUTO-SAVE: Every edit made in finalization (status, items, staging bay, date, customer name, notes) is auto-saved to disk and synced
   useEffect(() => {
-    const hasData = items.length > 0 || customerName.trim().length > 0 || orderNotes.trim().length > 0;
+    const hasData = items.length > 0 || customerName.trim().length > 0 || poNumber.trim().length > 0 || orderNotes.trim().length > 0;
     if (hasData || currentOrder.id) {
       const draft: OrderDraft = {
         orderId: currentOrder.id,
         isEditingExisting: true,
         customerName: customerName.trim() || currentOrder.customerName || 'Walk In Customer',
+        poNumber: poNumber.trim() || undefined,
         cartItems: items,
         fulfillmentType: fulfillment,
         scheduledDate: scheduledDate,
@@ -302,18 +306,19 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       };
       autoSaveDraft(draft);
     }
-  }, [customerName, fulfillment, scheduledDate, scheduledTime, orderStatus, holdingLocation, orderNotes, items, remainingPickupDate, partialPickupNotes, currentOrder.id]);
+  }, [customerName, poNumber, fulfillment, scheduledDate, scheduledTime, orderStatus, holdingLocation, orderNotes, items, remainingPickupDate, partialPickupNotes, currentOrder.id]);
 
   // Emergency lifecycle listeners: flush changes before tab closes or page is hidden
   useEffect(() => {
     const cleanup = initAutoSaveLifecycleListeners(() => {
       if (!hasUnsavedChanges) return null;
-      const hasData = items.length > 0 || customerName.trim().length > 0 || orderNotes.trim().length > 0;
+      const hasData = items.length > 0 || customerName.trim().length > 0 || poNumber.trim().length > 0 || orderNotes.trim().length > 0;
       if (!hasData && !currentOrder.id) return null;
       return {
         orderId: currentOrder.id,
         isEditingExisting: true,
         customerName: customerName.trim() || currentOrder.customerName || 'Walk In Customer',
+        poNumber: poNumber.trim() || undefined,
         cartItems: items,
         fulfillmentType: fulfillment,
         scheduledDate: scheduledDate,
@@ -327,7 +332,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       };
     });
     return cleanup;
-  }, [hasUnsavedChanges, customerName, fulfillment, scheduledDate, scheduledTime, orderStatus, holdingLocation, orderNotes, items, remainingPickupDate, partialPickupNotes, currentOrder.id]);
+  }, [hasUnsavedChanges, customerName, poNumber, fulfillment, scheduledDate, scheduledTime, orderStatus, holdingLocation, orderNotes, items, remainingPickupDate, partialPickupNotes, currentOrder.id]);
 
   // Computed Totals
   const calculatedTotal = items.reduce((sum, item) => sum + (getItemEffectiveUnitPrice(item) * item.quantity), 0);
@@ -605,6 +610,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     const updated: Order = {
       ...currentOrder,
       customerName: customerName.trim() || 'Walk In Customer',
+      poNumber: poNumber.trim() || undefined,
       type: fulfillment,
       scheduledTime: scheduledTime.trim() || 'Scheduled',
       scheduledDate: scheduledDate.trim(),
@@ -1058,7 +1064,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               )}
             </div>
             
-            {/* Editable Customer Name */}
+            {/* Editable Customer Name & PO Number */}
             {isEditingCustomer ? (
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                 <input
@@ -1072,6 +1078,16 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                   placeholder="Enter Customer Name"
                   autoFocus
                 />
+                <input
+                  type="text"
+                  value={poNumber}
+                  onChange={(e) => {
+                    setPoNumber(e.target.value);
+                    setHasUnsavedChanges(true);
+                  }}
+                  className="bg-[#f3f4f0] border border-[#012d1d] rounded-lg px-3 py-1.5 text-base font-bold text-[#1a1c1a] focus:outline-none focus:bg-white"
+                  placeholder="PO # / Name (Optional)"
+                />
                 <button
                   type="button"
                   onClick={() => setIsEditingCustomer(false)}
@@ -1081,15 +1097,20 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 </button>
               </div>
             ) : (
-              <div className="flex items-center gap-2 mt-1">
+              <div className="flex items-center gap-2 mt-1 flex-wrap">
                 <h1 className="text-xl sm:text-2xl font-extrabold text-[#1a1c1a]">
                   {customerName || 'Walk In Customer'}
                 </h1>
+                {poNumber && (
+                  <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-[#f3f4f0] text-[#012d1d] border border-[#c1c8c2]">
+                    PO: {poNumber}
+                  </span>
+                )}
                 <button
                   type="button"
                   onClick={() => setIsEditingCustomer(true)}
                   className="p-1 rounded-lg text-[#717973] hover:text-[#012d1d] hover:bg-[#f3f4f0] transition-colors cursor-pointer"
-                  title="Edit Customer Name"
+                  title="Edit Customer Name / PO Number"
                 >
                   <Edit3 className="w-4 h-4" />
                 </button>

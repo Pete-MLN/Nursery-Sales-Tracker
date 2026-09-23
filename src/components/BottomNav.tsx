@@ -33,7 +33,7 @@ export const BottomNav: React.FC<BottomNavProps> = ({
           const isActive = 
             currentScreen === item.id || 
             (item.id === 'scan' && currentScreen === 'scan') ||
-            (item.id === 'inventory' && currentScreen === 'inventory') ||
+            (item.id === 'inventory' && (currentScreen === 'inventory' || currentScreen === 'stock_notifications')) ||
             (item.id === 'inventory_audit' && currentScreen === 'inventory_audit') ||
             (item.id === 'orders' && (currentScreen === 'orders' || currentScreen === 'finalization' || currentScreen === 'holding_location'));
 

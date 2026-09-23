@@ -86,6 +86,18 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
     }
   }, [plant]);
 
+  // Lock background scroll and bring modal to focus when opened
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      window.scrollTo(0, 0);
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
+
   // Compute live preview
   const numericValue = parseFloat(discountValueInput);
   const isValidNumber = !isNaN(numericValue) && numericValue > 0;
@@ -227,11 +239,12 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-xs animate-fade-in"
+      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto"
       onClick={isUpdating ? undefined : onClose}
     >
       <div 
-        className="bg-white rounded-3xl border border-[#c1c8c2] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col max-h-[92vh]"
+        tabIndex={-1}
+        className="bg-white rounded-3xl border border-[#c1c8c2] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col my-auto max-h-[92vh] outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

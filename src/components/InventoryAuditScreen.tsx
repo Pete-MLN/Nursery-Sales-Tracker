@@ -62,7 +62,7 @@ import {
   Square
 } from 'lucide-react';
 
-import { OFFICIAL_YARD_LOCATIONS } from '../data/yardLocations';
+import { OFFICIAL_YARD_LOCATIONS, normalizeHoldingArea, normalizeYardLocationCode, compareYardLocations } from '../data/yardLocations';
 
 interface InventoryAuditScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -135,7 +135,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
   const [selectedLocation, setSelectedLocation] = useState<string>(() => {
     const saved = localStorage.getItem('maple_last_audit_location');
-    if (saved) return saved;
+    if (saved) return normalizeYardLocationCode(saved);
     const firstLoc = OFFICIAL_YARD_LOCATIONS.length > 0 ? `${OFFICIAL_YARD_LOCATIONS[0].title} - ${OFFICIAL_YARD_LOCATIONS[0].subtitle}`.trim() : 'H1-a - Front Retail';
     return firstLoc;
   });
@@ -164,6 +164,18 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+
+  // Lock background scroll and focus modal when active
+  useEffect(() => {
+    if (showEmailModal || isCameraOpen || mapModalGps) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      window.scrollTo(0, 0);
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [showEmailModal, isCameraOpen, mapModalGps]);
 
   // Table filter
   const [tableFilter, setTableFilter] = useState<'all' | 'discrepancies' | 'exact'>('all');
@@ -202,8 +214,9 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
     };
 
     effectiveAreas.forEach(a => {
-      const label = `${a.title} - ${a.subtitle}`.trim();
-      const cat = a.category && groups[a.category] ? a.category : 'Other';
+      const norm = normalizeHoldingArea(a);
+      const label = `${norm.title} - ${norm.subtitle}`.trim();
+      const cat = norm.category && groups[norm.category] ? norm.category : 'Other';
       if (!groups[cat].includes(label)) {
         groups[cat].push(label);
       }
@@ -211,11 +224,17 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
     inventory.forEach(p => {
       if (p.holdingLocation) {
-        const found = Object.values(groups).some(list => list.includes(p.holdingLocation!));
+        const normLoc = normalizeYardLocationCode(p.holdingLocation);
+        const found = Object.values(groups).some(list => list.includes(normLoc));
         if (!found) {
-          groups['Other'].push(p.holdingLocation);
+          groups['Other'].push(normLoc);
         }
       }
+    });
+
+    // Sort locations in each group sequentially so R01 is immediately followed by R02, R03...
+    Object.keys(groups).forEach(cat => {
+      groups[cat].sort(compareYardLocations);
     });
 
     return groups;
@@ -738,9 +757,6 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
           <h1 className="text-xl sm:text-2xl font-black text-[#f3f4f0] mt-1 tracking-tight">
             Physical Inventory Counter
           </h1>
-          <p className="text-xs text-[#a0f4c8]/90 mt-0.5 max-w-xl">
-            Count yard stock independently without modifying your baseline uploaded inventory file. Log GPS yard pins, select bay locations, and email variance reports.
-          </p>
         </div>
 
         <div className="flex items-center gap-2 shrink-0">
@@ -764,77 +780,63 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
         </div>
       </div>
 
-      {/* Navigation Tabs (Live Count vs History) */}
-      <div className="flex bg-[#e2e3df] p-1 rounded-xl border border-[#c1c8c2] self-start w-full sm:w-auto">
-        <button
-          type="button"
-          onClick={() => setActiveTab('count')}
-          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'count'
-              ? 'bg-[#012d1d] text-[#a0f4c8] shadow-xs'
-              : 'text-[#414844] hover:text-[#012d1d]'
-          }`}
-        >
-          <Layers className="w-4 h-4" />
-          <span>Active Count ({activeSession.items.length} logged)</span>
-        </button>
-        <button
-          type="button"
-          onClick={() => setActiveTab('history')}
-          className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-4 py-2 rounded-lg text-xs font-bold transition-all cursor-pointer ${
-            activeTab === 'history'
-              ? 'bg-[#012d1d] text-[#a0f4c8] shadow-xs'
-              : 'text-[#414844] hover:text-[#012d1d]'
-          }`}
-        >
-          <History className="w-4 h-4" />
-          <span>Audit History & Archives</span>
-        </button>
+      {/* Session Card with Auditor Info & Navigation Toggles */}
+      <div className="bg-[#f3f4f0] rounded-xl p-3 sm:p-3.5 border border-[#c1c8c2] flex flex-wrap items-center justify-between gap-3 text-xs">
+        <div className="flex items-center gap-2">
+          <span className="font-bold text-[#012d1d]">Session:</span>
+          <input
+            type="text"
+            value={activeSession.title}
+            onChange={(e) => updateActiveSession({ ...activeSession, title: e.target.value })}
+            className="font-semibold text-[#012d1d] bg-white border border-[#c1c8c2] rounded-lg px-2.5 py-1 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden min-w-[180px] sm:min-w-[220px]"
+            title="Edit Session Title"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+          <div className="flex items-center gap-2 text-[#525a55]">
+            <span>Auditor: <strong className="text-[#012d1d]">{activeSession.countedBy}</strong></span>
+            <span>•</span>
+            <span>Started: <strong className="text-[#012d1d]">{new Date(activeSession.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
+          </div>
+
+          {/* Active Count & Audit History Toggles */}
+          <div className="flex bg-[#e2e3df] p-1 rounded-xl border border-[#c1c8c2]">
+            <button
+              type="button"
+              onClick={() => setActiveTab('count')}
+              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'count'
+                  ? 'bg-[#012d1d] text-[#a0f4c8] shadow-xs'
+                  : 'text-[#414844] hover:text-[#012d1d]'
+              }`}
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Active Count ({activeSession.items.length} logged)</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setActiveTab('history')}
+              className={`flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+                activeTab === 'history'
+                  ? 'bg-[#012d1d] text-[#a0f4c8] shadow-xs'
+                  : 'text-[#414844] hover:text-[#012d1d]'
+              }`}
+            >
+              <History className="w-3.5 h-3.5" />
+              <span>Audit History & Archives</span>
+            </button>
+          </div>
+        </div>
       </div>
 
       {activeTab === 'count' ? (
         <>
-          {/* Active Session Info Bar */}
-          <div className="bg-[#f3f4f0] rounded-xl p-3.5 border border-[#c1c8c2] flex flex-wrap items-center justify-between gap-3 text-xs">
-            <div className="flex items-center gap-2">
-              <span className="font-bold text-[#012d1d]">Session:</span>
-              <input
-                type="text"
-                value={activeSession.title}
-                onChange={(e) => updateActiveSession({ ...activeSession, title: e.target.value })}
-                className="font-semibold text-[#012d1d] bg-white border border-[#c1c8c2] rounded-lg px-2.5 py-1 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden min-w-[200px]"
-                title="Edit Session Title"
-              />
-            </div>
-
-            <div className="flex items-center gap-3 text-[#525a55]">
-              <span>Auditor: <strong className="text-[#012d1d]">{activeSession.countedBy}</strong></span>
-              <span>•</span>
-              <span>Started: <strong className="text-[#012d1d]">{new Date(activeSession.startedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</strong></span>
-            </div>
-
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handleOpenEmailModal}
-                disabled={activeSession.items.length === 0}
-                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-extrabold transition-all cursor-pointer ${
-                  activeSession.items.length > 0
-                    ? 'bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] shadow-xs active:scale-95'
-                    : 'bg-[#c1c8c2] text-white opacity-60 cursor-not-allowed'
-                }`}
-              >
-                <Send className="w-3.5 h-3.5" />
-                <span>Finalize & Email Report</span>
-              </button>
-            </div>
-          </div>
-
           {/* Counting Entry Form Card */}
           <section className="bg-white rounded-2xl p-4 sm:p-6 border border-[#c1c8c2] shadow-sm flex flex-col gap-5">
-            <div className="flex items-center justify-between border-b border-[#e2e3df] pb-3">
-              <div className="flex items-center gap-2">
-                <div className="w-7 h-7 rounded-lg bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold text-xs">
+            <div className="flex items-center justify-between border-b border-[#e2e3df] pb-3 gap-3 flex-wrap">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold text-xs shrink-0">
                   {editingItem ? <Edit3 className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
                 </div>
                 <div>
@@ -847,20 +849,37 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                 </div>
               </div>
 
-              {editingItem && (
+              <div className="flex items-center gap-2 shrink-0">
+                {editingItem && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingItem(null);
+                      setSelectedPlant(null);
+                      setCountedQty(1);
+                      setQtyInputStr('1');
+                    }}
+                    className="text-xs font-bold text-[#ba1a1a] hover:underline cursor-pointer px-2 py-1"
+                  >
+                    Cancel Edit
+                  </button>
+                )}
+
                 <button
                   type="button"
-                  onClick={() => {
-                    setEditingItem(null);
-                    setSelectedPlant(null);
-                    setCountedQty(1);
-                    setQtyInputStr('1');
-                  }}
-                  className="text-xs font-bold text-[#ba1a1a] hover:underline cursor-pointer"
+                  onClick={handleOpenEmailModal}
+                  disabled={activeSession.items.length === 0}
+                  className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
+                    activeSession.items.length > 0
+                      ? 'bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] shadow-xs active:scale-95'
+                      : 'bg-[#c1c8c2] text-white opacity-60 cursor-not-allowed'
+                  }`}
+                  title={activeSession.items.length === 0 ? 'Log at least one plant to finalize' : 'Finalize session and email count report'}
                 >
-                  Cancel Edit
+                  <Send className="w-3.5 h-3.5" />
+                  <span>Finalize & Email Report</span>
                 </button>
-              )}
+              </div>
             </div>
 
             <form onSubmit={handleRecordCount} className="flex flex-col gap-5">
@@ -1712,7 +1731,10 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
       {/* Email & Finalize Report Modal */}
       {showEmailModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] text-[#012d1d] relative my-6">
+          <div 
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] text-[#012d1d] relative my-auto outline-none"
+          >
             <button
               onClick={() => setShowEmailModal(false)}
               className="absolute top-4 right-4 p-1.5 rounded-full text-[#717973] hover:bg-[#f3f4f0] transition-colors cursor-pointer"

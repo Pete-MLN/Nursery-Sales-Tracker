@@ -39,7 +39,7 @@ export const Header: React.FC<HeaderProps> = ({
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const showBackButton = currentScreen === 'holding_location' || currentScreen === 'data_management' || currentScreen === 'finalization' || currentScreen === 'instructions' || currentScreen === 'inventory_audit' || !!onBack;
+  const showBackButton = currentScreen === 'holding_location' || currentScreen === 'data_management' || currentScreen === 'finalization' || currentScreen === 'instructions' || currentScreen === 'inventory_audit' || currentScreen === 'stock_notifications' || !!onBack;
 
   const getTitle = () => {
     if (titleOverride) return titleOverride;
@@ -47,7 +47,9 @@ export const Header: React.FC<HeaderProps> = ({
       case 'data_management':
         return 'Data Management';
       case 'inventory':
-        return 'Inventory Alerts';
+        return 'Plant Inventory';
+      case 'stock_notifications':
+        return 'Stock Notifications';
       case 'inventory_audit':
         return 'Physical Inventory Count';
       case 'finalization':
@@ -71,7 +73,7 @@ export const Header: React.FC<HeaderProps> = ({
     } else {
       if (currentScreen === 'holding_location' || currentScreen === 'finalization') {
         onNavigate('orders');
-      } else if (currentScreen === 'inventory_audit') {
+      } else if (currentScreen === 'inventory_audit' || currentScreen === 'stock_notifications') {
         onNavigate('inventory');
       } else {
         onNavigate('home');

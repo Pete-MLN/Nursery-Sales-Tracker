@@ -77,83 +77,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   });
 
   return (
-    <div className="flex-1 px-4 py-6 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-6">
-      {/* Overview Cards */}
-      <div className="grid grid-cols-3 gap-3">
-        <button
-          onClick={() => setStatusFilter(statusFilter === 'critical' ? 'all' : 'critical')}
-          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'critical' 
-              ? 'bg-[#ffdad6] border-[#ba1a1a] shadow-xs' 
-              : 'bg-[#f3f4f0] border-[#c1c8c2] hover:bg-[#e7e9e5]'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#ba1a1a]">Critical</span>
-            <AlertTriangle className="w-4 h-4 text-[#ba1a1a]" />
-          </div>
-          <span className="block text-2xl font-bold text-[#ba1a1a]">{criticalCount}</span>
-          <span className="text-[10px] text-[#414844] font-medium">Reorder needed</span>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter(statusFilter === 'warning' ? 'all' : 'warning')}
-          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'warning' 
-              ? 'bg-[#fef9c3] border-[#ca8a04] shadow-xs' 
-              : 'bg-[#f3f4f0] border-[#c1c8c2] hover:bg-[#e7e9e5]'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#854d0e]">Low Stock</span>
-            <AlertCircle className="w-4 h-4 text-[#ca8a04]" />
-          </div>
-          <span className="block text-2xl font-bold text-[#854d0e]">{warningCount}</span>
-          <span className="text-[10px] text-[#414844] font-medium">Monitor levels</span>
-        </button>
-
-        <button
-          onClick={() => setStatusFilter(statusFilter === 'healthy' ? 'all' : 'healthy')}
-          className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-            statusFilter === 'healthy' 
-              ? 'bg-[#a0f4c8] border-[#0e6c4a] shadow-xs' 
-              : 'bg-[#f3f4f0] border-[#c1c8c2] hover:bg-[#e7e9e5]'
-          }`}
-        >
-          <div className="flex items-center justify-between mb-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-[#0e6c4a]">Healthy</span>
-            <CheckCircle2 className="w-4 h-4 text-[#0e6c4a]" />
-          </div>
-          <span className="block text-2xl font-bold text-[#012d1d]">{healthyCount}</span>
-          <span className="text-[10px] text-[#414844] font-medium">In stock</span>
-        </button>
-      </div>
-
-      {/* Critical Stock Alert Banner */}
-      {criticalCount > 0 && statusFilter === 'all' && (
-        <div className="bg-[#ffdad6] border border-[#ba1a1a]/40 rounded-2xl p-4 flex items-center justify-between shadow-2xs">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-[#ba1a1a] text-white flex items-center justify-center shrink-0">
-              <AlertTriangle className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-sm text-[#410002]">
-                {criticalCount} Item{criticalCount > 1 ? 's' : ''} Require Immediate Restock
-              </h3>
-              <p className="text-xs text-[#521213] mt-0.5">
-                Stock is at or near zero. Update quantities below or reorder via Data Management.
-              </p>
-            </div>
-          </div>
-          <button
-            onClick={() => setStatusFilter('critical')}
-            className="bg-[#ba1a1a] hover:bg-[#93000a] text-white text-xs font-bold px-3 py-1.5 rounded-lg shrink-0 transition-colors cursor-pointer"
-          >
-            View Alerts
-          </button>
-        </div>
-      )}
-
+    <div className="flex-1 px-4 py-6 w-full max-w-4xl mx-auto pb-44 animate-fade-in flex flex-col gap-5">
       {/* Inventory Search and Filter Section */}
       <section className="bg-white rounded-2xl p-5 border border-[#c1c8c2] flex flex-col gap-4 shadow-2xs">
         <div className="flex flex-col sm:flex-row justify-between sm:items-center gap-3 border-b border-[#f3f4f0] pb-3">
@@ -168,6 +92,20 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           </div>
 
           <div className="flex items-center gap-2 self-start sm:self-auto flex-wrap">
+            <button
+              onClick={() => onNavigate('stock_notifications')}
+              className="bg-[#fff5f5] hover:bg-[#ffdad6] text-[#ba1a1a] border border-[#ffdad6] px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer"
+              title="Open dedicated Stock Notifications & Reorder alerts page"
+            >
+              <AlertTriangle className="w-4 h-4 text-[#ba1a1a]" />
+              <span>Stock Notifications</span>
+              {(criticalCount > 0 || warningCount > 0) && (
+                <span className="bg-[#ba1a1a] text-white text-[10px] font-extrabold px-1.5 py-0.2 rounded-full ml-0.5">
+                  {criticalCount + warningCount}
+                </span>
+              )}
+            </button>
+
             <button
               onClick={() => onNavigate('inventory_audit')}
               className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] px-3.5 py-2 rounded-xl text-xs font-extrabold flex items-center gap-1.5 shadow-xs transition-colors shrink-0 cursor-pointer border border-[#19724f]/50"

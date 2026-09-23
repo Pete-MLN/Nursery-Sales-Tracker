@@ -3,12 +3,13 @@ export type ScreenType =
   | 'scan' 
   | 'inventory'
   | 'inventory_audit'
+  | 'stock_notifications'
   | 'orders' 
   | 'finalization' 
   | 'holding_location' 
   | 'data_management' 
   | 'settings' 
-  | 'instructions'
+  | 'instructions' 
   | 'login';
 
 export interface GPSLocationEntry {

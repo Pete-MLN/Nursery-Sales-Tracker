@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings, HoldingArea, InventoryAuditSession } from './types';
 import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, DEFAULT_CUSTOMER, INITIAL_EMPLOYEES, HOLDING_AREAS } from './data/mockData';
+import { normalizeHoldingArea, normalizeYardLocationCode } from './data/yardLocations';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
 import { HomeScreen } from './components/HomeScreen';
@@ -12,6 +13,7 @@ import { OrderFinalizationScreen } from './components/OrderFinalizationScreen';
 import { DataManagementScreen } from './components/DataManagementScreen';
 import { OrdersScreen } from './components/OrdersScreen';
 import { SettingsScreen } from './components/SettingsScreen';
+import { StockNotificationsScreen } from './components/StockNotificationsScreen';
 import { InstructionsScreen } from './components/InstructionsScreen';
 import { LoginScreen } from './components/LoginScreen';
 import { AppStartupProgressRing, LastUploadDatesInfo } from './components/AppStartupProgressRing';
@@ -160,7 +162,7 @@ export default function App() {
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (Array.isArray(parsed) && parsed.length >= 100) return ensureLeftInPlaceFirst(parsed);
+        if (Array.isArray(parsed) && parsed.length >= 100) return ensureLeftInPlaceFirst(parsed.map(normalizeHoldingArea));
       } catch (e) {
         // Fallback to default
       }
@@ -251,6 +253,76 @@ export default function App() {
     });
 
     return () => unsubscribeAuth();
+  }, []);
+
+  // Global Modal Focus & Scroll Manager
+  // Ensures any popup/modal on Scan, Inventory, Physical Count, Orders, Settings, etc.,
+  // immediately receives viewport focus and centers so the user does not have to scroll to it.
+  useEffect(() => {
+    let lastModalFound: HTMLElement | null = null;
+    let prevActiveElement: HTMLElement | null = null;
+
+    const checkAndFocusModals = () => {
+      // Look for any fixed modal overlay or dialog in the DOM
+      const modal = document.querySelector<HTMLElement>(
+        '[role="dialog"], [aria-modal="true"], .fixed.inset-0.z-50, .fixed.inset-0.bg-black\\/60, .fixed.inset-0.bg-black\\/65, .fixed.inset-0.bg-black\\/80'
+      );
+
+      if (modal && modal !== lastModalFound) {
+        lastModalFound = modal;
+        prevActiveElement = document.activeElement as HTMLElement | null;
+
+        // Prevent body from scrolling behind modal
+        document.body.style.overflow = 'hidden';
+
+        // Reset scroll position so modal is cleanly aligned
+        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        modal.scrollTop = 0;
+
+        // Auto-focus primary interactive element inside modal or the modal card itself
+        setTimeout(() => {
+          if (!document.contains(modal)) return;
+          const modalCard = modal.querySelector<HTMLElement>('[tabindex="-1"], .bg-white') || modal;
+          modalCard.scrollTop = 0;
+
+          // Priority focus: text/number input, then select, textarea, button, or the card
+          const firstInput = modalCard.querySelector<HTMLElement>(
+            'input:not([disabled]):not([type="hidden"]):not([readonly]), select:not([disabled]), textarea:not([disabled])'
+          );
+          if (firstInput) {
+            firstInput.focus();
+          } else {
+            const firstButton = modalCard.querySelector<HTMLElement>(
+              'button:not([disabled]):not([aria-label="Close"]):not(.btn-close), [tabindex]:not([tabindex="-1"])'
+            );
+            if (firstButton) {
+              firstButton.focus();
+            } else if (typeof modalCard.focus === 'function') {
+              modalCard.focus();
+            }
+          }
+        }, 40);
+      } else if (!modal && lastModalFound) {
+        lastModalFound = null;
+        document.body.style.overflow = '';
+        if (prevActiveElement && typeof prevActiveElement.focus === 'function' && document.contains(prevActiveElement)) {
+          prevActiveElement.focus();
+        }
+        prevActiveElement = null;
+      }
+    };
+
+    const observer = new MutationObserver(() => {
+      checkAndFocusModals();
+    });
+
+    observer.observe(document.body, { childList: true, subtree: true });
+    checkAndFocusModals();
+
+    return () => {
+      observer.disconnect();
+      document.body.style.overflow = '';
+    };
   }, []);
 
   // Initialize and subscribe to real-time Firestore updates for multi-device syncing
@@ -397,9 +469,20 @@ export default function App() {
     });
     const unsubHoldingLocations = subscribeToHoldingLocations((data) => {
       if (data && data.length >= 100) {
-        const ordered = ensureLeftInPlaceFirst(data);
+        let needsSync = false;
+        const normalizedList = data.map(item => {
+          const norm = normalizeHoldingArea(item);
+          if (norm.title !== item.title || norm.id !== item.id) {
+            needsSync = true;
+          }
+          return norm;
+        });
+        const ordered = ensureLeftInPlaceFirst(normalizedList);
         setHoldingAreas(ordered);
         localStorage.setItem('nursery_holding_areas', JSON.stringify(ordered));
+        if (needsSync) {
+          batchSaveHoldingLocationsToFirestore(ordered);
+        }
       } else {
         // Upgrade legacy/empty list to official 195 locations
         const ordered = ensureLeftInPlaceFirst(HOLDING_AREAS);
@@ -431,21 +514,23 @@ export default function App() {
   }, []);
 
   const handleUpdateHoldingArea = (updatedArea: HoldingArea) => {
+    const norm = normalizeHoldingArea(updatedArea);
     setHoldingAreas(prev => {
-      const next = prev.map(a => a.id === updatedArea.id ? updatedArea : a);
+      const next = prev.map(a => a.id === updatedArea.id ? norm : a);
       localStorage.setItem('nursery_holding_areas', JSON.stringify(next));
       return next;
     });
-    saveHoldingLocationToFirestore(updatedArea);
+    saveHoldingLocationToFirestore(norm);
   };
 
   const handleAddHoldingArea = (newArea: HoldingArea) => {
+    const norm = normalizeHoldingArea(newArea);
     setHoldingAreas(prev => {
-      const next = [...prev, newArea];
+      const next = [...prev, norm];
       localStorage.setItem('nursery_holding_areas', JSON.stringify(next));
       return next;
     });
-    saveHoldingLocationToFirestore(newArea);
+    saveHoldingLocationToFirestore(norm);
   };
 
   const handleDeleteHoldingArea = (id: string) => {
@@ -837,8 +922,8 @@ export default function App() {
           // Preserve GPS locations
           gpsLocation: newPlant.gpsLocation || existing.gpsLocation || undefined,
           gpsLocations: newPlant.gpsLocations || existing.gpsLocations || undefined,
-          // Preserve holding location if uploaded is empty
-          holdingLocation: (newPlant.holdingLocation && newPlant.holdingLocation.trim()) ? newPlant.holdingLocation : (existing.holdingLocation || undefined),
+          // Preserve holding location if uploaded is empty (and normalize single-digit bay codes)
+          holdingLocation: (newPlant.holdingLocation && newPlant.holdingLocation.trim()) ? normalizeYardLocationCode(newPlant.holdingLocation) : (existing.holdingLocation ? normalizeYardLocationCode(existing.holdingLocation) : undefined),
           descr: newPlant.descr || existing.descr || undefined,
           botanicalName: newPlant.botanicalName || existing.botanicalName || undefined,
           saleDiscount: newPlant.saleDiscount || existing.saleDiscount || undefined,
@@ -849,7 +934,11 @@ export default function App() {
         };
         mergedMap.set(existingMatchKey, updatedPlant);
       } else {
-        mergedMap.set(newPlant.id, newPlant);
+        const plantToInsert: PlantItem = {
+          ...newPlant,
+          holdingLocation: newPlant.holdingLocation ? normalizeYardLocationCode(newPlant.holdingLocation) : undefined
+        };
+        mergedMap.set(newPlant.id, plantToInsert);
         // Register in index maps so subsequent duplicate rows in the same upload merge
         indexById.set(newPlant.id, newPlant.id);
         if (cleanBarcode && cleanBarcode.length > 2) indexByBarcode.set(cleanBarcode, newPlant.id);
@@ -956,6 +1045,17 @@ export default function App() {
             inventory={inventory}
             onUpdateStock={handleUpdateStock}
             stockAlertSettings={stockAlertSettings}
+            onUpdatePlant={handleUpdatePlant}
+          />
+        )}
+
+        {currentScreen === 'stock_notifications' && (
+          <StockNotificationsScreen
+            onNavigate={navigateTo}
+            inventory={inventory}
+            onUpdateStock={handleUpdateStock}
+            stockAlertSettings={stockAlertSettings}
+            onUpdateStockAlertSettings={handleUpdateStockAlertSettings}
             onUpdatePlant={handleUpdatePlant}
           />
         )}

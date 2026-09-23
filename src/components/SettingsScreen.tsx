@@ -77,54 +77,49 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         <p className="text-xs text-[#414844] mt-0.5">Configure device behavior, system access, and sync tools.</p>
       </div>
 
-      {/* Profile Card */}
-      <div className="bg-[#f3f4f0] p-4 rounded-xl border border-[#c1c8c2] flex items-center justify-between">
-        <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full bg-[#a0f4c8] text-[#002113] flex items-center justify-center font-bold text-lg border border-[#19724f]/20">
-            {user.name.split(' ').map(n => n[0]).join('') || 'A'}
+      {/* Combined Profile & Mobile Link QR Card (Space-Conserving) */}
+      <div className="bg-gradient-to-br from-[#002113] to-[#0d3b27] text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-[#19724f]/30 flex flex-col gap-3.5">
+        {/* Profile Row: User Info, Live Status, Sign Out */}
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-10 h-10 rounded-full bg-[#a0f4c8] text-[#002113] flex items-center justify-center font-bold text-base border border-[#19724f]/20 shrink-0">
+              {user.name.split(' ').map(n => n[0]).join('') || 'A'}
+            </div>
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-bold text-sm sm:text-base text-white truncate">{user.name}</h3>
+                <span className="text-[10px] font-bold text-[#002113] bg-[#a0f4c8] px-2 py-0.5 rounded-full">
+                  {user.role}
+                </span>
+              </div>
+              <p className="text-xs text-[#a3c9b7] truncate">{user.email}</p>
+            </div>
           </div>
-          <div>
-            <h3 className="font-bold text-base text-[#012d1d]">{user.name}</h3>
-            <p className="text-xs text-[#414844]">{user.email}</p>
-            <span className="inline-block mt-1 text-[10px] font-bold text-[#19724f] bg-[#a0f4c8] px-2 py-0.5 rounded">
-              {user.role}
-            </span>
+
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+            <div className="inline-flex items-center gap-1.5 bg-[#a0f4c8]/20 text-[#a0f4c8] text-[10px] font-bold px-2.5 py-1 rounded-full border border-[#a0f4c8]/30">
+              <Wifi className="w-3 h-3 animate-pulse" />
+              <span className="hidden sm:inline">Live Firestore</span>
+              <span>Active</span>
+            </div>
+            <button
+              type="button"
+              onClick={onLogout}
+              className="px-2.5 py-1 text-rose-200 hover:text-white bg-rose-950/40 hover:bg-rose-900/60 border border-rose-800/40 rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer"
+              title="Sign Out"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </div>
 
-        <button
-          onClick={onLogout}
-          className="p-2 text-[#ba1a1a] hover:bg-[#ffdad6] rounded-lg transition-colors flex items-center gap-1 text-xs font-bold cursor-pointer"
-          title="Sign Out"
-        >
-          <LogOut className="w-4 h-4" />
-          <span>Sign Out</span>
-        </button>
-      </div>
-
-      {/* Dedicated Mobile Phone Link & Multi-Device Sync Section */}
-      <div className="bg-gradient-to-br from-[#002113] to-[#0d3b27] text-white rounded-2xl p-5 shadow-lg border border-[#19724f]/30 flex flex-col gap-4">
-        <div className="flex items-center justify-between border-b border-white/10 pb-3">
-          <div className="flex items-center gap-2">
-            <div className="w-9 h-9 rounded-full bg-[#a0f4c8]/20 text-[#a0f4c8] flex items-center justify-center">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div>
-              <h3 className="font-bold text-base text-white">4-Phone Mobile Link QR</h3>
-              <p className="text-xs text-[#a3c9b7]">Connect staff mobile devices in real time</p>
-            </div>
-          </div>
-          <div className="inline-flex items-center gap-1.5 bg-[#a0f4c8]/20 text-[#a0f4c8] text-[10px] font-bold px-2.5 py-1 rounded-full border border-[#a0f4c8]/30">
-            <Wifi className="w-3 h-3 animate-pulse" />
-            <span>Live Firestore Active</span>
-          </div>
-        </div>
-
-        <div className="flex flex-col sm:flex-row items-center gap-5">
-          <div className="bg-white p-3 rounded-xl shadow-md border border-white/20 shrink-0">
+        {/* Mobile Link QR Section */}
+        <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+          <div className="bg-white p-2.5 rounded-xl shadow-md border border-white/20 shrink-0">
             <QRCodeSVG
               value={appUrl}
-              size={140}
+              size={110}
               level="H"
               includeMargin={false}
               bgColor="#FFFFFF"
@@ -132,28 +127,34 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
             />
           </div>
 
-          <div className="flex-1 text-center sm:text-left flex flex-col gap-2">
-            <span className="text-xs text-[#a3c9b7]">
-              Scan with your phone's camera app to join the live session for Maple Lane Nursery.
-            </span>
+          <div className="flex-1 text-center sm:text-left flex flex-col gap-2 min-w-0 w-full">
+            <div className="flex items-center justify-between gap-2 flex-wrap">
+              <div className="flex items-center gap-1.5">
+                <Smartphone className="w-4 h-4 text-[#a0f4c8]" />
+                <h4 className="font-bold text-xs sm:text-sm text-white">4-Phone Mobile Link QR</h4>
+              </div>
+              <span className="text-[11px] text-[#a3c9b7]">
+                Scan with phone camera to connect staff devices
+              </span>
+            </div>
 
             {/* URL Selector Tabs */}
-            <div className="flex flex-wrap bg-white/10 p-1 rounded-xl border border-white/20 self-center sm:self-start my-1 gap-1">
+            <div className="flex flex-wrap bg-white/10 p-0.5 rounded-lg border border-white/20 self-center sm:self-start gap-1">
               <button
                 type="button"
                 onClick={() => setSelectedUrlType('vercel')}
-                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
                   selectedUrlType === 'vercel'
                     ? 'bg-[#a0f4c8] text-[#002113] shadow-2xs'
                     : 'text-white/80 hover:text-white'
                 }`}
               >
-                Vercel App (Recommended)
+                Vercel App
               </button>
               <button
                 type="button"
                 onClick={() => setSelectedUrlType('dev')}
-                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
                   selectedUrlType === 'dev'
                     ? 'bg-[#a0f4c8] text-[#002113] shadow-2xs'
                     : 'text-white/80 hover:text-white'
@@ -164,23 +165,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setSelectedUrlType('pre')}
-                className={`px-3 py-1 text-[11px] font-bold rounded-lg transition-all ${
+                className={`px-2.5 py-1 text-[10px] font-bold rounded-md transition-all ${
                   selectedUrlType === 'pre'
                     ? 'bg-[#a0f4c8] text-[#002113] shadow-2xs'
                     : 'text-white/80 hover:text-white'
                 }`}
               >
-                Shared AI Studio Link
+                Shared Link
               </button>
             </div>
 
             <div className="flex flex-wrap items-center gap-2 justify-center sm:justify-start">
               <button
+                type="button"
                 onClick={handleCopy}
-                className="bg-[#19724f] hover:bg-[#005236] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer"
+                className="bg-[#19724f] hover:bg-[#005236] text-white text-xs font-semibold px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1.5 cursor-pointer shadow-2xs"
               >
                 {copied ? <Check className="w-3.5 h-3.5 text-[#a0f4c8]" /> : <Copy className="w-3.5 h-3.5" />}
-                {copied ? 'Link Copied!' : 'Copy Mobile Link'}
+                <span>{copied ? 'Link Copied!' : 'Copy Mobile Link'}</span>
               </button>
               <a
                 href={appUrl}
@@ -192,17 +194,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
                 <ExternalLink className="w-3.5 h-3.5" />
               </a>
             </div>
-          </div>
-        </div>
 
-        {/* Troubleshooting box */}
-        <div className="bg-black/20 border border-white/10 rounded-xl p-3 text-xs text-[#a3c9b7]">
-          <p className="font-semibold text-white mb-1 flex items-center gap-1">
-            <span>💡 Getting "Page Not Found" or 403 on phone?</span>
-          </p>
-          <p className="text-[11px] leading-relaxed">
-            In Google AI Studio, preview URLs are private by default. To allow all 4 staff phones to open the app seamlessly, click the <strong>Share</strong> or <strong>Deploy</strong> button in the top right of the AI Studio window to enable public access!
-          </p>
+            <p className="text-[11px] text-[#a3c9b7] mt-0.5 leading-snug">
+              💡 Tip: Use <strong>Share/Deploy</strong> in AI Studio if preview requires public staff access.
+            </p>
+          </div>
         </div>
       </div>
 
@@ -263,6 +259,24 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
           <span className="text-xs font-bold text-[#0e6c4a] bg-[#a0f4c8] px-2.5 py-1 rounded-full">
             Routing
+          </span>
+        </button>
+
+        <button
+          onClick={() => onNavigate('stock_notifications')}
+          className="w-full bg-white p-3.5 rounded-xl border border-[#c1c8c2] hover:border-[#012d1d] flex items-center justify-between transition-colors text-left cursor-pointer"
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-lg bg-[#fff5f5] text-[#ba1a1a] border border-[#ffdad6] flex items-center justify-center">
+              <AlertTriangle className="w-4 h-4" />
+            </div>
+            <div>
+              <span className="block font-bold text-sm text-[#012d1d]">Stock Notifications & Alerts</span>
+              <span className="block text-xs text-[#414844]">Dedicated view for critical restock, low stock, and reorder lists</span>
+            </div>
+          </div>
+          <span className="text-xs font-bold text-[#ba1a1a] bg-[#ffdad6] px-2.5 py-1 rounded-full">
+            Alerts
           </span>
         </button>
       </div>

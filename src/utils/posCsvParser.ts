@@ -2,6 +2,7 @@ import Papa from 'papaparse';
 import * as XLSX from 'xlsx';
 import { PlantItem } from '../types';
 import defaultPlantImg from '../assets/images/default_maple_leaf_1786202948974.jpg';
+import { normalizeYardLocationCode } from '../data/yardLocations';
 
 export function parsePosCurrency(val: any): number | undefined {
   if (val === null || val === undefined) return undefined;
@@ -137,7 +138,7 @@ export function parsePosRowsToPlants(rows: Record<string, any>[]): PlantItem[] {
     if (stkUnit) plantItem.size = stkUnit;
     if (Object.keys(pricesObj).length > 0) plantItem.prices = pricesObj;
     if (categSubcat) plantItem.category = categSubcat;
-    if (addlDescr2) plantItem.holdingLocation = addlDescr2;
+    if (addlDescr2) plantItem.holdingLocation = normalizeYardLocationCode(addlDescr2);
     if (subcatCod) plantItem.subCategoryCode = subcatCod;
 
     // Sale Price / Discount if optionally present in spreadsheet

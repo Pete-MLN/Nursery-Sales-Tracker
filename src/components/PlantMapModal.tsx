@@ -131,6 +131,16 @@ const InteractiveTileMap: React.FC<{
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartZoomRef = useRef<number>(18);
 
+  // Lock body scroll and ensure view is centered when map modal is opened
+  useEffect(() => {
+    const originalOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    window.scrollTo(0, 0);
+    return () => {
+      document.body.style.overflow = originalOverflow;
+    };
+  }, []);
+
   // Resize observer to keep map container coordinates accurate
   useEffect(() => {
     if (!containerRef.current) return;
@@ -983,13 +993,14 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
 
   return (
     <div 
-      className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-start justify-center overflow-y-auto animate-fade-in ${
-        isLargerModal ? 'p-0' : 'p-1 sm:p-2 md:p-3 pt-1 sm:pt-2 md:pt-3'
+      className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center overflow-y-auto animate-fade-in ${
+        isLargerModal ? 'p-0' : 'p-1 sm:p-2 md:p-3'
       }`}
       onClick={onClose}
     >
       <div 
-        className={`bg-white shadow-2xl border border-[#c1c8c2] flex flex-col overflow-hidden animate-scale-up transition-all duration-200 mt-0 sm:mt-1 mb-auto ${
+        tabIndex={-1}
+        className={`bg-white shadow-2xl border border-[#c1c8c2] flex flex-col overflow-hidden animate-scale-up transition-all duration-200 my-auto outline-none ${
           isLargerModal 
             ? 'w-screen h-screen max-w-none max-h-none rounded-none' 
             : 'rounded-2xl max-w-6xl w-full h-[96vh] sm:h-[94vh] max-h-[960px]'

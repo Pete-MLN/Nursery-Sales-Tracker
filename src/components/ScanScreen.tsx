@@ -3008,11 +3008,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       {/* Cancel Order Confirmation Modal */}
       {isCancelModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
           onClick={() => setIsCancelModalOpen(false)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden mt-1 sm:mt-2 mb-auto"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
@@ -3115,8 +3116,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
       {/* Unrecognized Barcode Assignment Modal */}
       {unrecognizedCode && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-4 sm:pt-8 z-50 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto animate-fade-in">
+          <div 
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
+          >
             <div className="flex justify-between items-start">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-[#ffdad6] text-[#ba1a1a] rounded-xl">
@@ -3230,8 +3234,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       )}
       {/* Full Plant Catalog Search & Selection Modal */}
       {isCatalogModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-4 sm:pt-8 z-50 overflow-y-auto animate-fade-in">
-          <div className="bg-white rounded-2xl max-w-xl w-full max-h-[85vh] p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16 overflow-hidden">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto animate-fade-in">
+          <div 
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-xl w-full max-h-[85vh] p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto overflow-hidden outline-none"
+          >
             <div className="flex justify-between items-center pb-2 border-b border-[#e2e3df]">
               <div className="flex items-center gap-2">
                 <div className="p-2.5 bg-[#a0f4c8] text-[#012d1d] rounded-xl">

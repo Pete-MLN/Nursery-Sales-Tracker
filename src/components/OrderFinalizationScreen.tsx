@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { ScreenType, Order, PlantItem, Customer, HoldingArea, OrderCartItem, Employee } from '../types';
 import { DEFAULT_PLANT_IMAGE, INITIAL_EMPLOYEES } from '../data/mockData';
+import { normalizeHoldingArea, compareYardLocations } from '../data/yardLocations';
 import { 
   CheckCircle, 
   ShoppingBag, 
@@ -195,6 +196,20 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [isLoggingGpsId, setIsLoggingGpsId] = useState<string | null>(null);
 
+  // Lock background scroll and center viewport when any modal is open
+  useEffect(() => {
+    const isAnyModalOpen = isAddingPlantModalOpen || isChangingLocationModalOpen || isHoldSlipModalOpen || 
+      isEmailStaffModalOpen || isEmailReceiptModalOpen || isEmailOfficeModalOpen || isTextCrewModalOpen || isDeleteModalOpen;
+    if (isAnyModalOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      window.scrollTo(0, 0);
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isAddingPlantModalOpen, isChangingLocationModalOpen, isHoldSlipModalOpen, isEmailStaffModalOpen, isEmailReceiptModalOpen, isEmailOfficeModalOpen, isTextCrewModalOpen, isDeleteModalOpen]);
+
   // Robust customer matching helper
   const findMatchingCustomer = (name: string, customerList: Customer[]): Customer | undefined => {
     if (!name || !name.trim()) return undefined;
@@ -230,6 +245,15 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const matchedCustomer = useMemo(() => {
     return findMatchingCustomer(customerName || currentOrder.customerName || '', customers);
   }, [customerName, currentOrder.customerName, customers]);
+
+  // Normalized and sequentially sorted holding areas (R01, R02... M01, M02... B01, B02...)
+  const sortedHoldingAreas = useMemo(() => {
+    const norm = holdingAreas.map(normalizeHoldingArea);
+    const leftItem = norm.find(a => a.id === 'left_in_place');
+    const rest = norm.filter(a => a.id !== 'left_in_place');
+    rest.sort((a, b) => compareYardLocations(a.title, b.title));
+    return leftItem ? [leftItem, ...rest] : rest;
+  }, [holdingAreas]);
 
   // Synchronize internal form when currentOrder changes
   useEffect(() => {
@@ -2185,9 +2209,10 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Add Plant Search Modal */}
       {isAddingPlantModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16 overflow-hidden"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto overflow-hidden outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -2326,9 +2351,10 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Change Holding Location Modal */}
       {isChangingLocationModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
@@ -2354,7 +2380,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
                 Select Nursery Zone
               </label>
-              {holdingAreas.map(area => (
+              {sortedHoldingAreas.map(area => (
                 <button
                   key={area.id}
                   type="button"
@@ -2427,9 +2453,10 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Staff Modal */}
       {isEmailStaffModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -2565,9 +2592,10 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Printable Remaining Hold Slip Modal */}
       {isHoldSlipModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
@@ -2664,9 +2692,10 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Customer Receipt Modal */}
       {isEmailReceiptModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -2807,9 +2836,10 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Office Modal */}
       {isEmailOfficeModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center border-b border-[#e2e3df] pb-3">
@@ -3000,9 +3030,10 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Text Employee SMS Modal */}
       {isTextCrewModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in">
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-2 mb-16"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}
@@ -3177,11 +3208,12 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
       {/* Cancel / Delete Order Confirmation Modal */}
       {isDeleteModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
           onClick={() => setIsDeleteModalOpen(false)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden mt-1 sm:mt-2 mb-auto"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">

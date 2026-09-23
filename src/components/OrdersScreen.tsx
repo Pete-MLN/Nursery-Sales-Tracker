@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { ScreenType, Order } from '../types';
 import { formatOrderCreatedDate, formatOrderScheduledTime } from '../utils/dateUtils';
 import { PlantMapModal } from './PlantMapModal';
@@ -31,6 +31,18 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   const [orderToComplete, setOrderToComplete] = useState<Order | null>(null);
   const [mapModalOrder, setMapModalOrder] = useState<Order | null>(null);
   const [toastNotification, setToastNotification] = useState<{ text: string; orderToUndo?: Order } | null>(null);
+
+  // Lock background scroll and focus modal when open
+  useEffect(() => {
+    if (orderToDelete || orderToComplete || mapModalOrder) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      window.scrollTo(0, 0);
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [orderToDelete, orderToComplete, mapModalOrder]);
 
   const showToast = (text: string, orderToUndo?: Order) => {
     setToastNotification({ text, orderToUndo });
@@ -674,11 +686,12 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {/* Complete & Archive Order Confirmation Modal */}
       {orderToComplete && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
           onClick={() => setOrderToComplete(null)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden mt-1 sm:mt-2 mb-auto"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">
@@ -739,11 +752,12 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {/* Delete / Cancel Order Confirmation Modal */}
       {orderToDelete && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 pt-3 sm:pt-6 md:pt-8 overflow-y-auto animate-fade-in"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
           onClick={() => setOrderToDelete(null)}
         >
           <div 
-            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden mt-1 sm:mt-2 mb-auto"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 overflow-hidden my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex items-start gap-3">

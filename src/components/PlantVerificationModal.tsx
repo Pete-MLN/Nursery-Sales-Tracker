@@ -231,7 +231,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
       setItemNotes(existingCartItem?.itemNotes || '');
 
-      // Ensure window and modal start cleanly at the very top
+      // Ensure window and modal start cleanly at the very top and receive direct focus
       window.scrollTo(0, 0);
       if (scrollContainerRef.current) {
         scrollContainerRef.current.scrollTop = 0;
@@ -239,6 +239,23 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       if (modalCardRef.current) {
         modalCardRef.current.scrollTop = 0;
       }
+      // Directly focus quantity input or modal dialog
+      const focusTimer = setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.focus();
+        } else if (modalCardRef.current) {
+          modalCardRef.current.focus();
+        }
+      }, 50);
+
+      // Lock body scroll while modal is active
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+
+      return () => {
+        clearTimeout(focusTimer);
+        document.body.style.overflow = originalOverflow;
+      };
     }
   }, [isOpen, plant, existingCartItem, initialQuantity, customerType]);
 
@@ -480,13 +497,13 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       aria-modal="true"
       aria-labelledby="confirm-plant-heading"
       onKeyDown={handleModalKeyDown}
-      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-start justify-center p-2 sm:p-3 pt-1 sm:pt-2 md:pt-3 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-2 sm:p-3 overflow-y-auto animate-fade-in"
       onClick={onClose}
     >
       <div 
         ref={modalCardRef}
         tabIndex={-1}
-        className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-3.5 sm:gap-4 mt-0 sm:mt-1 mb-auto animate-scale-up outline-none"
+        className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-3.5 sm:gap-4 my-auto animate-scale-up outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with Title and Close Button */}

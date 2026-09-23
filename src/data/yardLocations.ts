@@ -31,36 +31,36 @@ export const OFFICIAL_YARD_LOCATIONS: HoldingArea[] = [
   { id: 'loc-g1-b-retail', title: 'G1-b', subtitle: 'Trees in Stakes', category: 'Retail', icon: 'store' },
   { id: 'loc-g1-c-retail', title: 'G1-c', subtitle: 'Trees in Stakes', category: 'Retail', icon: 'store' },
   { id: 'loc-g1-d-retail', title: 'G1-d', subtitle: 'Trees in Stakes', category: 'Retail', icon: 'store' },
-  { id: 'loc-z1', title: 'Z1', subtitle: 'Greenhouse 1 (Next to the office)', category: 'Retail', icon: 'warehouse' },
-  { id: 'loc-z2', title: 'Z2', subtitle: 'Greenhouse 2 (Next to the office)', category: 'Retail', icon: 'warehouse' },
-  { id: 'loc-z3', title: 'Z3', subtitle: 'Greenhouse 3 (Next to the office)', category: 'Retail', icon: 'warehouse' },
-  { id: 'loc-z4', title: 'Z4', subtitle: 'Greenhouse 4 (Next to the office)', category: 'Retail', icon: 'warehouse' },
-  { id: 'loc-z5', title: 'Z5', subtitle: 'Open area by loading zone', category: 'Retail', icon: 'store' },
-  { id: 'loc-z6', title: 'Z6', subtitle: 'Open area by loading zone', category: 'Retail', icon: 'store' },
-  { id: 'loc-z7', title: 'Z7', subtitle: 'Open area behind Greenhouse 3 & 4', category: 'Retail', icon: 'store' },
-  { id: 'loc-z8', title: 'Z8', subtitle: 'Open area behind Greenhouse 3 & 4', category: 'Retail', icon: 'store' },
-  { id: 'loc-z9', title: 'Z9', subtitle: 'Open area behind Greenhouse 1 & 2', category: 'Retail', icon: 'store' },
+  { id: 'loc-z01', title: 'Z01', subtitle: 'Greenhouse 1 (Next to the office)', category: 'Retail', icon: 'warehouse' },
+  { id: 'loc-z02', title: 'Z02', subtitle: 'Greenhouse 2 (Next to the office)', category: 'Retail', icon: 'warehouse' },
+  { id: 'loc-z03', title: 'Z03', subtitle: 'Greenhouse 3 (Next to the office)', category: 'Retail', icon: 'warehouse' },
+  { id: 'loc-z04', title: 'Z04', subtitle: 'Greenhouse 4 (Next to the office)', category: 'Retail', icon: 'warehouse' },
+  { id: 'loc-z05', title: 'Z05', subtitle: 'Open area by loading zone', category: 'Retail', icon: 'store' },
+  { id: 'loc-z06', title: 'Z06', subtitle: 'Open area by loading zone', category: 'Retail', icon: 'store' },
+  { id: 'loc-z07', title: 'Z07', subtitle: 'Open area behind Greenhouse 3 & 4', category: 'Retail', icon: 'store' },
+  { id: 'loc-z08', title: 'Z08', subtitle: 'Open area behind Greenhouse 3 & 4', category: 'Retail', icon: 'store' },
+  { id: 'loc-z09', title: 'Z09', subtitle: 'Open area behind Greenhouse 1 & 2', category: 'Retail', icon: 'store' },
   { id: 'loc-z10', title: 'Z10', subtitle: 'Open mat behind Office', category: 'Retail', icon: 'store' },
 
   // B&B (55 locations)
-  { id: 'loc-t1-a', title: 'T1-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t1-b', title: 'T1-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t2-a', title: 'T2-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t2-b', title: 'T2-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t3-a', title: 'T3-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t3-b', title: 'T3-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t4-a', title: 'T4-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t4-b', title: 'T4-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t5-a', title: 'T5-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t5-b', title: 'T5-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t6-a', title: 'T6-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t6-b', title: 'T6-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t7-a', title: 'T7-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t7-b', title: 'T7-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t8-a', title: 'T8-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t8-b', title: 'T8-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t9-a', title: 'T9-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
-  { id: 'loc-t9-b', title: 'T9-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t01-a', title: 'T01-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t01-b', title: 'T01-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t02-a', title: 'T02-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t02-b', title: 'T02-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t03-a', title: 'T03-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t03-b', title: 'T03-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t04-a', title: 'T04-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t04-b', title: 'T04-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t05-a', title: 'T05-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t05-b', title: 'T05-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t06-a', title: 'T06-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t06-b', title: 'T06-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t07-a', title: 'T07-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t07-b', title: 'T07-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t08-a', title: 'T08-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t08-b', title: 'T08-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t09-a', title: 'T09-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
+  { id: 'loc-t09-b', title: 'T09-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
   { id: 'loc-t10-a', title: 'T10-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
   { id: 'loc-t10-b', title: 'T10-b', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
   { id: 'loc-t11-a', title: 'T11-a', subtitle: 'B&B tree section', category: 'B&B', icon: 'sprout' },
@@ -104,15 +104,15 @@ export const OFFICIAL_YARD_LOCATIONS: HoldingArea[] = [
   { id: 'loc-c16-b', title: 'C16-b', subtitle: 'Open Mat by the lower pond', category: 'Barn Area', icon: 'building' },
   { id: 'loc-c16-c', title: 'C16-c', subtitle: 'Open Mat by the lower pond', category: 'Barn Area', icon: 'building' },
   { id: 'loc-c16-d', title: 'C16-d', subtitle: 'Open Mat by the lower pond', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b1', title: 'B1', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b2', title: 'B2', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b3', title: 'B3', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b4', title: 'B4', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b5', title: 'B5', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b6', title: 'B6', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b7', title: 'B7', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b8', title: 'B8', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
-  { id: 'loc-b9', title: 'B9', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b01', title: 'B01', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b02', title: 'B02', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b03', title: 'B03', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b04', title: 'B04', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b05', title: 'B05', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b06', title: 'B06', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b07', title: 'B07', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b08', title: 'B08', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
+  { id: 'loc-b09', title: 'B09', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
   { id: 'loc-b10', title: 'B10', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
   { id: 'loc-b11', title: 'B11', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
   { id: 'loc-b12', title: 'B12', subtitle: 'Greenhouses by the Red barn', category: 'Barn Area', icon: 'building' },
@@ -123,15 +123,15 @@ export const OFFICIAL_YARD_LOCATIONS: HoldingArea[] = [
   { id: 'loc-g2', title: 'G2', subtitle: 'By old potting house', category: 'Greenhouses', icon: 'warehouse' },
   { id: 'loc-g3', title: 'G3', subtitle: 'By old potting house', category: 'Greenhouses', icon: 'warehouse' },
   { id: 'loc-g4', title: 'G4', subtitle: 'By old potting house', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r1', title: 'R1', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r2', title: 'R2', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r3', title: 'R3', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r4', title: 'R4', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r5', title: 'R5', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r6', title: 'R6', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r7', title: 'R7', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r8', title: 'R8', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-r9', title: 'R9', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r01', title: 'R01', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r02', title: 'R02', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r03', title: 'R03', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r04', title: 'R04', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r05', title: 'R05', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r06', title: 'R06', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r07', title: 'R07', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r08', title: 'R08', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
+  { id: 'loc-r09', title: 'R09', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
   { id: 'loc-r10', title: 'R10', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
   { id: 'loc-r11', title: 'R11', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
   { id: 'loc-r12', title: 'R12', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
@@ -150,16 +150,16 @@ export const OFFICIAL_YARD_LOCATIONS: HoldingArea[] = [
   { id: 'loc-r25', title: 'R25', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
   { id: 'loc-r26', title: 'R26', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
   { id: 'loc-r27', title: 'R27', subtitle: 'Greenhouses out back', category: 'Greenhouses', icon: 'warehouse' },
-  { id: 'loc-m1', title: 'M1', subtitle: 'Open Mat by Hannaford', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m2', title: 'M2', subtitle: 'Open Mat by Hannaford', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m3', title: 'M3', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m4', title: 'M4', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m5', title: 'M5', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m6', title: 'M6', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m7', title: 'M7', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m8', title: 'M8', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m9-a', title: 'M9-a', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
-  { id: 'loc-m9-b', title: 'M9-b', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m01', title: 'M01', subtitle: 'Open Mat by Hannaford', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m02', title: 'M02', subtitle: 'Open Mat by Hannaford', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m03', title: 'M03', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m04', title: 'M04', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m05', title: 'M05', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m06', title: 'M06', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m07', title: 'M07', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m08', title: 'M08', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m09-a', title: 'M09-a', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
+  { id: 'loc-m09-b', title: 'M09-b', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
   { id: 'loc-m10-a', title: 'M10-a', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
   { id: 'loc-m10-b', title: 'M10-b', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
   { id: 'loc-m11', title: 'M11', subtitle: 'Open mat by Orchard', category: 'Greenhouses', icon: 'sprout' },
@@ -209,3 +209,38 @@ export const OFFICIAL_YARD_LOCATIONS: HoldingArea[] = [
   { id: 'loc-loading-2', title: 'Loading Area 2', subtitle: 'In front of the Red Barn', category: 'Loading/Staging', icon: 'local_shipping' },
   { id: 'loc-loading-3', title: 'Loading Area 3', subtitle: 'M14-Holding area (Open mat by old potting shed)', category: 'Loading/Staging', icon: 'local_shipping' }
 ];
+
+/**
+ * Normalizes yard location codes so that single-digit identifiers like R1..R9, M1..M9,
+ * Z1..Z9, T1..T9, and B1..B9 are zero-padded to R01..R09, M01..M09, Z01..Z09, T01..T09, and B01..B09.
+ * This guarantees strict sequential order (e.g. Greenhouse R01 is followed by R02, then R03..R09, R10..).
+ */
+export function normalizeYardLocationCode(locationStr: string): string {
+  if (!locationStr) return locationStr;
+  return locationStr.replace(/\b([RMZTBrmztb])([1-9])(?![0-9])/g, (_match, letter: string, digit: string) => {
+    return `${letter.toUpperCase()}0${digit}`;
+  });
+}
+
+/**
+ * Normalizes a HoldingArea item so that its title and id use the zero-padded format for single digits.
+ */
+export function normalizeHoldingArea(area: HoldingArea): HoldingArea {
+  if (!area) return area;
+  const newTitle = normalizeYardLocationCode(area.title);
+  const newId = normalizeYardLocationCode(area.id).toLowerCase();
+  if (newTitle === area.title && newId === area.id) return area;
+  return {
+    ...area,
+    id: newId,
+    title: newTitle
+  };
+}
+
+/**
+ * Natural comparator for sorting yard locations and holding area titles sequentially
+ */
+export function compareYardLocations(a: string, b: string): number {
+  return a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' });
+}
+

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { ScreenType, Order, HoldingArea } from '../types';
 import { HOLDING_AREAS } from '../data/mockData';
+import { normalizeHoldingArea, normalizeYardLocationCode, compareYardLocations } from '../data/yardLocations';
 import { PlantMapModal } from './PlantMapModal';
 import { saveOrderToFirestore } from '../services/firebaseService';
 import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
@@ -78,14 +79,15 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
 
   // Always ensure 'Left in Place' is the first option in the list
   const areas = useMemo(() => {
-    const leftItem = rawAreas.find(a => a.id === 'left_in_place') || { 
+    const normalized = rawAreas.map(normalizeHoldingArea);
+    const leftItem = normalized.find(a => a.id === 'left_in_place') || { 
       id: 'left_in_place', 
       title: 'Left in Place', 
       subtitle: 'Keep in current physical location (no relocation needed)', 
       category: 'Special', 
       icon: 'pin_drop' 
     };
-    const rest = rawAreas.filter(a => a.id !== 'left_in_place');
+    const rest = normalized.filter(a => a.id !== 'left_in_place');
     return [leftItem, ...rest];
   }, [rawAreas]);
 
@@ -95,7 +97,8 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
       if (activeOrder.holdingLocation.toLowerCase().includes('left in place')) {
         return 'left_in_place';
       }
-      const match = rawAreas.find(a => activeOrder.holdingLocation?.includes(a.title));
+      const normActiveLoc = normalizeYardLocationCode(activeOrder.holdingLocation);
+      const match = rawAreas.map(normalizeHoldingArea).find(a => normActiveLoc.includes(a.title));
       if (match) return match.id;
     }
     return 'left_in_place';
@@ -132,6 +135,9 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
       const catMatch = (area.category || '').toLowerCase().includes(q);
       return titleMatch || subtitleMatch || catMatch;
     });
+
+    // Sort other areas sequentially so that single-digit locations like R01 are followed immediately by R02, R03...
+    otherAreas.sort((a, b) => compareYardLocations(a.title, b.title));
 
     // Check if search query matches Left in Place when user searches
     let showLeftInPlace = true;

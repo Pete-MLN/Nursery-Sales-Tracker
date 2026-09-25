@@ -86,15 +86,10 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
     }
   }, [plant]);
 
-  // Lock background scroll and bring modal to focus when opened
+  // Bring modal to clean scroll alignment when opened
   useEffect(() => {
     if (isOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
       window.scrollTo(0, 0);
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
     }
   }, [isOpen]);
 
@@ -239,12 +234,14 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto"
+      role="dialog"
+      aria-modal="true"
+      className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto overscroll-y-contain"
       onClick={isUpdating ? undefined : onClose}
     >
       <div 
         tabIndex={-1}
-        className="bg-white rounded-3xl border border-[#c1c8c2] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col my-auto max-h-[92vh] outline-none"
+        className="bg-white rounded-3xl border border-[#c1c8c2] shadow-2xl w-full max-w-lg overflow-hidden flex flex-col my-auto outline-none"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}

@@ -256,8 +256,8 @@ export default function App() {
   }, []);
 
   // Global Modal Focus & Scroll Manager
-  // Ensures any popup/modal on Scan, Inventory, Physical Count, Orders, Settings, etc.,
-  // immediately receives viewport focus and centers so the user does not have to scroll to it.
+  // Ensures whenever any pop-up dialog opens anywhere in the application, it
+  // immediately receives viewport focus while allowing natural scrolling with the screen.
   useEffect(() => {
     let lastModalFound: HTMLElement | null = null;
     let prevActiveElement: HTMLElement | null = null;
@@ -272,39 +272,33 @@ export default function App() {
         lastModalFound = modal;
         prevActiveElement = document.activeElement as HTMLElement | null;
 
-        // Prevent body from scrolling behind modal
-        document.body.style.overflow = 'hidden';
-
-        // Reset scroll position so modal is cleanly aligned
-        window.scrollTo({ top: 0, left: 0, behavior: 'instant' });
+        // Reset scroll position so modal is cleanly aligned at top
         modal.scrollTop = 0;
 
         // Auto-focus primary interactive element inside modal or the modal card itself
         setTimeout(() => {
           if (!document.contains(modal)) return;
           const modalCard = modal.querySelector<HTMLElement>('[tabindex="-1"], .bg-white') || modal;
-          modalCard.scrollTop = 0;
 
           // Priority focus: text/number input, then select, textarea, button, or the card
           const firstInput = modalCard.querySelector<HTMLElement>(
             'input:not([disabled]):not([type="hidden"]):not([readonly]), select:not([disabled]), textarea:not([disabled])'
           );
           if (firstInput) {
-            firstInput.focus();
+            firstInput.focus({ preventScroll: true });
           } else {
             const firstButton = modalCard.querySelector<HTMLElement>(
               'button:not([disabled]):not([aria-label="Close"]):not(.btn-close), [tabindex]:not([tabindex="-1"])'
             );
             if (firstButton) {
-              firstButton.focus();
+              firstButton.focus({ preventScroll: true });
             } else if (typeof modalCard.focus === 'function') {
-              modalCard.focus();
+              modalCard.focus({ preventScroll: true });
             }
           }
         }, 40);
       } else if (!modal && lastModalFound) {
         lastModalFound = null;
-        document.body.style.overflow = '';
         if (prevActiveElement && typeof prevActiveElement.focus === 'function' && document.contains(prevActiveElement)) {
           prevActiveElement.focus();
         }
@@ -321,7 +315,6 @@ export default function App() {
 
     return () => {
       observer.disconnect();
-      document.body.style.overflow = '';
     };
   }, []);
 

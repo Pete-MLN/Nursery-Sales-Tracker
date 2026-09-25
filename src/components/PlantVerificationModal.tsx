@@ -242,19 +242,14 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       // Directly focus quantity input or modal dialog
       const focusTimer = setTimeout(() => {
         if (inputRef.current) {
-          inputRef.current.focus();
+          inputRef.current.focus({ preventScroll: true });
         } else if (modalCardRef.current) {
-          modalCardRef.current.focus();
+          modalCardRef.current.focus({ preventScroll: true });
         }
       }, 50);
 
-      // Lock body scroll while modal is active
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
-
       return () => {
         clearTimeout(focusTimer);
-        document.body.style.overflow = originalOverflow;
       };
     }
   }, [isOpen, plant, existingCartItem, initialQuantity, customerType]);
@@ -497,7 +492,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       aria-modal="true"
       aria-labelledby="confirm-plant-heading"
       onKeyDown={handleModalKeyDown}
-      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-center justify-center p-2 sm:p-3 overflow-y-auto animate-fade-in"
+      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-start justify-center p-2 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
       onClick={onClose}
     >
       <div 

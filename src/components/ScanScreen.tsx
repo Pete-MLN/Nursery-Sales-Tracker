@@ -3072,7 +3072,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       {/* Cancel Order Confirmation Modal */}
       {isCancelModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
           onClick={() => setIsCancelModalOpen(false)}
         >
           <div 
@@ -3181,7 +3183,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
       {/* Unrecognized Barcode Assignment Modal */}
       {unrecognizedCode && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 z-50 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
@@ -3299,7 +3305,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       )}
       {/* Full Plant Catalog Search & Selection Modal */}
       {isCatalogModalOpen && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 z-50 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 z-50 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-xl w-full max-h-[85vh] p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto overflow-hidden outline-none"

@@ -165,15 +165,10 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
 
-  // Lock background scroll and focus modal when active
+  // Ensure clean view alignment when modal is active
   useEffect(() => {
     if (showEmailModal || isCameraOpen || mapModalGps) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
       window.scrollTo(0, 0);
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
     }
   }, [showEmailModal, isCameraOpen, mapModalGps]);
 
@@ -1733,7 +1728,11 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
       {/* Email & Finalize Report Modal */}
       {showEmailModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 animate-in fade-in duration-200 overflow-y-auto">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 animate-in fade-in duration-200 overflow-y-auto overscroll-y-contain"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] text-[#012d1d] relative my-auto outline-none"
@@ -1849,8 +1848,15 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
       {/* Barcode Camera Modal */}
       {isCameraOpen && (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-white/20 text-center relative">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/80 flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 animate-in fade-in duration-200 overflow-y-auto overscroll-y-contain"
+        >
+          <div 
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-white/20 text-center relative my-auto outline-none"
+          >
             <button
               onClick={stopCameraScanner}
               className="absolute top-4 right-4 p-1.5 rounded-full text-gray-500 hover:bg-gray-100 cursor-pointer"

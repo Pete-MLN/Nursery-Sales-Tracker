@@ -131,14 +131,9 @@ const InteractiveTileMap: React.FC<{
   const pinchStartDistRef = useRef<number | null>(null);
   const pinchStartZoomRef = useRef<number>(18);
 
-  // Lock body scroll and ensure view is centered when map modal is opened
+  // Ensure view is centered when map modal is opened
   useEffect(() => {
-    const originalOverflow = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
     window.scrollTo(0, 0);
-    return () => {
-      document.body.style.overflow = originalOverflow;
-    };
   }, []);
 
   // Resize observer to keep map container coordinates accurate
@@ -993,8 +988,10 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
 
   return (
     <div 
-      className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-center justify-center overflow-y-auto animate-fade-in ${
-        isLargerModal ? 'p-0' : 'p-1 sm:p-2 md:p-3'
+      role="dialog"
+      aria-modal="true"
+      className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-start justify-center overflow-y-auto overscroll-y-contain animate-fade-in ${
+        isLargerModal ? 'p-0' : 'p-1 sm:p-2 md:p-3 py-3 sm:py-5'
       }`}
       onClick={onClose}
     >

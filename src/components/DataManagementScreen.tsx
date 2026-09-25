@@ -879,8 +879,12 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
       {/* Manual Add/Edit Customer Modal */}
       {showCustomerModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 pt-4 sm:pt-6 md:pt-8 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in my-0">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain"
+        >
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in my-auto">
             <div className="flex justify-between items-center border-b border-[#f3f4f0] pb-3">
               <h3 className="font-bold text-lg text-[#012d1d]">
                 {editingCustId ? 'Edit Customer Account' : 'Add New Customer'}
@@ -1016,8 +1020,12 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
       {/* Manual Add/Edit Employee Modal */}
       {showEmployeeModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 pt-4 sm:pt-6 md:pt-8 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in my-0">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain"
+        >
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-xl flex flex-col gap-4 animate-fade-in my-auto">
             <div className="flex justify-between items-center border-b border-[#f3f4f0] pb-3">
               <h3 className="font-bold text-lg text-[#012d1d]">
                 {editingEmpId ? 'Edit Employee Record' : 'Add New Employee'}
@@ -1123,8 +1131,12 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
 
       {/* Dataset File Import Modal */}
       {activeUploadModal && (
-        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 pt-4 sm:pt-6 md:pt-8 overflow-y-auto">
-          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-2xl flex flex-col gap-4 animate-fade-in my-0">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/50 backdrop-blur-xs flex items-start justify-center p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain"
+        >
+          <div className="bg-white rounded-2xl max-w-md w-full p-6 border border-[#c1c8c2] shadow-2xl flex flex-col gap-4 animate-fade-in my-auto">
             {/* Hidden HTML File Input */}
             <input
               ref={fileInputRef}

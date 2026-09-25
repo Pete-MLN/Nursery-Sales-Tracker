@@ -198,17 +198,12 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState<boolean>(false);
   const [isLoggingGpsId, setIsLoggingGpsId] = useState<string | null>(null);
 
-  // Lock background scroll and center viewport when any modal is open
+  // Ensure viewport alignment when any modal is open
   useEffect(() => {
     const isAnyModalOpen = isAddingPlantModalOpen || isChangingLocationModalOpen || isHoldSlipModalOpen || 
       isEmailStaffModalOpen || isEmailReceiptModalOpen || isEmailOfficeModalOpen || isTextCrewModalOpen || isDeleteModalOpen;
     if (isAnyModalOpen) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
       window.scrollTo(0, 0);
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
     }
   }, [isAddingPlantModalOpen, isChangingLocationModalOpen, isHoldSlipModalOpen, isEmailStaffModalOpen, isEmailReceiptModalOpen, isEmailOfficeModalOpen, isTextCrewModalOpen, isDeleteModalOpen]);
 
@@ -2230,7 +2225,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Add Plant Search Modal */}
       {isAddingPlantModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-2xl w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto overflow-hidden outline-none"
@@ -2372,7 +2371,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Change Holding Location Modal */}
       {isChangingLocationModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
@@ -2474,7 +2477,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Staff Modal */}
       {isEmailStaffModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
@@ -2613,7 +2620,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Printable Remaining Hold Slip Modal */}
       {isHoldSlipModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
@@ -2713,7 +2724,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Customer Receipt Modal */}
       {isEmailReceiptModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
@@ -2857,7 +2872,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Email Office Modal */}
       {isEmailOfficeModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
@@ -3051,7 +3070,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
       {/* Text Employee SMS Modal */}
       {isTextCrewModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-lg w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-4 my-auto outline-none"
@@ -3229,7 +3252,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
       {/* Cancel / Delete Order Confirmation Modal */}
       {isDeleteModalOpen && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
           onClick={() => setIsDeleteModalOpen(false)}
         >
           <div 

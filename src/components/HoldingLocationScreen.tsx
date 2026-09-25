@@ -686,9 +686,14 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
 
       {/* Edit / Create Holding Location Modal */}
       {(editingArea || isCreatingNew) && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+        >
           <div 
-            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-5 max-h-[90vh] overflow-y-auto"
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-[#c1c8c2] flex flex-col gap-5 my-auto outline-none"
             onClick={(e) => e.stopPropagation()}
           >
             {/* Modal Header */}

@@ -47,3 +47,13 @@ body {
 .animate-fade-in {
   animation: fadeIn 0.3s ease-out forwards;
 }
+
+/* Ensure all modal containers allow smooth touch momentum scrolling on mobile */
+[role="dialog"],
+[aria-modal="true"],
+.modal-overlay,
+div[class*="fixed inset-0"] {
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+}
+

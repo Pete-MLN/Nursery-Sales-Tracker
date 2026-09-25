@@ -166,8 +166,17 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* QR Code Modal for Phone Access */}
       {showQrModal && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-[#e2e3df] text-[#1a1c1a] relative">
+        <div 
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 animate-in fade-in duration-200 overflow-y-auto overscroll-y-contain"
+          onClick={() => setShowQrModal(false)}
+        >
+          <div 
+            tabIndex={-1}
+            className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl border border-[#e2e3df] text-[#1a1c1a] relative my-auto outline-none"
+            onClick={(e) => e.stopPropagation()}
+          >
             <button
               onClick={() => setShowQrModal(false)}
               className="absolute top-4 right-4 p-1.5 rounded-full text-[#727972] hover:bg-[#f3f4f0] transition-colors"

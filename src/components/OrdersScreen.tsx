@@ -32,15 +32,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   const [mapModalOrder, setMapModalOrder] = useState<Order | null>(null);
   const [toastNotification, setToastNotification] = useState<{ text: string; orderToUndo?: Order } | null>(null);
 
-  // Lock background scroll and focus modal when open
+  // Ensure view is centered when modal opens
   useEffect(() => {
     if (orderToDelete || orderToComplete || mapModalOrder) {
-      const originalOverflow = document.body.style.overflow;
-      document.body.style.overflow = 'hidden';
       window.scrollTo(0, 0);
-      return () => {
-        document.body.style.overflow = originalOverflow;
-      };
     }
   }, [orderToDelete, orderToComplete, mapModalOrder]);
 
@@ -692,7 +687,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {/* Complete & Archive Order Confirmation Modal */}
       {orderToComplete && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
           onClick={() => setOrderToComplete(null)}
         >
           <div 
@@ -758,7 +755,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {/* Delete / Cancel Order Confirmation Modal */}
       {orderToDelete && (
         <div 
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-3 sm:p-4 overflow-y-auto animate-fade-in"
+          role="dialog"
+          aria-modal="true"
+          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
           onClick={() => setOrderToDelete(null)}
         >
           <div 

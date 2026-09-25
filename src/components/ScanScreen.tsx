@@ -2011,7 +2011,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                                 <Tag className="w-3.5 h-3.5 text-[#a0f4c8]" />
                                 #{plant.itemNo || plant.barcode || 'N/A'}
                               </span>
-                              <span className="bg-[#461702] text-amber-100 text-xs font-bold px-2 py-0.5 rounded-md flex items-center gap-1 leading-tight">
+                              <span className="bg-[#461702] text-amber-100 text-[18px] font-bold px-2 py-0.5 rounded-md flex items-center gap-1 leading-tight">
                                 <Package className="w-3.5 h-3.5 text-amber-300" />
                                 SIZE: {plant.size || 'Standard'}
                               </span>

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { PlantItem, OrderCartItem, GPSLocationEntry } from '../types';
 import { PriceLevelKey, getPlantPriceTiers, isPlantOnSale, getPlantSaleSavings, getPlantSalePrice } from '../utils/pricingUtils';
 import { PricingDropdown } from './PricingDropdown';
@@ -239,11 +240,9 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       if (modalCardRef.current) {
         modalCardRef.current.scrollTop = 0;
       }
-      // Directly focus quantity input or modal dialog
+      // Directly focus the popup card so the popup itself is the focus without keyboard jumping
       const focusTimer = setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.focus({ preventScroll: true });
-        } else if (modalCardRef.current) {
+        if (modalCardRef.current) {
           modalCardRef.current.focus({ preventScroll: true });
         }
       }, 50);
@@ -485,20 +484,20 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       ? plant.name
       : undefined;
 
-  return (
+  const modalContent = (
     <div 
       ref={scrollContainerRef}
       role="dialog"
       aria-modal="true"
       aria-labelledby="confirm-plant-heading"
       onKeyDown={handleModalKeyDown}
-      className="fixed inset-0 z-50 bg-black/65 backdrop-blur-xs flex items-start justify-center p-2 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+      className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-xs flex flex-col items-center justify-start p-3 sm:p-4 py-6 sm:py-10 overflow-y-auto overscroll-y-contain animate-fade-in"
       onClick={onClose}
     >
       <div 
         ref={modalCardRef}
         tabIndex={-1}
-        className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 shadow-2xl border border-[#c1c8c2] flex flex-col gap-3.5 sm:gap-4 my-auto animate-scale-up outline-none"
+        className="bg-white rounded-2xl max-w-lg w-full p-4 sm:p-5 pb-8 shadow-2xl border border-[#c1c8c2] flex flex-col gap-3.5 sm:gap-4 my-auto outline-none animate-scale-up"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header with Title and Close Button */}
@@ -1123,7 +1122,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
         </div>
 
         {/* Live Calculation Summary */}
-        <div className="bg-[#012d1d] text-white p-4 rounded-2xl flex items-center justify-between shadow-md">
+        <div className="bg-[#012d1d] text-white p-4 rounded-2xl flex items-center justify-between shadow-md mb-2">
           <div>
             <span className="text-xs text-[#a0f4c8] font-bold block uppercase tracking-wider">
               Item Subtotal
@@ -1152,4 +1151,6 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

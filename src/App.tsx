@@ -265,7 +265,7 @@ export default function App() {
     const checkAndFocusModals = () => {
       // Look for any fixed modal overlay or dialog in the DOM
       const modal = document.querySelector<HTMLElement>(
-        '[role="dialog"], [aria-modal="true"], .fixed.inset-0.z-50, .fixed.inset-0.bg-black\\/60, .fixed.inset-0.bg-black\\/65, .fixed.inset-0.bg-black\\/80'
+        '[role="dialog"], [aria-modal="true"], .fixed.inset-0.z-50, [class*="fixed inset-0"], .fixed.inset-0.bg-black\\/60, .fixed.inset-0.bg-black\\/65, .fixed.inset-0.bg-black\\/80'
       );
 
       if (modal && modal !== lastModalFound) {
@@ -274,27 +274,23 @@ export default function App() {
 
         // Reset scroll position so modal is cleanly aligned at top
         modal.scrollTop = 0;
+        const initialCard = modal.querySelector<HTMLElement>('[tabindex="-1"], .bg-white');
+        if (initialCard) {
+          initialCard.scrollTop = 0;
+        }
 
-        // Auto-focus primary interactive element inside modal or the modal card itself
+        // Focus the modal popup card so the popup is in focus without mobile keyboard hijacking
         setTimeout(() => {
           if (!document.contains(modal)) return;
           const modalCard = modal.querySelector<HTMLElement>('[tabindex="-1"], .bg-white') || modal;
+          modalCard.scrollTop = 0;
 
-          // Priority focus: text/number input, then select, textarea, button, or the card
-          const firstInput = modalCard.querySelector<HTMLElement>(
-            'input:not([disabled]):not([type="hidden"]):not([readonly]), select:not([disabled]), textarea:not([disabled])'
-          );
-          if (firstInput) {
-            firstInput.focus({ preventScroll: true });
-          } else {
-            const firstButton = modalCard.querySelector<HTMLElement>(
-              'button:not([disabled]):not([aria-label="Close"]):not(.btn-close), [tabindex]:not([tabindex="-1"])'
-            );
-            if (firstButton) {
-              firstButton.focus({ preventScroll: true });
-            } else if (typeof modalCard.focus === 'function') {
-              modalCard.focus({ preventScroll: true });
-            }
+          // If the modal has a specific autofocus input (like catalog search), focus that input; otherwise focus the popup card
+          const autoFocusInput = modalCard.querySelector<HTMLElement>('input[autofocus]');
+          if (autoFocusInput) {
+            autoFocusInput.focus({ preventScroll: true });
+          } else if (typeof modalCard.focus === 'function') {
+            modalCard.focus({ preventScroll: true });
           }
         }, 40);
       } else if (!modal && lastModalFound) {

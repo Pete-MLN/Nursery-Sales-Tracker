@@ -1806,51 +1806,54 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             )}
           </div>
 
-          {/* PO Number / Name Text Box to the right of Customer Name */}
-          <div className="relative w-full sm:w-48 md:w-56 lg:w-64 shrink-0">
-            <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none z-10">
-              <FileText className="w-5 h-5 text-[#012d1d]" />
-            </div>
-            <input
-              id="scan-po-number-input"
-              type="text"
-              value={poNumber}
-              onChange={(e) => {
-                setPoNumber(e.target.value);
-                setHasUnsavedChanges(true);
-              }}
-              placeholder="PO Number / Name..."
-              className="w-full bg-[#f9faf6] border-2 border-[#012d1d] focus:border-[#012d1d] focus:bg-white focus:ring-4 focus:ring-[#012d1d]/15 rounded-xl pl-11 pr-9 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] transition-all shadow-sm placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
-              title="Purchase Order Number or Job/Project Name"
-            />
-            {poNumber && (
-              <button
-                type="button"
-                onClick={() => {
-                  setPoNumber('');
+          {/* PO Number & Rate Button: on the same line in mobile, inline on sm */}
+          <div className="flex items-center gap-1.5 sm:gap-2 w-full sm:w-auto shrink-0">
+            {/* PO Number / Name Text Box */}
+            <div className="relative flex-1 sm:w-48 md:w-56 lg:w-64 sm:flex-none">
+              <div className="absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none z-10">
+                <FileText className="w-5 h-5 text-[#012d1d]" />
+              </div>
+              <input
+                id="scan-po-number-input"
+                type="text"
+                value={poNumber}
+                onChange={(e) => {
+                  setPoNumber(e.target.value);
                   setHasUnsavedChanges(true);
                 }}
-                className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#717973] hover:text-[#ba1a1a] rounded-lg transition-colors cursor-pointer"
-                title="Clear PO Number"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            )}
-          </div>
+                placeholder="PO Number / Name..."
+                className="w-full bg-[#f9faf6] border-2 border-[#012d1d] focus:border-[#012d1d] focus:bg-white focus:ring-4 focus:ring-[#012d1d]/15 rounded-xl pl-11 pr-9 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] transition-all shadow-sm placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
+                title="Purchase Order Number or Job/Project Name"
+              />
+              {poNumber && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setPoNumber('');
+                    setHasUnsavedChanges(true);
+                  }}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-[#717973] hover:text-[#ba1a1a] rounded-lg transition-colors cursor-pointer"
+                  title="Clear PO Number"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              )}
+            </div>
 
-          <button
-            type="button"
-            onClick={() => setCustomerType(prev => prev === 'RETAIL' ? 'WHOLESALE' : 'RETAIL')}
-            className={`px-3 sm:px-4 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all shrink-0 cursor-pointer shadow-2xs flex flex-col items-center justify-center leading-tight border ${
-              customerType === 'WHOLESALE'
-                ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
-                : 'bg-white text-[#012d1d] border-[#012d1d] hover:bg-[#f3f4f0]'
-            }`}
-            title="Toggle customer rate classification between Retail and Wholesale"
-          >
-            <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Rate</span>
-            <span>{customerType}</span>
-          </button>
+            <button
+              type="button"
+              onClick={() => setCustomerType(prev => prev === 'RETAIL' ? 'WHOLESALE' : 'RETAIL')}
+              className={`px-2 sm:px-3 py-2.5 rounded-xl text-xs sm:text-sm font-black transition-all shrink-0 cursor-pointer shadow-2xs flex flex-col items-center justify-center leading-tight border whitespace-nowrap ${
+                customerType === 'WHOLESALE'
+                  ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
+                  : 'bg-white text-[#012d1d] border-[#012d1d] hover:bg-[#f3f4f0]'
+              }`}
+              title="Toggle customer rate classification between Retail and Wholesale"
+            >
+              <span className="text-[10px] uppercase font-bold tracking-wider opacity-75">Rate</span>
+              <span>{customerType}</span>
+            </button>
+          </div>
         </div>
       </section>
 

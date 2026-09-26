@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { OrderCartItem } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { 
@@ -986,11 +987,11 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
     }
   };
 
-  return (
+  const modalContent = (
     <div 
       role="dialog"
       aria-modal="true"
-      className={`fixed inset-0 z-50 bg-black/80 backdrop-blur-xs flex items-start justify-center overflow-y-auto overscroll-y-contain animate-fade-in ${
+      className={`fixed inset-0 z-[100] bg-black/80 backdrop-blur-xs flex items-start justify-center overflow-y-auto overscroll-y-contain animate-fade-in ${
         isLargerModal ? 'p-0' : 'p-1 sm:p-2 md:p-3 py-3 sm:py-5'
       }`}
       onClick={onClose}
@@ -1455,4 +1456,6 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

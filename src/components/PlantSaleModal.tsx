@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { PlantItem, DiscountType, PlantSaleDiscount } from '../types';
 import { calculateSalePrice, isPlantOnSale } from '../utils/pricingUtils';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
@@ -232,11 +233,11 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
     }
   };
 
-  return (
+  const modalContent = (
     <div 
       role="dialog"
       aria-modal="true"
-      className="fixed inset-0 z-50 flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto overscroll-y-contain"
+      className="fixed inset-0 z-[100] flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 bg-black/60 backdrop-blur-xs animate-fade-in overflow-y-auto overscroll-y-contain"
       onClick={isUpdating ? undefined : onClose}
     >
       <div 
@@ -700,4 +701,6 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
       </div>
     </div>
   );
+
+  return createPortal(modalContent, document.body);
 };

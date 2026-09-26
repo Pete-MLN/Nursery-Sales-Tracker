@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 import { 
   ScreenType, 
   PlantItem, 
@@ -165,12 +166,6 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
 
-  // Ensure clean view alignment when modal is active
-  useEffect(() => {
-    if (showEmailModal || isCameraOpen || mapModalGps) {
-      window.scrollTo(0, 0);
-    }
-  }, [showEmailModal, isCameraOpen, mapModalGps]);
 
   // Table filter
   const [tableFilter, setTableFilter] = useState<'all' | 'discrepancies' | 'exact'>('all');
@@ -1727,17 +1722,20 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
       )}
 
       {/* Email & Finalize Report Modal */}
-      {showEmailModal && (
+      {showEmailModal && createPortal(
         <div 
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 animate-in fade-in duration-200 overflow-y-auto overscroll-y-contain"
+          className="fixed inset-0 z-[100] bg-black/65 backdrop-blur-xs flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+          onClick={() => setShowEmailModal(false)}
         >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-2xl w-full p-5 sm:p-6 shadow-2xl border border-[#c1c8c2] text-[#012d1d] relative my-auto outline-none"
+            onClick={(e) => e.stopPropagation()}
           >
             <button
+              type="button"
               onClick={() => setShowEmailModal(false)}
               className="absolute top-4 right-4 p-1.5 rounded-full text-[#717973] hover:bg-[#f3f4f0] transition-colors cursor-pointer"
             >
@@ -1843,21 +1841,25 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
               </div>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Barcode Camera Modal */}
-      {isCameraOpen && (
+      {isCameraOpen && createPortal(
         <div 
           role="dialog"
           aria-modal="true"
-          className="fixed inset-0 z-50 bg-black/80 flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 animate-in fade-in duration-200 overflow-y-auto overscroll-y-contain"
+          className="fixed inset-0 z-[100] bg-black/80 flex items-start justify-center p-3 sm:p-4 py-4 sm:py-6 overflow-y-auto overscroll-y-contain animate-fade-in"
+          onClick={stopCameraScanner}
         >
           <div 
             tabIndex={-1}
             className="bg-white rounded-2xl max-w-md w-full p-5 shadow-2xl border border-white/20 text-center relative my-auto outline-none"
+            onClick={(e) => e.stopPropagation()}
           >
             <button
+              type="button"
               onClick={stopCameraScanner}
               className="absolute top-4 right-4 p-1.5 rounded-full text-gray-500 hover:bg-gray-100 cursor-pointer"
             >
@@ -1907,7 +1909,8 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
               Cancel Scanning
             </button>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
 
       {/* Satellite Map Modal */}

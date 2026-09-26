@@ -416,6 +416,119 @@ export async function batchSaveCustomersToFirestore(customers: Customer[]) {
   }
 }
 
+/**
+ * Fully synchronizes imported customers from a CSV/Excel file with Firestore:
+ * 1. Writes/updates all customers present in the uploaded dataset.
+ * 2. Deletes legacy/duplicate customer documents in Firestore that are not in this upload
+ *    (while strictly preserving the default Walk In / CASH customer).
+ */
+export async function syncImportedCustomersToFirestore(newCustomers: Customer[]) {
+  try {
+    const validIds = new Set(newCustomers.map(c => c.id));
+    validIds.add('cust-cash');
+    validIds.add('c-cash');
+
+    const snapshot = await getDocs(collection(db, CUSTOMERS_COL));
+    const toDelete: string[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const docId = docSnap.id;
+      const data = docSnap.data() as Customer;
+      // Never delete Walk In / CASH customer
+      if (docId === 'cust-cash' || data.accountNo === 'CASH' || data.name?.toLowerCase() === 'walk in customer') {
+        return;
+      }
+      if (!validIds.has(docId)) {
+        toDelete.push(docId);
+      }
+    });
+
+    if (toDelete.length > 0) {
+      console.log(`Deleting ${toDelete.length} obsolete / duplicate customer documents from Firestore...`);
+      const deleteChunkSize = 400;
+      for (let i = 0; i < toDelete.length; i += deleteChunkSize) {
+        const chunk = toDelete.slice(i, i + deleteChunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((id) => {
+          batch.delete(doc(db, CUSTOMERS_COL, id));
+        });
+        await batch.commit();
+      }
+    }
+
+    await batchSaveCustomersToFirestore(newCustomers);
+    console.log(`Successfully synced ${newCustomers.length} imported customers to Firestore.`);
+  } catch (err) {
+    console.error('Error syncing imported customers to Firestore:', err);
+    await batchSaveCustomersToFirestore(newCustomers);
+  }
+}
+
+/**
+ * Scans the Firestore customers collection, detects duplicate customer records
+ * accumulated from previous imports (matching on accountNo or name), keeps the best
+ * record, and purges the redundant copies from Firestore.
+ */
+export async function deduplicateFirestoreCustomers(): Promise<{ before: number; after: number; deleted: number }> {
+  try {
+    const snapshot = await getDocs(collection(db, CUSTOMERS_COL));
+    const beforeCount = snapshot.size;
+
+    const seenMap = new Map<string, string>(); // key -> docId to keep
+    const toDelete: string[] = [];
+
+    snapshot.forEach((docSnap) => {
+      const docId = docSnap.id;
+      const data = docSnap.data() as Customer;
+
+      // Preserve CASH customer
+      if (docId === 'cust-cash' || data.accountNo === 'CASH' || data.name?.toLowerCase() === 'walk in customer') {
+        if (!seenMap.has('CASH')) {
+          seenMap.set('CASH', docId);
+        } else {
+          toDelete.push(docId);
+        }
+        return;
+      }
+
+      let key = '';
+      if (data.accountNo && data.accountNo.trim() && data.accountNo.trim().toUpperCase() !== 'CASH') {
+        key = `acc_${data.accountNo.trim().toUpperCase()}`;
+      } else {
+        const cleanName = (data.name || '').trim().toLowerCase();
+        const contact = (data.phone || data.email || '').trim().toLowerCase();
+        key = `nam_${cleanName}_${contact}`;
+      }
+
+      if (seenMap.has(key)) {
+        // Redundant duplicate accumulated from prior uploads
+        toDelete.push(docId);
+      } else {
+        seenMap.set(key, docId);
+      }
+    });
+
+    if (toDelete.length > 0) {
+      console.log(`Purging ${toDelete.length} duplicate customer documents from Firestore...`);
+      const deleteChunkSize = 400;
+      for (let i = 0; i < toDelete.length; i += deleteChunkSize) {
+        const chunk = toDelete.slice(i, i + deleteChunkSize);
+        const batch = writeBatch(db);
+        chunk.forEach((id) => {
+          batch.delete(doc(db, CUSTOMERS_COL, id));
+        });
+        await batch.commit();
+      }
+    }
+
+    const afterCount = beforeCount - toDelete.length;
+    return { before: beforeCount, after: afterCount, deleted: toDelete.length };
+  } catch (err) {
+    console.error('Error deduplicating Firestore customers:', err);
+    throw err;
+  }
+}
+
 export async function deleteCustomerFromFirestore(id: string) {
   await deleteDoc(doc(db, CUSTOMERS_COL, id));
 }

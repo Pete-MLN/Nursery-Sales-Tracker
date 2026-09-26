@@ -34,6 +34,8 @@ import {
   isDefaultMockItem,
   saveCustomerToFirestore,
   batchSaveCustomersToFirestore,
+  syncImportedCustomersToFirestore,
+  deduplicateFirestoreCustomers,
   deleteCustomerFromFirestore,
   saveEmployeeToFirestore,
   deleteEmployeeFromFirestore,
@@ -320,6 +322,7 @@ export default function App() {
     let customersReceived = false;
     let holdingReceived = false;
     let isCompleted = false;
+    let hasAutoCleanedCustomers = false;
 
     // Smooth progress tick while waiting for network handshake
     const progressInterval = setInterval(() => {
@@ -412,12 +415,38 @@ export default function App() {
     });
     const unsubCustomers = subscribeToCustomers((data) => {
       if (data && data.length > 0) {
-        const cashCust = data.find(c => c.accountNo === 'CASH' || c.id === 'cust-cash' || c.name.toLowerCase() === 'walk in customer');
-        if (cashCust) {
-          const others = data.filter(c => c !== cashCust);
-          setCustomers([cashCust, ...others]);
-        } else {
-          setCustomers([DEFAULT_CUSTOMER, ...data]);
+        // Guarantee deduplicated unique customer accounts (filtering redundant documents from past uploads)
+        const seenKeys = new Set<string>();
+        const deduped: Customer[] = [];
+        let cashCust: Customer | undefined;
+
+        for (const c of data) {
+          if (c.accountNo === 'CASH' || c.id === 'cust-cash' || c.name.toLowerCase() === 'walk in customer') {
+            if (!cashCust) cashCust = c;
+            continue;
+          }
+          const key = c.accountNo && c.accountNo.trim() && c.accountNo.trim().toUpperCase() !== 'CASH'
+            ? `acc_${c.accountNo.trim().toUpperCase()}`
+            : `nam_${c.name.trim().toLowerCase()}_${(c.phone || c.email || '').trim().toLowerCase()}`;
+
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            deduped.push(c);
+          }
+        }
+
+        const defaultCash = cashCust || DEFAULT_CUSTOMER;
+        setCustomers([defaultCash, ...deduped]);
+
+        // Auto-clean: If Firestore contains duplicate customer records from past uploads,
+        // automatically purge redundant duplicate documents in the background
+        if (data.length > deduped.length + 10 && !hasAutoCleanedCustomers) {
+          hasAutoCleanedCustomers = true;
+          deduplicateFirestoreCustomers().then(res => {
+            console.log(`Auto-cleaned ${res.deleted} duplicate customer records from Firestore.`);
+          }).catch(err => {
+            console.warn('Auto-clean customer duplicates failed:', err);
+          });
         }
       } else {
         setCustomers(INITIAL_CUSTOMERS);
@@ -942,8 +971,34 @@ export default function App() {
   };
 
   const handleImportCustomers = (newCustomers: Customer[]) => {
-    setCustomers(newCustomers);
-    batchSaveCustomersToFirestore(newCustomers);
+    // Deduplicate in memory first
+    const seenKeys = new Set<string>();
+    const deduped: Customer[] = [];
+    let cashCust = customers.find(c => c.accountNo === 'CASH' || c.id === 'cust-cash') || DEFAULT_CUSTOMER;
+
+    for (const c of newCustomers) {
+      if (c.accountNo === 'CASH' || c.id === 'cust-cash' || c.name.toLowerCase() === 'walk in customer') {
+        continue;
+      }
+      const key = c.accountNo && c.accountNo.trim() && c.accountNo.trim().toUpperCase() !== 'CASH'
+        ? `acc_${c.accountNo.trim().toUpperCase()}`
+        : `nam_${c.name.trim().toLowerCase()}_${(c.phone || c.email || '').trim().toLowerCase()}`;
+
+      if (!seenKeys.has(key)) {
+        seenKeys.add(key);
+        deduped.push(c);
+      }
+    }
+
+    const updatedList = [cashCust, ...deduped];
+    setCustomers(updatedList);
+    // Sync with Firestore, purging any legacy/duplicate documents not in this upload
+    syncImportedCustomersToFirestore(deduped);
+  };
+
+  const handleDeduplicateCustomers = async (): Promise<{ before: number; after: number; deleted: number }> => {
+    const result = await deduplicateFirestoreCustomers();
+    return result;
   };
 
   const handleAddCustomer = (custData: Omit<Customer, 'id'>) => {
@@ -1101,11 +1156,13 @@ export default function App() {
             onDeleteEmployee={handleDeleteEmployee}
             onUpdateEmployee={handleUpdateEmployee}
             customers={customers}
+            inventory={inventory}
             onAddCustomer={handleAddCustomer}
             onDeleteCustomer={handleDeleteCustomer}
             onUpdateCustomer={handleUpdateCustomer}
             onImportCustomers={handleImportCustomers}
             onImportInventoryPlants={handleImportInventoryPlants}
+            onDeduplicateCustomers={handleDeduplicateCustomers}
           />
         )}
 

@@ -6,6 +6,7 @@ export function parseRowsToCustomers(rows: Record<string, any>[]): Customer[] {
   if (!rows || rows.length === 0) return [];
 
   const customers: Customer[] = [];
+  const seenAccountIds = new Map<string, number>();
 
   rows.forEach((row, idx) => {
     // Normalize header keys: strip BOM, quotes, whitespace, replace spaces with underscore
@@ -136,8 +137,24 @@ export function parseRowsToCustomers(rows: Record<string, any>[]): Customer[] {
       defaultPriceLevel = 'retail';
     }
 
+    // Stable deterministic ID based on accountNo or name (avoiding arbitrary row index `-idx`)
+    const cleanAccountKey = (accountNo && accountNo.trim().toUpperCase() !== 'CASH')
+      ? accountNo.trim().toUpperCase().replace(/[^a-zA-Z0-9_-]/g, '_')
+      : '';
+    const cleanNameKey = (name || '').trim().toLowerCase().replace(/[^a-z0-9_-]/g, '_').slice(0, 36);
+
+    const baseId = cleanAccountKey ? `cust-${cleanAccountKey}` : `cust-n-${cleanNameKey || idx}`;
+    let finalId = baseId;
+    if (seenAccountIds.has(baseId)) {
+      const count = seenAccountIds.get(baseId)! + 1;
+      seenAccountIds.set(baseId, count);
+      finalId = `${baseId}-${count}`;
+    } else {
+      seenAccountIds.set(baseId, 1);
+    }
+
     const customerObj: Customer = {
-      id: `c-${accountNo}-${idx}`,
+      id: finalId,
       name,
       type,
       accountNo,

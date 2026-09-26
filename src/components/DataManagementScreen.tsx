@@ -23,7 +23,8 @@ import {
   FileCode,
   Building,
   Hash,
-  Tag
+  Tag,
+  RefreshCw
 } from 'lucide-react';
 
 interface DataManagementScreenProps {
@@ -35,11 +36,13 @@ interface DataManagementScreenProps {
   onDeleteEmployee: (id: string) => void;
   onUpdateEmployee: (employee: Employee) => void;
   customers?: Customer[];
+  inventory?: PlantItem[];
   onAddCustomer?: (customer: Omit<Customer, 'id'>) => void;
   onDeleteCustomer?: (id: string) => void;
   onUpdateCustomer?: (customer: Customer) => void;
   onImportCustomers?: (customers: Customer[]) => void;
   onImportInventoryPlants?: (plants: PlantItem[]) => void;
+  onDeduplicateCustomers?: () => Promise<{ before: number; after: number; deleted: number }>;
 }
 
 export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
@@ -51,15 +54,39 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
   onDeleteEmployee,
   onUpdateEmployee,
   customers = [],
+  inventory = [],
   onAddCustomer,
   onDeleteCustomer,
   onUpdateCustomer,
   onImportCustomers,
-  onImportInventoryPlants
+  onImportInventoryPlants,
+  onDeduplicateCustomers
 }) => {
   const [activeUploadModal, setActiveUploadModal] = useState<'inventory' | 'customer' | 'employee' | null>(null);
   const [isUploading, setIsUploading] = useState<boolean>(false);
+  const [isDeduplicating, setIsDeduplicating] = useState<boolean>(false);
   const [uploadSuccessMsg, setUploadSuccessMsg] = useState<string | null>(null);
+
+  const handleDeduplicateClick = async () => {
+    if (!onDeduplicateCustomers || isDeduplicating) return;
+    try {
+      setIsDeduplicating(true);
+      const res = await onDeduplicateCustomers();
+      if (res.deleted > 0) {
+        setUploadSuccessMsg(
+          `Successfully purged ${res.deleted.toLocaleString()} duplicate / legacy customer records from Firestore. Your active customer database now accurately contains ${res.after.toLocaleString()} unique accounts.`
+        );
+      } else {
+        setUploadSuccessMsg(
+          `Customer records are already clean and in 1:1 sync with your records (${res.after.toLocaleString()} unique accounts).`
+        );
+      }
+    } catch (err) {
+      console.error('Failed to deduplicate customers:', err);
+    } finally {
+      setIsDeduplicating(false);
+    }
+  };
 
   // File selection state
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -381,7 +408,9 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
   );
 
   const lastInventoryUpload = uploads.find(u => 
+    u.type === 'inventory' ||
     u.filename.toLowerCase().includes('inventory') || 
+    u.filename.toLowerCase().includes('avail') ||
     u.filename.toLowerCase().includes('pos') || 
     u.filename.toLowerCase().includes('plant') ||
     u.filename.toLowerCase().endsWith('.csv') ||
@@ -389,9 +418,27 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     u.filename.toLowerCase().endsWith('.xls')
   ) || uploads[0];
 
-  const lastInventoryDate = lastInventoryUpload ? lastInventoryUpload.date : 'Oct 24, 2023';
+  const lastInventoryDate = lastInventoryUpload ? lastInventoryUpload.date : 'Sep 14, 2026';
+
+  const cachedInventoryCount = (() => {
+    try {
+      const cached = localStorage.getItem('nursery_last_upload_dates');
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (parsed?.inventoryCount) return Number(parsed.inventoryCount);
+      }
+    } catch {
+      // ignore
+    }
+    return 0;
+  })();
+
+  const inventoryRecordsCount = inventory.length > 0 
+    ? inventory.length 
+    : (lastInventoryUpload?.recordsCount || cachedInventoryCount || 0);
 
   const lastCustomerUpload = uploads.find(u => 
+    u.type === 'customer' ||
     u.filename.toLowerCase().includes('customer') || 
     u.filename.toLowerCase().includes('client')
   );
@@ -420,16 +467,24 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                 </span>
               </div>
               <p className="text-xs text-[#a0f4c8]/90 mt-0.5 leading-snug">
-                Uploaded data is stored in <strong className="text-white">Google Cloud Firestore</strong> (<code className="bg-[#002113] px-1.5 py-0.5 rounded text-[11px] text-[#a0f4c8]">customers</code> collection). Real-time listeners automatically update your device and order forms.
+                Uploaded data is stored in <strong className="text-white">Google Cloud Firestore</strong> (<code className="bg-[#002113] px-1.5 py-0.5 rounded text-[11px] text-[#a0f4c8]">inventory</code> & <code className="bg-[#002113] px-1.5 py-0.5 rounded text-[11px] text-[#a0f4c8]">customers</code> collections). Real-time listeners automatically update your device and order forms.
               </p>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 shrink-0 self-end md:self-auto border-t md:border-t-0 md:border-l border-[#0e6c4a]/60 pt-3 md:pt-0 md:pl-4 text-xs">
-            <div className="text-right">
-              <span className="block text-[14px] font-bold text-[#a0f4c8]/80 uppercase">STORED CUSTOMERS</span>
-              <span className="text-[20px] font-extrabold text-white leading-tight">{customers.length.toLocaleString()} Records</span>
-            </div>
+          <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
+            {onDeduplicateCustomers && (
+              <button
+                type="button"
+                onClick={handleDeduplicateClick}
+                disabled={isDeduplicating}
+                className="bg-[#0e6c4a] hover:bg-[#135a3f] text-[#a0f4c8] font-bold px-2.5 py-2 rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer border border-[#a0f4c8]/30 disabled:opacity-50"
+                title="Purge duplicate customer records in Firestore"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 ${isDeduplicating ? 'animate-spin' : ''}`} />
+                <span className="hidden sm:inline">{isDeduplicating ? 'Cleaning...' : 'Deduplicate'}</span>
+              </button>
+            )}
             <button
               onClick={() => handleOpenUploadModal('customer')}
               className="bg-[#a0f4c8] hover:bg-[#a0f4c8]/90 text-[#002113] font-bold px-3 py-2 rounded-xl text-xs transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
@@ -470,12 +525,17 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
               <h3 className="text-lg font-bold text-[#1a1c1a]">Inventory List</h3>
             </div>
 
-            <div className="relative z-10">
-              <span className="block text-[14px] font-bold text-[#414844] uppercase tracking-wider">
-                LAST UPLOAD
-              </span>
-              <span className="block text-[18px] font-bold text-[#1a1c1a] mt-0.5">
-                {lastInventoryDate}
+            <div className="relative z-10 flex flex-col gap-1">
+              <div>
+                <span className="block text-[14px] font-bold text-[#414844] uppercase tracking-wider">
+                  STORED IN FIRESTORE
+                </span>
+                <span className="block text-[18px] font-bold text-[#012d1d] mt-0.5">
+                  {inventoryRecordsCount.toLocaleString()} Records
+                </span>
+              </div>
+              <span className="text-[11px] text-[#717973] font-medium">
+                Last sync: {lastInventoryDate}
               </span>
             </div>
           </div>
@@ -509,7 +569,7 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                   STORED IN FIRESTORE
                 </span>
                 <span className="block text-[18px] font-bold text-[#012d1d] mt-0.5">
-                  {customers.length.toLocaleString()} Active Accounts
+                  {customers.length.toLocaleString()} Records
                 </span>
               </div>
               <span className="text-[11px] text-[#717973] font-medium">
@@ -518,13 +578,27 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
             </div>
           </div>
 
-          <button
-            onClick={() => handleOpenUploadModal('customer')}
-            className="relative z-10 w-full bg-[#0e6c4a] hover:bg-[#012d1d] active:scale-[0.99] text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all flex justify-center items-center gap-1.5 cursor-pointer mt-1 shadow-2xs"
-          >
-            <UploadCloud className="w-4 h-4" />
-            <span>Upload / Re-Import File</span>
-          </button>
+          <div className="flex gap-2 relative z-10 mt-1">
+            <button
+              onClick={() => handleOpenUploadModal('customer')}
+              className="flex-1 bg-[#0e6c4a] hover:bg-[#012d1d] active:scale-[0.99] text-white font-bold py-2.5 px-3 rounded-xl text-xs transition-all flex justify-center items-center gap-1.5 cursor-pointer shadow-2xs"
+            >
+              <UploadCloud className="w-4 h-4" />
+              <span>Upload / Re-Import</span>
+            </button>
+            {onDeduplicateCustomers && (
+              <button
+                type="button"
+                onClick={handleDeduplicateClick}
+                disabled={isDeduplicating}
+                className="bg-white hover:bg-[#e7e9e5] border border-[#c1c8c2] px-3 py-2.5 rounded-xl text-xs font-bold text-[#012d1d] transition-all flex items-center gap-1.5 cursor-pointer shrink-0 disabled:opacity-50"
+                title="Deduplicate and clean up obsolete records in Firestore"
+              >
+                <RefreshCw className={`w-3.5 h-3.5 text-[#0e6c4a] ${isDeduplicating ? 'animate-spin' : ''}`} />
+                <span>{isDeduplicating ? 'Cleaning...' : 'Deduplicate'}</span>
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Employee List Card */}

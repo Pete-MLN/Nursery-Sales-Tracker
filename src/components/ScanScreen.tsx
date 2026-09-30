@@ -1943,14 +1943,24 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
             {/* Live Autocomplete Suggestions Popover - Full width of search bar and action buttons */}
             {showPlantSuggestions && manualBarcodeInput.trim().length > 0 && (
-              <div className="absolute left-0 right-0 top-full mt-1.5 w-full bg-white border border-[#c1c8c2] rounded-2xl shadow-2xl z-40 max-h-96 overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
+              <div className="absolute left-0 right-0 top-full mt-1.5 w-full bg-white border border-[#c1c8c2] rounded-2xl shadow-2xl z-40 max-h-[70vh] sm:max-h-[30rem] overflow-y-auto divide-y divide-[#f3f4f0] animate-fade-in">
                 {(() => {
                   const q = manualBarcodeInput.trim().toLowerCase();
                   const searchTerms = q.split(/\s+/).filter(Boolean);
-                  const matches = inventory.filter(p => {
-                    const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
-                    return searchTerms.every(term => searchable.includes(term));
-                  }).slice(0, 8);
+                  const matches = inventory
+                    .filter(p => {
+                      const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
+                      return searchTerms.every(term => searchable.includes(term));
+                    })
+                    .sort((a, b) => {
+                      const nameA = (a.name || '').replace(/\uFFFD/g, '®').trim();
+                      const nameB = (b.name || '').replace(/\uFFFD/g, '®').trim();
+                      const nameComp = nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+                      if (nameComp !== 0) return nameComp;
+                      const sizeA = (a.size || '').trim();
+                      const sizeB = (b.size || '').trim();
+                      return sizeA.localeCompare(sizeB, undefined, { numeric: true, sensitivity: 'base' });
+                    });
 
                   if (matches.length === 0) {
                     return (
@@ -1960,7 +1970,17 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     );
                   }
 
-                  return matches.map((plant) => {
+                  return (
+                    <>
+                      <div className="px-4 py-2 bg-[#f3f4f0] border-b border-[#c1c8c2] flex items-center justify-between text-xs text-[#525a55] sticky top-0 z-10 backdrop-blur-xs">
+                        <span className="font-extrabold text-[#012d1d]">
+                          {matches.length} {matches.length === 1 ? 'Plant Match' : 'Plant Matches'}
+                        </span>
+                        <span className="text-[11px] font-bold text-[#0e6c4a]">
+                          Ordered by Plant Name &amp; Size
+                        </span>
+                      </div>
+                      {matches.map((plant) => {
                     const cleanName = (plant.name || '').replace(/\uFFFD/g, '®');
                     const cleanBotanical = (plant.botanicalName || '').replace(/\uFFFD/g, '®');
                     const cleanCommon = (plant.commonName || '').replace(/\uFFFD/g, '®');
@@ -2056,8 +2076,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                         </div>
                       </button>
                     );
-                  });
-                })()}
+                  })}
+                </>
+              );
+            })()}
               </div>
             )}
           </form>
@@ -3395,6 +3417,14 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   const searchTerms = catalogSearchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
                   const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
                   return searchTerms.every(term => searchable.includes(term));
+                }).sort((a, b) => {
+                  const nameA = (a.name || '').replace(/\uFFFD/g, '®').trim();
+                  const nameB = (b.name || '').replace(/\uFFFD/g, '®').trim();
+                  const nameComp = nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+                  if (nameComp !== 0) return nameComp;
+                  const sizeA = (a.size || '').trim();
+                  const sizeB = (b.size || '').trim();
+                  return sizeA.localeCompare(sizeB, undefined, { numeric: true, sensitivity: 'base' });
                 });
 
                 if (matches.length === 0) {

@@ -46,6 +46,7 @@ import {
   CheckCircle2, 
   ChevronDown, 
   ChevronRight, 
+  ChevronUp,
   Layers, 
   Package, 
   Trash2, 
@@ -60,7 +61,9 @@ import {
   Calendar,
   Building2,
   ExternalLink,
-  Square
+  Square,
+  Clock,
+  Save
 } from 'lucide-react';
 
 import { OFFICIAL_YARD_LOCATIONS, normalizeHoldingArea, normalizeYardLocationCode, compareYardLocations } from '../data/yardLocations';
@@ -167,14 +170,75 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
   const codeReaderRef = useRef<BrowserMultiFormatReader | null>(null);
 
 
-  // Table filter
+  // Table filter for top active summary table
   const [tableFilter, setTableFilter] = useState<'all' | 'discrepancies' | 'exact'>('all');
   const [tableSearch, setTableSearch] = useState('');
+
+  // Persisted local sessions across sessions and reloads
+  const [savedLocalSessions, setSavedLocalSessions] = useState<InventoryAuditSession[]>(() => {
+    const cached = localStorage.getItem('maple_saved_audit_sessions');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) return parsed;
+      } catch (e) {
+        console.error('Failed to parse cached audit sessions', e);
+      }
+    }
+    return [];
+  });
+
+  // Track session selected for email modal
+  const [selectedSessionForEmail, setSelectedSessionForEmail] = useState<InventoryAuditSession | null>(null);
+
+  // Search & Filter state for the Recorded Items sessions card
+  const [sessionSearch, setSessionSearch] = useState('');
+  const [sessionFilter, setSessionFilter] = useState<'all' | 'active' | 'completed'>('all');
+  const [expandedSessionIds, setExpandedSessionIds] = useState<Set<string>>(() => {
+    const initial = new Set<string>();
+    if (activeSession && activeSession.id) initial.add(activeSession.id);
+    return initial;
+  });
+
+  // Per-session plant item search & filter inside expanded reviews
+  const [sessionItemFilters, setSessionItemFilters] = useState<Record<string, { search: string; tab: 'all' | 'discrepancies' | 'exact' }>>({});
+
+  const getSessionItemFilter = (sessionId: string) => {
+    return sessionItemFilters[sessionId] || { search: '', tab: 'all' };
+  };
+
+  const setSessionItemFilter = (sessionId: string, search: string, tab: 'all' | 'discrepancies' | 'exact') => {
+    setSessionItemFilters(prev => ({
+      ...prev,
+      [sessionId]: { search, tab }
+    }));
+  };
+
+  const toggleExpandSession = (sessionId: string, forceOpen?: boolean) => {
+    setExpandedSessionIds(prev => {
+      const next = new Set(prev);
+      if (forceOpen === true) {
+        next.add(sessionId);
+      } else if (forceOpen === false) {
+        next.delete(sessionId);
+      } else {
+        if (next.has(sessionId)) next.delete(sessionId);
+        else next.add(sessionId);
+      }
+      return next;
+    });
+  };
 
   // Sync active session with localStorage and parent/Firestore
   const updateActiveSession = (updated: InventoryAuditSession) => {
     setActiveSession(updated);
     localStorage.setItem('maple_active_inventory_audit', JSON.stringify(updated));
+    setSavedLocalSessions(prev => {
+      const filtered = prev.filter(s => s.id !== updated.id);
+      const next = [updated, ...filtered];
+      localStorage.setItem('maple_saved_audit_sessions', JSON.stringify(next));
+      return next;
+    });
     saveAuditSessionToFirestore(updated).catch(err => {
       console.warn('Could not sync audit session to Firestore (offline mode active):', err);
     });
@@ -182,6 +246,224 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
       onSaveAuditSession(updated);
     }
   };
+
+  // One-time auto-migration for past dates: separates older counted items into their own past sessions
+  useEffect(() => {
+    if (!activeSession || !activeSession.items || activeSession.items.length === 0) return;
+
+    const now = new Date();
+    const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+    // Group items by calendar date
+    const dateGroups = new Map<string, InventoryCountItem[]>();
+    for (const item of activeSession.items) {
+      const itemDate = item.timestamp ? item.timestamp.slice(0, 10) : (activeSession.startedAt ? activeSession.startedAt.slice(0, 10) : todayStr);
+      if (!dateGroups.has(itemDate)) {
+        dateGroups.set(itemDate, []);
+      }
+      dateGroups.get(itemDate)!.push(item);
+    }
+
+    const dates = Array.from(dateGroups.keys()).sort();
+    const olderDates = dates.filter(d => d < todayStr);
+
+    if (olderDates.length > 0) {
+      const pastSessionsToSave: InventoryAuditSession[] = [];
+      olderDates.forEach(dateKey => {
+        const items = dateGroups.get(dateKey)!;
+        const dObj = new Date(dateKey + 'T12:00:00');
+        const formattedDate = dObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        const pastId = `AUDIT-${dateKey.replace(/-/g, '')}-${activeSession.id.slice(-4)}`;
+
+        const pastSession: InventoryAuditSession = {
+          id: pastId,
+          title: `Physical Count - ${formattedDate}`,
+          status: 'completed',
+          startedAt: `${dateKey}T09:00:00.000Z`,
+          completedAt: `${dateKey}T17:00:00.000Z`,
+          countedBy: items[0]?.countedBy || activeSession.countedBy || currentUser.name || 'Pete',
+          items: items
+        };
+        pastSessionsToSave.push(pastSession);
+        saveAuditSessionToFirestore(pastSession).catch(() => {});
+        if (onSaveAuditSession) onSaveAuditSession(pastSession);
+      });
+
+      // Update savedLocalSessions
+      setSavedLocalSessions(prev => {
+        const newMap = new Map<string, InventoryAuditSession>();
+        pastSessionsToSave.forEach(s => newMap.set(s.id, s));
+        prev.forEach(s => {
+          if (!newMap.has(s.id)) newMap.set(s.id, s);
+        });
+        const combined = Array.from(newMap.values());
+        localStorage.setItem('maple_saved_audit_sessions', JSON.stringify(combined));
+        return combined;
+      });
+
+      // Remaining items for today
+      const todayItems = dateGroups.get(todayStr) || [];
+      if (todayItems.length > 0) {
+        const updatedTodaySession: InventoryAuditSession = {
+          ...activeSession,
+          items: todayItems
+        };
+        updateActiveSession(updatedTodaySession);
+      } else {
+        // All items were from past weeks! Start a clean session for today
+        const newId = `AUDIT-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
+        const freshTodaySession: InventoryAuditSession = {
+          id: newId,
+          title: `Physical Inventory Count - ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+          status: 'in_progress',
+          startedAt: now.toISOString(),
+          countedBy: currentUser.name || 'Pete',
+          items: []
+        };
+        updateActiveSession(freshTodaySession);
+      }
+    }
+  }, []);
+
+  // Unified sessions list sorted from most recent to oldest
+  const sortedSessions = useMemo(() => {
+    const map = new Map<string, InventoryAuditSession>();
+    if (activeSession && activeSession.id) {
+      map.set(activeSession.id, activeSession);
+    }
+    if (Array.isArray(auditSessions)) {
+      auditSessions.forEach(s => {
+        if (s && s.id) {
+          if (!map.has(s.id)) {
+            map.set(s.id, s);
+          } else if (s.id === activeSession?.id) {
+            map.set(s.id, activeSession);
+          }
+        }
+      });
+    }
+    savedLocalSessions.forEach(s => {
+      if (s && s.id && !map.has(s.id)) {
+        map.set(s.id, s);
+      }
+    });
+
+    const list = Array.from(map.values());
+    return list.sort((a, b) => {
+      const timeA = new Date(a.startedAt || a.completedAt || 0).getTime();
+      const timeB = new Date(b.startedAt || b.completedAt || 0).getTime();
+      if (timeB !== timeA) return timeB - timeA;
+      return (b.id || '').localeCompare(a.id || '');
+    });
+  }, [activeSession, auditSessions, savedLocalSessions]);
+
+  // Explicit Save Session handler
+  const handleExplicitSaveSession = (sessionToSave: InventoryAuditSession) => {
+    saveAuditSessionToFirestore(sessionToSave).catch(err => {
+      console.warn('Could not sync audit session to Firestore:', err);
+    });
+    if (onSaveAuditSession) onSaveAuditSession(sessionToSave);
+    setSavedLocalSessions(prev => {
+      const filtered = prev.filter(s => s.id !== sessionToSave.id);
+      const next = [sessionToSave, ...filtered];
+      localStorage.setItem('maple_saved_audit_sessions', JSON.stringify(next));
+      return next;
+    });
+    showToast(`💾 Session "${sessionToSave.title}" saved successfully`);
+  };
+
+  // Resume or switch active workspace session
+  const handleResumeSession = (sessionToResume: InventoryAuditSession) => {
+    if (activeSession.id !== sessionToResume.id && activeSession.items.length > 0) {
+      saveAuditSessionToFirestore(activeSession).catch(() => {});
+      if (onSaveAuditSession) onSaveAuditSession(activeSession);
+      setSavedLocalSessions(prev => {
+        const filtered = prev.filter(s => s.id !== activeSession.id);
+        const next = [activeSession, ...filtered];
+        localStorage.setItem('maple_saved_audit_sessions', JSON.stringify(next));
+        return next;
+      });
+    }
+
+    updateActiveSession(sessionToResume);
+    toggleExpandSession(sessionToResume.id, true);
+    showToast(`Switched active workspace to "${sessionToResume.title}"`);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Delete session handler
+  const handleDeleteSession = async (sessionId: string) => {
+    const confirmDelete = window.confirm('Are you sure you want to permanently delete this count session and all its recorded items?');
+    if (!confirmDelete) return;
+
+    try {
+      await deleteAuditSessionFromFirestore(sessionId);
+    } catch (err) {
+      console.warn('Error deleting audit session from Firestore:', err);
+    }
+
+    setSavedLocalSessions(prev => {
+      const next = prev.filter(s => s.id !== sessionId);
+      localStorage.setItem('maple_saved_audit_sessions', JSON.stringify(next));
+      return next;
+    });
+
+    if (activeSession.id === sessionId) {
+      const now = new Date();
+      const newId = `AUDIT-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
+      const newSession: InventoryAuditSession = {
+        id: newId,
+        title: `Physical Inventory Count - ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+        status: 'in_progress',
+        startedAt: now.toISOString(),
+        countedBy: currentUser.name || 'Pete',
+        items: []
+      };
+      updateActiveSession(newSession);
+    }
+
+    showToast('Deleted count session');
+  };
+
+  // Format date helper
+  const formatSessionDate = (isoString?: string): string => {
+    if (!isoString) return 'Recent';
+    try {
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return 'Recent';
+      const now = new Date();
+      const isToday = d.toDateString() === now.toDateString();
+      const yesterday = new Date();
+      yesterday.setDate(now.getDate() - 1);
+      const isYesterday = d.toDateString() === yesterday.toDateString();
+
+      const timeStr = d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      if (isToday) return `Today at ${timeStr}`;
+      if (isYesterday) return `Yesterday at ${timeStr}`;
+
+      return `${d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })} at ${timeStr}`;
+    } catch {
+      return isoString || 'Recent';
+    }
+  };
+
+  const filteredSessions = useMemo(() => {
+    return sortedSessions.filter(session => {
+      const isAct = session.id === activeSession.id;
+      if (sessionFilter === 'active' && !isAct && session.status !== 'in_progress') return false;
+      if (sessionFilter === 'completed' && session.status !== 'completed') return false;
+
+      if (sessionSearch.trim()) {
+        const q = sessionSearch.toLowerCase();
+        const titleMatch = (session.title || '').toLowerCase().includes(q);
+        const idMatch = (session.id || '').toLowerCase().includes(q);
+        const auditorMatch = (session.countedBy || '').toLowerCase().includes(q);
+        const dateMatch = new Date(session.startedAt || session.completedAt || '').toLocaleDateString().toLowerCase().includes(q);
+        return titleMatch || idMatch || auditorMatch || dateMatch;
+      }
+      return true;
+    });
+  }, [sortedSessions, sessionFilter, sessionSearch, activeSession.id]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -565,28 +847,46 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
     if (activeSession.items.length > 0) {
       const confirmReset = window.confirm('Start a new inventory audit session? Current session counts will be archived in history.');
       if (!confirmReset) return;
+
+      const archived: InventoryAuditSession = {
+        ...activeSession,
+        status: 'completed',
+        completedAt: new Date().toISOString()
+      };
+      saveAuditSessionToFirestore(archived).catch(() => {});
+      if (onSaveAuditSession) onSaveAuditSession(archived);
+      setSavedLocalSessions(prev => {
+        const filtered = prev.filter(s => s.id !== archived.id);
+        const next = [archived, ...filtered];
+        localStorage.setItem('maple_saved_audit_sessions', JSON.stringify(next));
+        return next;
+      });
     }
 
-    const newId = `AUDIT-${new Date().getFullYear()}${String(new Date().getMonth() + 1).padStart(2, '0')}${String(new Date().getDate()).padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
+    const now = new Date();
+    const newId = `AUDIT-${now.getFullYear()}${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}-${Date.now().toString().slice(-4)}`;
     const newSession: InventoryAuditSession = {
       id: newId,
-      title: `Physical Count - ${new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
+      title: `Physical Inventory Count - ${now.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}`,
       status: 'in_progress',
-      startedAt: new Date().toISOString(),
+      startedAt: now.toISOString(),
       countedBy: currentUser.name || 'Pete',
       items: []
     };
     updateActiveSession(newSession);
-    showToast('Started fresh physical inventory audit session');
+    toggleExpandSession(newId, true);
+    showToast('Started fresh physical inventory audit session. Previous session saved.');
   };
 
-  // Open email report modal
-  const handleOpenEmailModal = () => {
-    if (activeSession.items.length === 0) {
+  // Open email report modal (for active or any selected session)
+  const handleOpenEmailModal = (session?: InventoryAuditSession) => {
+    const targetSession = session || activeSession;
+    if (targetSession.items.length === 0) {
       showToast('No plants counted yet in this session.');
       return;
     }
-    const { subject, body } = generateAuditEmailReport(activeSession);
+    setSelectedSessionForEmail(targetSession);
+    const { subject, body } = generateAuditEmailReport(targetSession);
     setEmailSubject(subject);
     setEmailBodyPreview(body);
     setShowEmailModal(true);
@@ -689,14 +989,15 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
   // Finalize and mark completed
   const handleFinalizeSession = () => {
+    const targetSession = selectedSessionForEmail || activeSession;
     const completedSession: InventoryAuditSession = {
-      ...activeSession,
+      ...targetSession,
       status: 'completed',
       completedAt: new Date().toISOString()
     };
     updateActiveSession(completedSession);
     setShowEmailModal(false);
-    showToast('🎉 Physical Inventory Audit finalized and archived to history.');
+    showToast('🎉 Physical Inventory Audit finalized and saved.');
   };
 
   // Consolidated items & stats
@@ -770,20 +1071,63 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
         </div>
       </div>
 
-      {/* Session Card with Auditor Info & Navigation Toggles */}
-      <div className="bg-[#f3f4f0] rounded-xl p-3 sm:p-3.5 border border-[#c1c8c2] flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-2">
-          <span className="font-bold text-[#012d1d]">Session:</span>
-          <input
-            type="text"
-            value={activeSession.title}
-            onChange={(e) => updateActiveSession({ ...activeSession, title: e.target.value })}
-            className="font-semibold text-[#012d1d] bg-white border border-[#c1c8c2] rounded-lg px-2.5 py-1 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden min-w-[180px] sm:min-w-[220px]"
-            title="Edit Session Title"
-          />
+      {/* Session Card with Auditor Info, Count Mode & Navigation Toggles */}
+      <div className="bg-[#f3f4f0] rounded-xl p-3 sm:p-3.5 border border-[#c1c8c2] flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs">
+        <div className="flex flex-col gap-2">
+          {/* Line 1: Session Text Box */}
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-[#012d1d]">Session:</span>
+            <input
+              type="text"
+              value={activeSession.title}
+              onChange={(e) => updateActiveSession({ ...activeSession, title: e.target.value })}
+              className="font-semibold text-[#012d1d] bg-white border border-[#c1c8c2] rounded-lg px-2.5 py-1 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden min-w-[180px] sm:min-w-[240px]"
+              title="Edit Session Title"
+            />
+          </div>
+
+          {/* Line 2 (below Session): Count Mode */}
+          <div className="flex items-center gap-2">
+            <span className="font-bold text-[#012d1d]">Count Mode:</span>
+            <div className="flex items-center gap-1.5">
+              <button
+                type="button"
+                onClick={() => setCountMode('total')}
+                className={`flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-lg border text-xs font-extrabold transition-all cursor-pointer ${
+                  countMode === 'total'
+                    ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-2xs'
+                    : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#e2e3df] hover:text-[#012d1d]'
+                }`}
+              >
+                <div className={`w-2.5 h-2.5 rounded-full border-2 flex items-center justify-center ${
+                  countMode === 'total' ? 'border-[#a0f4c8] bg-[#a0f4c8]' : 'border-gray-400'
+                }`}>
+                  {countMode === 'total' && <div className="w-1 h-1 rounded-full bg-[#012d1d]" />}
+                </div>
+                <span>Total Count</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setCountMode('cycle_additive')}
+                className={`flex items-center justify-center gap-1.5 py-1 px-2.5 rounded-lg border text-xs font-extrabold transition-all cursor-pointer ${
+                  countMode === 'cycle_additive'
+                    ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-2xs'
+                    : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#e2e3df] hover:text-[#012d1d]'
+                }`}
+              >
+                <div className={`w-2.5 h-2.5 rounded-full border-2 flex items-center justify-center ${
+                  countMode === 'cycle_additive' ? 'border-[#a0f4c8] bg-[#a0f4c8]' : 'border-gray-400'
+                }`}>
+                  {countMode === 'cycle_additive' && <div className="w-1 h-1 rounded-full bg-[#012d1d]" />}
+                </div>
+                <span>Cycle Count</span>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <div className="flex flex-wrap items-center gap-3 sm:gap-4">
+        <div className="flex flex-col sm:items-end gap-2 shrink-0">
           <div className="flex items-center gap-2 text-[#525a55]">
             <span>Auditor: <strong className="text-[#012d1d]">{activeSession.countedBy}</strong></span>
             <span>•</span>
@@ -876,10 +1220,163 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
             </div>
 
             <form onSubmit={handleRecordCount} className="flex flex-col gap-5">
-              {/* Plant Search & Selection Section */}
+              {/* 1. Nursery Bay / Yard Location */}
+              <div className="flex flex-col gap-2.5 bg-[#f9faf6] p-3.5 sm:p-4 rounded-xl border border-[#c1c8c2]">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
+                      <Building2 className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                      <span>1. Nursery Bay / Yard Location</span>
+                    </label>
+                    <div className="flex items-center gap-1.5 text-[10px] text-[#525a55]">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#0e6c4a]"></span>
+                      <span>Selected Area & Location remain locked for subsequent plant entries.</span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setIsCustomLocation(!isCustomLocation)}
+                    className="text-[11px] font-bold text-[#0e6c4a] hover:underline cursor-pointer shrink-0"
+                  >
+                    {isCustomLocation ? 'Select from standard list' : '+ Custom Location'}
+                  </button>
+                </div>
+
+                {!isCustomLocation ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    {/* Area / Category Filter Dropdown */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-extrabold uppercase text-[#525a55] tracking-wider flex items-center gap-1">
+                        <Filter className="w-3 h-3 text-[#0e6c4a]" />
+                        <span>Area / Category</span>
+                      </label>
+                      <select
+                        value={selectedAreaCategory}
+                        onChange={(e) => handleCategoryChange(e.target.value)}
+                        className="w-full bg-white border border-[#c1c8c2] text-[#012d1d] font-bold rounded-xl px-2.5 py-2.5 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden cursor-pointer shadow-2xs"
+                      >
+                        {availableCategories.map((cat) => {
+                          const count = cat === 'All Areas'
+                            ? combinedLocations.length
+                            : (categoryGroups[cat]?.length || 0);
+                          return (
+                            <option key={cat} value={cat}>
+                              {cat} ({count})
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </div>
+
+                    {/* Filtered Yard Location Dropdown */}
+                    <div className="flex flex-col gap-1">
+                      <label className="text-[10px] font-extrabold uppercase text-[#525a55] tracking-wider flex items-center gap-1">
+                        <MapPin className="w-3 h-3 text-[#0e6c4a]" />
+                        <span>Yard Location ({displayedLocations.length})</span>
+                      </label>
+                      <select
+                        value={selectedLocation}
+                        onChange={(e) => handleLocationChange(e.target.value)}
+                        className="w-full bg-white border border-[#c1c8c2] text-[#012d1d] font-bold rounded-xl px-2.5 py-2.5 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden cursor-pointer shadow-2xs"
+                      >
+                        {selectedAreaCategory === 'All Areas' ? (
+                          (Object.entries(categoryGroups) as [string, string[]][]).map(([groupName, locs]) => {
+                            if (locs.length === 0) return null;
+                            return (
+                              <optgroup key={groupName} label={`📍 ${groupName} (${locs.length})`}>
+                                {locs.map((loc, idx) => (
+                                  <option key={idx} value={loc}>
+                                    {loc}
+                                  </option>
+                                ))}
+                              </optgroup>
+                            );
+                          })
+                        ) : (
+                          displayedLocations.map((loc, idx) => (
+                            <option key={idx} value={loc}>
+                              {loc}
+                            </option>
+                          ))
+                        )}
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <input
+                    type="text"
+                    value={customLocationText}
+                    onChange={(e) => setCustomLocationText(e.target.value)}
+                    placeholder="e.g. North Field Row 4B near water tower"
+                    className="w-full bg-white border border-[#c1c8c2] text-[#012d1d] font-bold rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden shadow-2xs"
+                  />
+                )}
+
+                {/* Tag Yard GPS & Location Coordinates */}
+                <div className="pt-2 border-t border-[#c1c8c2]/50 flex flex-col sm:flex-row sm:items-center gap-2">
+                  <div className="flex items-center gap-2 flex-1">
+                    <button
+                      type="button"
+                      onClick={handleCaptureGps}
+                      disabled={isLoggingGps}
+                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${
+                        gpsLocation
+                          ? 'bg-[#e8f5e9] text-[#012d1d] border-[#a0f4c8] hover:bg-[#d0f0db]'
+                          : 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] hover:bg-[#0e6c4a]'
+                      }`}
+                    >
+                      {isLoggingGps ? (
+                        <>
+                          <RefreshCw className="w-4 h-4 animate-spin" />
+                          <span>{gpsStatusText || 'Acquiring GPS...'}</span>
+                        </>
+                      ) : (
+                        <>
+                          <MapPin className="w-4 h-4" />
+                          <span>{gpsLocation ? '📍 Update GPS Tag' : '📍 Tag Yard GPS'}</span>
+                        </>
+                      )}
+                    </button>
+
+                    {gpsLocation && (
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMapModalGps({
+                            latitude: gpsLocation.latitude,
+                            longitude: gpsLocation.longitude,
+                            title: selectedPlant?.name || manualName || 'Audited Plant',
+                            subtitle: `${selectedLocation} (±${Math.round((gpsLocation.accuracy || 5) * 3.28084)} ft)`
+                          });
+                        }}
+                        className="p-2 bg-white border border-[#c1c8c2] text-[#012d1d] hover:bg-[#f3f4f0] rounded-xl text-xs font-bold transition-colors cursor-pointer"
+                        title="View GPS on Nursery Satellite Map"
+                      >
+                        <ExternalLink className="w-4 h-4 text-[#0e6c4a]" />
+                      </button>
+                    )}
+                  </div>
+
+                  {gpsLocation && (
+                    <div className="flex items-center justify-between gap-2 text-[11px] text-[#0e6c4a] bg-[#f0fdf4] px-2.5 py-1.5 rounded-lg border border-[#a0f4c8]/50">
+                      <span>{formatGpsCoordinates(gpsLocation.latitude, gpsLocation.longitude, gpsLocation.accuracy)}</span>
+                      <button
+                        type="button"
+                        onClick={() => setGpsLocation(undefined)}
+                        className="text-gray-400 hover:text-red-600 cursor-pointer"
+                        title="Remove GPS"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* 2. Plant Search & Selection Section */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center justify-between">
-                  <span>1. Plant SKU / Botanical / Common Name</span>
+                  <span>2. Plant SKU / Botanical / Common Name</span>
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
@@ -1065,212 +1562,10 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                 )}
               </div>
 
-              {/* Location & GPS Section */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {/* Location Selector Dropdown */}
-                <div className="flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between">
-                    <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                      <span>2. Nursery Bay / Yard Location</span>
-                    </label>
-                    <button
-                      type="button"
-                      onClick={() => setIsCustomLocation(!isCustomLocation)}
-                      className="text-[11px] font-bold text-[#0e6c4a] hover:underline cursor-pointer"
-                    >
-                      {isCustomLocation ? 'Select from standard list' : '+ Custom Location'}
-                    </button>
-                  </div>
-
-                  {!isCustomLocation ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                      {/* Area / Category Filter Dropdown */}
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-extrabold uppercase text-[#525a55] tracking-wider flex items-center gap-1">
-                          <Filter className="w-3 h-3 text-[#0e6c4a]" />
-                          <span>Area / Category</span>
-                        </label>
-                        <select
-                          value={selectedAreaCategory}
-                          onChange={(e) => handleCategoryChange(e.target.value)}
-                          className="w-full bg-[#f9faf6] border border-[#c1c8c2] text-[#012d1d] font-bold rounded-xl px-2.5 py-2.5 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden cursor-pointer shadow-2xs"
-                        >
-                          {availableCategories.map((cat) => {
-                            const count = cat === 'All Areas'
-                              ? combinedLocations.length
-                              : (categoryGroups[cat]?.length || 0);
-                            return (
-                              <option key={cat} value={cat}>
-                                {cat} ({count})
-                              </option>
-                            );
-                          })}
-                        </select>
-                      </div>
-
-                      {/* Filtered Yard Location Dropdown */}
-                      <div className="flex flex-col gap-1">
-                        <label className="text-[10px] font-extrabold uppercase text-[#525a55] tracking-wider flex items-center gap-1">
-                          <MapPin className="w-3 h-3 text-[#0e6c4a]" />
-                          <span>Yard Location ({displayedLocations.length})</span>
-                        </label>
-                        <select
-                          value={selectedLocation}
-                          onChange={(e) => handleLocationChange(e.target.value)}
-                          className="w-full bg-[#f9faf6] border border-[#c1c8c2] text-[#012d1d] font-bold rounded-xl px-2.5 py-2.5 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden cursor-pointer shadow-2xs"
-                        >
-                          {selectedAreaCategory === 'All Areas' ? (
-                            (Object.entries(categoryGroups) as [string, string[]][]).map(([groupName, locs]) => {
-                              if (locs.length === 0) return null;
-                              return (
-                                <optgroup key={groupName} label={`📍 ${groupName} (${locs.length})`}>
-                                  {locs.map((loc, idx) => (
-                                    <option key={idx} value={loc}>
-                                      {loc}
-                                    </option>
-                                  ))}
-                                </optgroup>
-                              );
-                            })
-                          ) : (
-                            displayedLocations.map((loc, idx) => (
-                              <option key={idx} value={loc}>
-                                {loc}
-                              </option>
-                            ))
-                          )}
-                        </select>
-                      </div>
-                    </div>
-                  ) : (
-                    <input
-                      type="text"
-                      value={customLocationText}
-                      onChange={(e) => setCustomLocationText(e.target.value)}
-                      placeholder="e.g. North Field Row 4B near water tower"
-                      className="w-full bg-[#f9faf6] border border-[#c1c8c2] text-[#012d1d] font-bold rounded-xl px-3 py-2.5 text-xs focus:ring-2 focus:ring-[#012d1d] outline-hidden shadow-2xs"
-                    />
-                  )}
-                  <div className="flex items-center gap-1.5 text-[10px] text-[#525a55] mt-0.5">
-                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-[#0e6c4a]"></span>
-                    <span>Selected Area & Location remain locked for subsequent plant entries.</span>
-                  </div>
-                </div>
-
-                {/* GPS High-Precision Logger */}
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center gap-1.5">
-                    <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
-                    <span>3. High-Precision Yard GPS</span>
-                  </label>
-
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={handleCaptureGps}
-                      disabled={isLoggingGps}
-                      className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-extrabold transition-all border cursor-pointer ${
-                        gpsLocation
-                          ? 'bg-[#e8f5e9] text-[#012d1d] border-[#a0f4c8] hover:bg-[#d0f0db]'
-                          : 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] hover:bg-[#0e6c4a]'
-                      }`}
-                    >
-                      {isLoggingGps ? (
-                        <>
-                          <RefreshCw className="w-4 h-4 animate-spin" />
-                          <span>{gpsStatusText || 'Acquiring GPS...'}</span>
-                        </>
-                      ) : (
-                        <>
-                          <MapPin className="w-4 h-4" />
-                          <span>{gpsLocation ? '📍 Update GPS Tag' : '📍 Tag Yard GPS'}</span>
-                        </>
-                      )}
-                    </button>
-
-                    {gpsLocation && (
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setMapModalGps({
-                            latitude: gpsLocation.latitude,
-                            longitude: gpsLocation.longitude,
-                            title: selectedPlant?.name || manualName || 'Audited Plant',
-                            subtitle: `${selectedLocation} (±${Math.round((gpsLocation.accuracy || 5) * 3.28084)} ft)`
-                          });
-                        }}
-                        className="p-2.5 bg-white border border-[#c1c8c2] text-[#012d1d] hover:bg-[#f3f4f0] rounded-xl text-xs font-bold transition-colors cursor-pointer"
-                        title="View GPS on Nursery Satellite Map"
-                      >
-                        <ExternalLink className="w-4 h-4 text-[#0e6c4a]" />
-                      </button>
-                    )}
-                  </div>
-
-                  {gpsLocation && (
-                    <div className="flex items-center justify-between text-[11px] text-[#0e6c4a] bg-[#f0fdf4] px-2.5 py-1 rounded-lg border border-[#a0f4c8]/50">
-                      <span>{formatGpsCoordinates(gpsLocation.latitude, gpsLocation.longitude, gpsLocation.accuracy)}</span>
-                      <button
-                        type="button"
-                        onClick={() => setGpsLocation(undefined)}
-                        className="text-gray-400 hover:text-red-600"
-                        title="Remove GPS"
-                      >
-                        <X className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Count Mode Toggle (Side-by-Side Compact) */}
-              <div className="flex flex-col gap-1.5 bg-[#f3f4f0] p-2.5 rounded-xl border border-[#c1c8c2]">
-                <label className="text-[11px] font-bold text-[#012d1d] uppercase tracking-wider">
-                  4. Count Mode
-                </label>
-
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => setCountMode('total')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-extrabold transition-all cursor-pointer ${
-                      countMode === 'total'
-                        ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-2xs'
-                        : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#e2e3df] hover:text-[#012d1d]'
-                    }`}
-                  >
-                    <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
-                      countMode === 'total' ? 'border-[#a0f4c8] bg-[#a0f4c8]' : 'border-gray-400'
-                    }`}>
-                      {countMode === 'total' && <div className="w-1 h-1 rounded-full bg-[#012d1d]" />}
-                    </div>
-                    <span>Total Count</span>
-                  </button>
-
-                  <button
-                    type="button"
-                    onClick={() => setCountMode('cycle_additive')}
-                    className={`flex items-center justify-center gap-2 py-2 px-3 rounded-lg border text-xs font-extrabold transition-all cursor-pointer ${
-                      countMode === 'cycle_additive'
-                        ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-2xs'
-                        : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#e2e3df] hover:text-[#012d1d]'
-                    }`}
-                  >
-                    <div className={`w-3 h-3 rounded-full border-2 flex items-center justify-center ${
-                      countMode === 'cycle_additive' ? 'border-[#a0f4c8] bg-[#a0f4c8]' : 'border-gray-400'
-                    }`}>
-                      {countMode === 'cycle_additive' && <div className="w-1 h-1 rounded-full bg-[#012d1d]" />}
-                    </div>
-                    <span>Cycle Count</span>
-                  </button>
-                </div>
-              </div>
-
               {/* Quantity Keypad & Steppers */}
               <div className="flex flex-col gap-2">
                 <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center justify-between">
-                  <span>5. Physical Counted Quantity</span>
+                  <span>3. Physical Counted Quantity</span>
                   <span className="text-xs font-bold text-[#0e6c4a]">
                     Unit: {selectedPlant?.size || manualSize || 'Units'}
                   </span>
@@ -1347,7 +1642,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
               {/* Notes Input */}
               <div>
                 <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
-                  6. Inspection Notes / Plant Health (Optional)
+                  4. Inspection Notes / Plant Health (Optional)
                 </label>
                 <input
                   type="text"
@@ -1410,47 +1705,52 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
             </div>
           </section>
 
-          {/* Audited Items Feed & Consolidated List */}
+          {/* Recorded Items & Count Sessions Card */}
           <section className="bg-white rounded-2xl p-4 sm:p-5 border border-[#c1c8c2] shadow-sm flex flex-col gap-4">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-[#e2e3df] pb-3">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 border-b border-[#e2e3df] pb-3">
               <div>
-                <h3 className="text-base font-extrabold text-[#012d1d]">
-                  Recorded Items ({consolidatedList.length} Plants Audited)
-                </h3>
-                <p className="text-xs text-[#525a55]">
-                  Consolidated multi-bay totals vs original uploaded POS inventory baseline.
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base sm:text-lg font-extrabold text-[#012d1d]">
+                    Recorded Items
+                  </h3>
+                  <span className="text-xs bg-[#f3f4f0] text-[#012d1d] font-bold px-2.5 py-0.5 rounded-full border border-[#c1c8c2]">
+                    {sortedSessions.length} {sortedSessions.length === 1 ? 'Count Session' : 'Count Sessions'}
+                  </span>
+                </div>
+                <p className="text-xs text-[#525a55] mt-0.5">
+                  Count sessions sorted from most recent to oldest. Expand any session to review recorded items, resume counting, or export audit reports.
                 </p>
               </div>
 
-              {/* Filter controls */}
+              {/* Filter controls & Action buttons */}
               <div className="flex items-center gap-2 flex-wrap">
                 <div className="flex bg-[#f3f4f0] p-1 rounded-xl border border-[#c1c8c2] text-xs">
                   <button
                     type="button"
-                    onClick={() => setTableFilter('all')}
+                    onClick={() => setSessionFilter('all')}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                      tableFilter === 'all' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
+                      sessionFilter === 'all' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
                     }`}
                   >
-                    All ({consolidatedList.length})
+                    All ({sortedSessions.length})
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTableFilter('discrepancies')}
+                    onClick={() => setSessionFilter('active')}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                      tableFilter === 'discrepancies' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
+                      sessionFilter === 'active' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
                     }`}
                   >
-                    Discrepancies Only ({stats.overCount + stats.underCount})
+                    Active
                   </button>
                   <button
                     type="button"
-                    onClick={() => setTableFilter('exact')}
+                    onClick={() => setSessionFilter('completed')}
                     className={`px-2.5 py-1 rounded-lg font-bold transition-all cursor-pointer ${
-                      tableFilter === 'exact' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
+                      sessionFilter === 'completed' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
                     }`}
                   >
-                    Matches ({stats.exactMatchCount})
+                    Saved / Archived
                   </button>
                 </div>
 
@@ -1458,142 +1758,409 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                   <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
                   <input
                     type="text"
-                    value={tableSearch}
-                    onChange={(e) => setTableSearch(e.target.value)}
-                    placeholder="Search recorded..."
-                    className="bg-[#f9faf6] border border-[#c1c8c2] rounded-lg pl-7 pr-2.5 py-1 text-xs text-[#012d1d] w-36 sm:w-44 focus:bg-white outline-hidden"
+                    value={sessionSearch}
+                    onChange={(e) => setSessionSearch(e.target.value)}
+                    placeholder="Search sessions..."
+                    className="bg-[#f9faf6] border border-[#c1c8c2] rounded-lg pl-7 pr-2.5 py-1 text-xs text-[#012d1d] w-32 sm:w-44 focus:bg-white outline-hidden"
                   />
                 </div>
+
+                <button
+                  type="button"
+                  onClick={handleStartNewSession}
+                  className="flex items-center gap-1.5 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-lg shadow-2xs transition-all active:scale-95 cursor-pointer shrink-0"
+                  title="Start a fresh count session"
+                >
+                  <PlusCircle className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                  <span>+ New Session</span>
+                </button>
               </div>
             </div>
 
-            {displayItems.length === 0 ? (
+            {/* List of sessions sorted from most recent to oldest */}
+            {filteredSessions.length === 0 ? (
               <div className="text-center py-12 flex flex-col items-center justify-center gap-2">
                 <Package className="w-8 h-8 text-gray-400" />
-                <h4 className="text-sm font-bold text-[#012d1d]">No plants match the filter</h4>
+                <h4 className="text-sm font-bold text-[#012d1d]">No count sessions found</h4>
                 <p className="text-xs text-[#525a55] max-w-sm">
-                  {activeSession.items.length === 0 
-                    ? 'Start counting above by searching a plant, selecting a yard location, and recording quantity.' 
-                    : 'Try selecting "All" or clearing the search filter.'}
+                  {sessionSearch ? 'Try clearing your search query.' : 'Click "+ New Session" above to start your first physical inventory count.'}
                 </p>
               </div>
             ) : (
-              <div className="divide-y divide-[#e2e3df] flex flex-col">
-                {displayItems.map((item) => (
-                  <div key={item.key} className="py-3.5 flex flex-col gap-2 hover:bg-[#f9faf6] transition-colors rounded-xl px-2">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xs font-black text-[#012d1d] bg-[#f3f4f0] px-2 py-1 rounded-md border border-[#c1c8c2] shrink-0">
-                          #{item.itemNo}
-                        </span>
-                        <div className="min-w-0">
-                          <div className="flex items-center gap-2">
-                            <h4 className="font-extrabold text-sm text-[#012d1d] truncate">
-                              {item.name}
-                            </h4>
-                            <span className="text-xs font-semibold text-[#525a55]">
-                              ({item.size})
+              <div className="flex flex-col gap-3.5">
+                {filteredSessions.map((session) => {
+                  const isCurrentActive = session.id === activeSession.id;
+                  const isExpanded = expandedSessionIds.has(session.id);
+                  const sessionStats = calculateAuditSummaryStats(session.items);
+                  const sessionConsolidated = consolidateAuditItems(session.items);
+                  const sessionItemFilter = getSessionItemFilter(session.id);
+
+                  // Filter plants inside this session
+                  const displaySessionPlants = sessionConsolidated.filter(item => {
+                    if (sessionItemFilter.tab === 'discrepancies' && item.status === 'exact') return false;
+                    if (sessionItemFilter.tab === 'exact' && item.status !== 'exact') return false;
+                    if (sessionItemFilter.search.trim()) {
+                      const q = sessionItemFilter.search.toLowerCase();
+                      const matchName = item.name.toLowerCase().includes(q);
+                      const matchItemNo = item.itemNo.toLowerCase().includes(q);
+                      const matchSize = item.size.toLowerCase().includes(q);
+                      const matchLoc = item.locations.some(l => l.location.toLowerCase().includes(q));
+                      return matchName || matchItemNo || matchSize || matchLoc;
+                    }
+                    return true;
+                  });
+
+                  return (
+                    <div
+                      key={session.id}
+                      className={`rounded-2xl border transition-all ${
+                        isCurrentActive
+                          ? 'border-[#0e6c4a] bg-[#fbfdfa] shadow-xs ring-1 ring-[#0e6c4a]/30'
+                          : 'border-[#c1c8c2] bg-white hover:border-[#0e6c4a]/40 shadow-2xs'
+                      }`}
+                    >
+                      {/* Session Header Card */}
+                      <div className="p-3.5 sm:p-4.5 flex flex-col gap-3">
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+                          <div className="flex flex-col gap-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <h4 className="font-black text-sm sm:text-base text-[#012d1d] truncate">
+                                {session.title || 'Physical Inventory Count'}
+                              </h4>
+                              {isCurrentActive ? (
+                                <span className="text-[10px] font-black text-[#012d1d] bg-[#a0f4c8] px-2 py-0.5 rounded-full border border-[#012d1d]/20 flex items-center gap-1 shadow-2xs">
+                                  <Sparkles className="w-3 h-3 text-[#012d1d]" />
+                                  Active Workspace
+                                </span>
+                              ) : session.status === 'completed' ? (
+                                <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full border border-emerald-300">
+                                  Completed & Saved
+                                </span>
+                              ) : (
+                                <span className="text-[10px] font-extrabold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full border border-amber-300">
+                                  Saved In Progress
+                                </span>
+                              )}
+                            </div>
+
+                            <div className="flex items-center gap-2 text-xs text-[#525a55] flex-wrap">
+                              <span>📅 <strong>{formatSessionDate(session.startedAt || session.completedAt || '')}</strong></span>
+                              <span>•</span>
+                              <span>Auditor: <strong className="text-[#012d1d]">{session.countedBy || 'Pete'}</strong></span>
+                              <span>•</span>
+                              <span className="text-[11px] text-[#717973]">ID: #{session.id}</span>
+                            </div>
+                          </div>
+
+                          {/* Action Buttons for this session */}
+                          <div className="flex items-center gap-1.5 flex-wrap self-end sm:self-auto shrink-0">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandSession(session.id)}
+                              className={`flex items-center gap-1 text-xs font-bold px-3 py-1.5 rounded-xl border transition-all cursor-pointer ${
+                                isExpanded
+                                  ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
+                                  : 'bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] border-[#c1c8c2]'
+                              }`}
+                              title={isExpanded ? 'Hide recorded plants' : 'Review recorded plants for this session'}
+                            >
+                              <Package className="w-3.5 h-3.5" />
+                              <span>{isExpanded ? 'Hide Items' : `Review Recorded Items (${session.items.length})`}</span>
+                              {isExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
+                            </button>
+
+                            {!isCurrentActive && (
+                              <button
+                                type="button"
+                                onClick={() => handleResumeSession(session)}
+                                className="bg-[#0e6c4a] hover:bg-[#012d1d] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-xl transition-all cursor-pointer shadow-2xs"
+                                title="Set this session as the active counting session"
+                              >
+                                Resume / Make Active
+                              </button>
+                            )}
+
+                            {isCurrentActive && (
+                              <button
+                                type="button"
+                                onClick={() => handleExplicitSaveSession(session)}
+                                className="flex items-center gap-1 bg-white hover:bg-[#f3f4f0] text-[#012d1d] text-xs font-bold px-2.5 py-1.5 rounded-xl border border-[#c1c8c2] transition-colors cursor-pointer"
+                                title="Explicitly save session to database"
+                              >
+                                <Save className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                                <span>Save</span>
+                              </button>
+                            )}
+
+                            <button
+                              type="button"
+                              onClick={() => downloadAuditCsv(session)}
+                              className="flex items-center gap-1 bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] text-xs font-bold px-2.5 py-1.5 rounded-xl border border-[#c1c8c2] transition-colors cursor-pointer"
+                              title="Download CSV"
+                            >
+                              <Download className="w-3.5 h-3.5 text-[#525a55]" />
+                              <span>CSV</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleOpenEmailModal(session)}
+                              className="flex items-center gap-1 bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] text-xs font-bold px-2.5 py-1.5 rounded-xl border border-[#c1c8c2] transition-colors cursor-pointer"
+                              title="Email Report"
+                            >
+                              <Mail className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                              <span>Email</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteSession(session.id)}
+                              className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                              title="Delete Session"
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                          </div>
+                        </div>
+
+                        {/* Metric stats grid for this session */}
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs bg-[#f3f4f0] p-2.5 rounded-xl border border-[#c1c8c2]/60">
+                          <div>
+                            <span className="text-[#525a55] block text-[10px] uppercase font-bold">Varieties Audited</span>
+                            <strong className="text-sm text-[#012d1d]">{sessionStats.totalUniquePlants} SKUs</strong>
+                            <span className="text-[10px] text-[#525a55] block">{session.items.length} bay entries</span>
+                          </div>
+                          <div>
+                            <span className="text-[#525a55] block text-[10px] uppercase font-bold">Physical Units</span>
+                            <strong className="text-sm text-[#0e6c4a]">{sessionStats.totalPhysicalUnits} units</strong>
+                            <span className="text-[10px] text-[#525a55] block">Baseline: {sessionStats.totalBaselineUnits}</span>
+                          </div>
+                          <div>
+                            <span className="text-[#525a55] block text-[10px] uppercase font-bold">Net Variance</span>
+                            <strong className={`text-sm ${
+                              sessionStats.netUnitVariance > 0 ? 'text-emerald-700' : sessionStats.netUnitVariance < 0 ? 'text-rose-700' : 'text-[#012d1d]'
+                            }`}>
+                              {sessionStats.netUnitVariance >= 0 ? `+${sessionStats.netUnitVariance}` : sessionStats.netUnitVariance}
+                            </strong>
+                            <span className="text-[10px] text-[#525a55] block">
+                              {sessionStats.netDollarVariance >= 0 ? `+$${sessionStats.netDollarVariance.toFixed(2)}` : `-$${Math.abs(sessionStats.netDollarVariance).toFixed(2)}`}
                             </span>
                           </div>
-                          {item.botanicalName && (
-                            <p className="text-xs text-[#525a55] italic truncate">
-                              {item.botanicalName}
-                            </p>
-                          )}
+                          <div>
+                            <span className="text-[#525a55] block text-[10px] uppercase font-bold">Discrepancies</span>
+                            <strong className="text-sm text-[#012d1d]">{sessionStats.overCount + sessionStats.underCount}</strong>
+                            <span className="text-[10px] text-[#525a55] block">{sessionStats.exactMatchCount} exact matches</span>
+                          </div>
                         </div>
                       </div>
 
-                      {/* Quantities & Variance Badges */}
-                      <div className="flex items-center gap-3 self-end sm:self-auto shrink-0">
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase font-bold text-[#525a55]">Baseline</div>
-                          <div className="text-xs font-bold text-[#525a55]">{item.masterStock} units</div>
-                        </div>
-
-                        <div className="text-right">
-                          <div className="text-[10px] uppercase font-bold text-[#012d1d]">Counted</div>
-                          <div className="text-sm font-black text-[#012d1d]">{item.totalCountedQuantity} units</div>
-                        </div>
-
-                        <div className={`px-2.5 py-1 rounded-full text-xs font-extrabold border ${
-                          item.status === 'exact'
-                            ? 'bg-gray-100 text-gray-700 border-gray-300'
-                            : item.status === 'over'
-                            ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
-                            : 'bg-rose-50 text-rose-800 border-rose-300'
-                        }`}>
-                          {item.variance > 0 ? `+${item.variance} Over` : item.variance === 0 ? 'Match' : `${item.variance} Short`}
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Breakdown by Bay / Location */}
-                    <div className="bg-[#f3f4f0] rounded-lg p-2 flex flex-col gap-1 text-xs">
-                      {item.locations.map((loc, idx) => {
-                        const matchingItem = activeSession.items.find(i => 
-                          (i.itemNo === item.itemNo || i.name === item.name) && 
-                          i.yardLocation === loc.location && 
-                          i.timestamp === loc.timestamp
-                        );
-
-                        return (
-                          <div key={idx} className="flex items-center justify-between gap-2 text-[#414844] flex-wrap">
-                            <div className="flex items-center gap-1.5 min-w-0">
-                              <span className="w-1.5 h-1.5 rounded-full bg-[#012d1d] shrink-0" />
-                              <span className="font-bold text-[#012d1d] truncate">{loc.location}:</span>
-                              <span className="font-extrabold text-[#0e6c4a]">{loc.quantity} qty</span>
-                              <span className="text-[10px] bg-white text-[#525a55] px-1.5 py-0.5 rounded-md border border-[#c1c8c2]">
-                                {loc.countMode === 'total' ? 'Total' : 'Additive'}
-                              </span>
-                              {loc.notes && <span className="text-[11px] italic text-[#525a55]">"{loc.notes}"</span>}
+                      {/* Expanded Section: Review Recorded Items for this Session */}
+                      {isExpanded && (
+                        <div className="border-t border-[#e2e3df] p-3.5 sm:p-5 bg-white rounded-b-2xl flex flex-col gap-3.5 animate-fade-in">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2 border-b border-[#e2e3df]">
+                            <div className="flex items-center gap-2">
+                              <Package className="w-4 h-4 text-[#0e6c4a]" />
+                              <h5 className="font-extrabold text-sm text-[#012d1d]">
+                                Recorded Plants in Session ({sessionConsolidated.length} Varieties, {session.items.length} Entries)
+                              </h5>
                             </div>
 
-                            <div className="flex items-center gap-2 shrink-0">
-                              {loc.gpsLocation && (
+                            {/* Item Filter controls inside this session */}
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <div className="flex bg-[#f3f4f0] p-0.5 rounded-lg border border-[#c1c8c2] text-xs">
                                 <button
                                   type="button"
-                                  onClick={() => {
-                                    setMapModalGps({
-                                      latitude: loc.gpsLocation!.latitude,
-                                      longitude: loc.gpsLocation!.longitude,
-                                      title: item.name,
-                                      subtitle: `${loc.location} (±${Math.round((loc.gpsLocation!.accuracy || 5) * 3.28084)} ft)`
-                                    });
-                                  }}
-                                  className="flex items-center gap-1 text-[11px] font-bold text-[#0e6c4a] bg-white px-2 py-0.5 rounded-md border border-[#a0f4c8] hover:bg-[#d0f0db] cursor-pointer"
+                                  onClick={() => setSessionItemFilter(session.id, sessionItemFilter.search, 'all')}
+                                  className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                                    sessionItemFilter.tab === 'all' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
+                                  }`}
                                 >
-                                  <MapPin className="w-3 h-3 text-[#0e6c4a]" />
-                                  <span>GPS</span>
+                                  All ({sessionConsolidated.length})
                                 </button>
-                              )}
+                                <button
+                                  type="button"
+                                  onClick={() => setSessionItemFilter(session.id, sessionItemFilter.search, 'discrepancies')}
+                                  className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                                    sessionItemFilter.tab === 'discrepancies' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
+                                  }`}
+                                >
+                                  Discrepancies ({sessionStats.overCount + sessionStats.underCount})
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setSessionItemFilter(session.id, sessionItemFilter.search, 'exact')}
+                                  className={`px-2 py-0.5 rounded-md font-bold transition-all cursor-pointer ${
+                                    sessionItemFilter.tab === 'exact' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'text-[#525a55]'
+                                  }`}
+                                >
+                                  Matches ({sessionStats.exactMatchCount})
+                                </button>
+                              </div>
 
-                              {matchingItem && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleEditEntry(matchingItem)}
-                                    className="p-1 text-gray-500 hover:text-[#012d1d] cursor-pointer"
-                                    title="Edit Entry"
-                                  >
-                                    <Edit3 className="w-3.5 h-3.5" />
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleDeleteEntry(matchingItem.id)}
-                                    className="p-1 text-gray-400 hover:text-red-600 cursor-pointer"
-                                    title="Delete Entry"
-                                  >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                  </button>
-                                </>
+                              <div className="relative">
+                                <Search className="w-3 h-3 text-gray-400 absolute left-2 top-1/2 -translate-y-1/2 pointer-events-none" />
+                                <input
+                                  type="text"
+                                  value={sessionItemFilter.search}
+                                  onChange={(e) => setSessionItemFilter(session.id, e.target.value, sessionItemFilter.tab)}
+                                  placeholder="Filter plants..."
+                                  className="bg-[#f9faf6] border border-[#c1c8c2] rounded-md pl-6 pr-2 py-0.5 text-xs text-[#012d1d] w-32 focus:bg-white outline-hidden"
+                                />
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Plants List inside this Session */}
+                          {displaySessionPlants.length === 0 ? (
+                            <div className="text-center py-8 text-xs text-[#525a55]">
+                              {session.items.length === 0
+                                ? 'No plants recorded in this session yet. Use the counting form above to record items.'
+                                : 'No plants match the current filter in this session.'}
+                            </div>
+                          ) : (
+                            <div className="divide-y divide-[#e2e3df] flex flex-col">
+                              {displaySessionPlants.map((item) => (
+                                <div key={item.key} className="py-3 flex flex-col gap-2 hover:bg-[#f9faf6] transition-colors rounded-xl px-2">
+                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                    <div className="flex items-center gap-2.5 min-w-0">
+                                      <span className="text-xs font-black text-[#012d1d] bg-[#f3f4f0] px-2 py-0.5 rounded-md border border-[#c1c8c2] shrink-0">
+                                        #{item.itemNo}
+                                      </span>
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5 flex-wrap">
+                                          <h5 className="font-extrabold text-xs sm:text-sm text-[#012d1d] truncate">
+                                            {item.name}
+                                          </h5>
+                                          <span className="text-xs font-semibold text-[#525a55]">
+                                            ({item.size})
+                                          </span>
+                                        </div>
+                                        {item.botanicalName && (
+                                          <p className="text-[11px] text-[#525a55] italic truncate">
+                                            {item.botanicalName}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </div>
+
+                                    {/* Baseline vs Counted vs Variance */}
+                                    <div className="flex items-center gap-3 self-end sm:self-auto shrink-0 text-xs">
+                                      <div className="text-right">
+                                        <div className="text-[9px] uppercase font-bold text-[#525a55]">Baseline</div>
+                                        <div className="font-bold text-[#525a55]">{item.masterStock} units</div>
+                                      </div>
+                                      <div className="text-right">
+                                        <div className="text-[9px] uppercase font-bold text-[#012d1d]">Counted</div>
+                                        <div className="font-black text-[#012d1d]">{item.totalCountedQuantity} units</div>
+                                      </div>
+                                      <div className={`px-2 py-0.5 rounded-full text-xs font-extrabold border ${
+                                        item.status === 'exact'
+                                          ? 'bg-gray-100 text-gray-700 border-gray-300'
+                                          : item.status === 'over'
+                                          ? 'bg-emerald-50 text-emerald-800 border-emerald-300'
+                                          : 'bg-rose-50 text-rose-800 border-rose-300'
+                                      }`}>
+                                        {item.variance > 0 ? `+${item.variance} Over` : item.variance === 0 ? 'Match' : `${item.variance} Short`}
+                                      </div>
+                                    </div>
+                                  </div>
+
+                                  {/* Breakdown by Bay / Location */}
+                                  <div className="bg-[#f3f4f0] rounded-lg p-2 flex flex-col gap-1 text-xs">
+                                    {item.locations.map((loc, idx) => {
+                                      const matchingItem = session.items.find(i => 
+                                        (i.itemNo === item.itemNo || i.name === item.name) && 
+                                        i.yardLocation === loc.location && 
+                                        i.timestamp === loc.timestamp
+                                      );
+
+                                      return (
+                                        <div key={idx} className="flex items-center justify-between gap-2 text-[#414844] flex-wrap">
+                                          <div className="flex items-center gap-1.5 min-w-0">
+                                            <span className="w-1.5 h-1.5 rounded-full bg-[#012d1d] shrink-0" />
+                                            <span className="font-bold text-[#012d1d] truncate">{loc.location}:</span>
+                                            <span className="font-extrabold text-[#0e6c4a]">{loc.quantity} qty</span>
+                                            <span className="text-[10px] bg-white text-[#525a55] px-1.5 py-0.5 rounded-md border border-[#c1c8c2]">
+                                              {loc.countMode === 'total' ? 'Total' : 'Additive'}
+                                            </span>
+                                            {loc.notes && <span className="text-[11px] italic text-[#525a55]">"{loc.notes}"</span>}
+                                          </div>
+
+                                          <div className="flex items-center gap-2 shrink-0">
+                                            {loc.gpsLocation && (
+                                              <button
+                                                type="button"
+                                                onClick={() => {
+                                                  setMapModalGps({
+                                                    latitude: loc.gpsLocation!.latitude,
+                                                    longitude: loc.gpsLocation!.longitude,
+                                                    title: item.name,
+                                                    subtitle: `${loc.location} (±${Math.round((loc.gpsLocation!.accuracy || 5) * 3.28084)} ft)`
+                                                  });
+                                                }}
+                                                className="flex items-center gap-1 text-[11px] font-bold text-[#0e6c4a] bg-white px-2 py-0.5 rounded-md border border-[#a0f4c8] hover:bg-[#d0f0db] cursor-pointer"
+                                              >
+                                                <MapPin className="w-3 h-3 text-[#0e6c4a]" />
+                                                <span>GPS</span>
+                                              </button>
+                                            )}
+
+                                            {matchingItem && isCurrentActive && (
+                                              <>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleEditEntry(matchingItem)}
+                                                  className="p-1 text-gray-500 hover:text-[#012d1d] cursor-pointer"
+                                                  title="Edit Entry"
+                                                >
+                                                  <Edit3 className="w-3.5 h-3.5" />
+                                                </button>
+                                                <button
+                                                  type="button"
+                                                  onClick={() => handleDeleteEntry(matchingItem.id)}
+                                                  className="p-1 text-gray-400 hover:text-red-600 cursor-pointer"
+                                                  title="Delete Entry"
+                                                >
+                                                  <Trash2 className="w-3.5 h-3.5" />
+                                                </button>
+                                              </>
+                                            )}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+
+                          {/* Footer action bar for this session */}
+                          <div className="pt-2 border-t border-[#e2e3df] flex items-center justify-between text-xs text-[#525a55]">
+                            <button
+                              type="button"
+                              onClick={() => toggleExpandSession(session.id)}
+                              className="font-bold text-[#0e6c4a] hover:underline cursor-pointer"
+                            >
+                              ↑ Collapse Recorded Items
+                            </button>
+                            <div className="flex items-center gap-2">
+                              {!isCurrentActive && (
+                                <button
+                                  type="button"
+                                  onClick={() => handleResumeSession(session)}
+                                  className="font-extrabold text-[#0e6c4a] hover:underline cursor-pointer"
+                                >
+                                  Resume Counting in this Session →
+                                </button>
                               )}
                             </div>
                           </div>
-                        );
-                      })}
+                        </div>
+                      )}
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             )}
           </section>
@@ -1619,7 +2186,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
             </button>
           </div>
 
-          {auditSessions.length === 0 && !activeSession.items.length ? (
+          {sortedSessions.length === 0 ? (
             <div className="text-center py-12 flex flex-col items-center justify-center gap-2">
               <History className="w-8 h-8 text-gray-400" />
               <h4 className="text-sm font-bold text-[#012d1d]">No past audits recorded</h4>
@@ -1629,7 +2196,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
             </div>
           ) : (
             <div className="divide-y divide-[#e2e3df] flex flex-col">
-              {[activeSession, ...auditSessions.filter(s => s.id !== activeSession.id)].map((session) => {
+              {sortedSessions.map((session) => {
                 const sessionStats = calculateAuditSummaryStats(session.items);
                 const isCurrentActive = session.id === activeSession.id;
 
@@ -1655,24 +2222,23 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                           )}
                         </div>
                         <div className="text-xs text-[#525a55] mt-0.5">
-                          ID: <strong>{session.id}</strong> • Date: {new Date(session.startedAt).toLocaleDateString()} • Auditor: {session.countedBy}
+                          ID: <strong>{session.id}</strong> • Date: {formatSessionDate(session.startedAt || session.completedAt)} • Auditor: {session.countedBy || 'Pete'}
                         </div>
                       </div>
 
                       <div className="flex items-center gap-2">
-                        {!isCurrentActive && (
-                          <button
-                            type="button"
-                            onClick={() => {
-                              setActiveSession(session);
-                              setActiveTab('count');
-                              showToast(`Resumed session: ${session.title}`);
-                            }}
-                            className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
-                          >
-                            Open Session
-                          </button>
-                        )}
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!isCurrentActive) {
+                              handleResumeSession(session);
+                            }
+                            setActiveTab('count');
+                          }}
+                          className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-extrabold px-3 py-1.5 rounded-lg transition-all cursor-pointer"
+                        >
+                          {isCurrentActive ? 'View Active Count' : 'Open / Resume'}
+                        </button>
                         <button
                           type="button"
                           onClick={() => downloadAuditCsv(session)}
@@ -1684,15 +2250,20 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                         </button>
                         <button
                           type="button"
-                          onClick={() => {
-                            setActiveSession(session);
-                            handleOpenEmailModal();
-                          }}
+                          onClick={() => handleOpenEmailModal(session)}
                           className="flex items-center gap-1 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-bold px-3 py-1.5 rounded-lg transition-colors cursor-pointer"
                           title="Email Report"
                         >
                           <Mail className="w-3.5 h-3.5" />
                           <span>Email Report</span>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteSession(session.id)}
+                          className="p-1.5 text-gray-400 hover:text-red-600 rounded-lg hover:bg-red-50 transition-colors cursor-pointer"
+                          title="Delete Session"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       </div>
                     </div>
@@ -1803,7 +2374,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                 <div className="flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => downloadAuditCsv(activeSession)}
+                    onClick={() => downloadAuditCsv(selectedSessionForEmail || activeSession)}
                     className="flex items-center gap-1.5 bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] text-xs font-bold px-3 py-2 rounded-xl border border-[#c1c8c2] transition-colors cursor-pointer"
                   >
                     <Download className="w-4 h-4" />
@@ -1821,7 +2392,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
                 <div className="flex items-center gap-2">
                   <a
-                    href={createAuditMailtoUrl(recipientEmail, activeSession)}
+                    href={createAuditMailtoUrl(recipientEmail, selectedSessionForEmail || activeSession)}
                     target="_blank"
                     rel="noreferrer"
                     className="flex items-center gap-1.5 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-extrabold px-4 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"

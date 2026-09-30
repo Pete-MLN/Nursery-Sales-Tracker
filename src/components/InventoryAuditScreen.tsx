@@ -117,6 +117,18 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [isManualEntry, setIsManualEntry] = useState(false);
+  const plantSearchContainerRef = useRef<HTMLDivElement | null>(null);
+
+  // Click outside to close plant search popover
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (plantSearchContainerRef.current && !plantSearchContainerRef.current.contains(event.target as Node)) {
+        setIsSearchOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
   
   // Snapshot form fields
   const [manualItemNo, setManualItemNo] = useState('');
@@ -554,16 +566,25 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
     localStorage.setItem('maple_last_audit_location', newLoc);
   };
 
-  // Filtered plant search results
-  const filteredPlants = searchQuery.trim() === '' ? [] : inventory.filter(p => {
-    const q = searchQuery.toLowerCase();
-    const nameMatch = (p.name || '').toLowerCase().includes(q);
-    const botMatch = (p.botanicalName || '').toLowerCase().includes(q);
-    const itemNoMatch = (p.itemNo || '').toLowerCase().includes(q);
-    const barcodeMatch = (p.barcode || '').toLowerCase().includes(q);
-    const sizeMatch = (p.size || '').toLowerCase().includes(q);
-    return nameMatch || botMatch || itemNoMatch || barcodeMatch || sizeMatch;
-  }).slice(0, 10);
+  // Filtered plant search results (shows all matches ordered by Plant Name and Size)
+  const filteredPlants = useMemo(() => {
+    if (searchQuery.trim() === '') return [];
+    const searchTerms = searchQuery.trim().toLowerCase().split(/\s+/).filter(Boolean);
+    return inventory
+      .filter(p => {
+        const searchable = `${p.name} ${p.botanicalName || ''} ${p.commonName || ''} ${p.category || ''} ${p.size || ''} ${p.itemNo || ''} ${p.barcode || ''}`.toLowerCase();
+        return searchTerms.every(term => searchable.includes(term));
+      })
+      .sort((a, b) => {
+        const nameA = (a.name || '').replace(/\uFFFD/g, '®').trim();
+        const nameB = (b.name || '').replace(/\uFFFD/g, '®').trim();
+        const nameComp = nameA.localeCompare(nameB, undefined, { numeric: true, sensitivity: 'base' });
+        if (nameComp !== 0) return nameComp;
+        const sizeA = (a.size || '').trim();
+        const sizeB = (b.size || '').trim();
+        return sizeA.localeCompare(sizeB, undefined, { numeric: true, sensitivity: 'base' });
+      });
+  }, [searchQuery, inventory]);
 
   // Select plant handler
   const handleSelectPlant = (plant: PlantItem) => {
@@ -1392,7 +1413,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                 </label>
 
                 {!isManualEntry ? (
-                  <div className="relative">
+                  <div ref={plantSearchContainerRef} className="relative">
                     <div className="flex gap-2">
                       <div className="relative flex-1">
                         <Search className="w-4 h-4 text-[#717973] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
@@ -1430,41 +1451,59 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                       </button>
                     </div>
 
-                    {/* Autocomplete Dropdown */}
-                    {isSearchOpen && filteredPlants.length > 0 && (
-                      <div className="absolute top-full left-0 right-0 z-30 bg-white border border-[#c1c8c2] rounded-xl shadow-xl mt-1 max-h-64 overflow-y-auto divide-y divide-[#e2e3df]">
-                        {filteredPlants.map((plant) => (
-                          <div
-                            key={plant.id}
-                            onClick={() => handleSelectPlant(plant)}
-                            className="p-3 hover:bg-[#f3f4f0] cursor-pointer flex items-center justify-between gap-3 transition-colors"
-                          >
-                            <div className="flex items-center gap-3 min-w-0">
-                              <img
-                                src={plant.image || DEFAULT_PLANT_IMAGE}
-                                alt={plant.name}
-                                className="w-10 h-10 rounded-lg object-cover border border-[#c1c8c2]/50 shrink-0"
-                                onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                              />
-                              <div className="min-w-0">
-                                <div className="font-bold text-sm text-[#012d1d] truncate">
-                                  {plant.name}
-                                </div>
-                                <div className="text-xs text-[#525a55] truncate">
-                                  SKU: <strong>{plant.itemNo || plant.id}</strong> • Size: {plant.size || '3 GAL'} • {plant.botanicalName}
-                                </div>
-                              </div>
-                            </div>
-                            <div className="text-right shrink-0">
-                              <div className="text-xs font-bold text-[#0e6c4a]">
-                                Baseline: {plant.stock}
-                              </div>
-                              <div className="text-[11px] text-[#525a55]">
-                                ${plant.price?.toFixed(2) || '0.00'}
-                              </div>
-                            </div>
+                    {/* Autocomplete Dropdown - Shows all matches ordered by Plant Name and Size */}
+                    {isSearchOpen && searchQuery.trim().length > 0 && (
+                      <div className="absolute top-full left-0 right-0 z-30 bg-white border border-[#c1c8c2] rounded-xl shadow-xl mt-1 max-h-72 sm:max-h-96 overflow-y-auto divide-y divide-[#e2e3df]">
+                        {filteredPlants.length === 0 ? (
+                          <div className="p-4 text-center text-xs font-medium text-[#717973]">
+                            No matching plants found for "{searchQuery}". Try a different keyword or click "+ Unlisted Yard Plant" above.
                           </div>
-                        ))}
+                        ) : (
+                          <>
+                            {/* Sticky Header with Match Counter & Sorting Order */}
+                            <div className="px-3.5 py-2 bg-[#f3f4f0] border-b border-[#c1c8c2] flex items-center justify-between text-xs text-[#525a55] sticky top-0 z-10 backdrop-blur-xs">
+                              <span className="font-extrabold text-[#012d1d]">
+                                {filteredPlants.length} {filteredPlants.length === 1 ? 'Plant Match' : 'Plant Matches'}
+                              </span>
+                              <span className="text-[11px] font-bold text-[#0e6c4a]">
+                                Ordered by Plant Name &amp; Size
+                              </span>
+                            </div>
+
+                            {filteredPlants.map((plant) => (
+                              <div
+                                key={plant.id}
+                                onClick={() => handleSelectPlant(plant)}
+                                className="p-3 hover:bg-[#f3f4f0] cursor-pointer flex items-center justify-between gap-3 transition-colors"
+                              >
+                                <div className="flex items-center gap-3 min-w-0">
+                                  <img
+                                    src={plant.image || DEFAULT_PLANT_IMAGE}
+                                    alt={plant.name}
+                                    className="w-10 h-10 rounded-lg object-cover border border-[#c1c8c2]/50 shrink-0"
+                                    onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                                  />
+                                  <div className="min-w-0">
+                                    <div className="font-bold text-sm text-[#012d1d] truncate">
+                                      {plant.name}
+                                    </div>
+                                    <div className="text-xs text-[#525a55] truncate">
+                                      SKU: <strong>{plant.itemNo || plant.id}</strong> • Size: {plant.size || '3 GAL'} • {plant.botanicalName}
+                                    </div>
+                                  </div>
+                                </div>
+                                <div className="text-right shrink-0">
+                                  <div className="text-xs font-bold text-[#0e6c4a]">
+                                    Baseline: {plant.stock}
+                                  </div>
+                                  <div className="text-[11px] text-[#525a55]">
+                                    ${plant.price?.toFixed(2) || '0.00'}
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </>
+                        )}
                       </div>
                     )}
                   </div>

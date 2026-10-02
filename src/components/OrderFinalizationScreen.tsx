@@ -634,6 +634,40 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     onNavigate('home');
   };
 
+  // Navigate to scan page while preserving current order state
+  const handleScanAndAddPlants = () => {
+    if (onUpdateOrder && currentOrder) {
+      const calculatedRemaining = items.reduce((sum, item) => sum + getItemRemainingQty(item), 0);
+      const calculatedPickedUp = items.reduce((sum, item) => sum + getItemPickedUpQty(item), 0);
+      const hasRemaining = calculatedRemaining > 0 && (calculatedPickedUp > 0 || hasPartialPickupToggle);
+
+      const itemsWithPickup = items.map(item => ({
+        ...item,
+        pickedUpQuantity: item.pickedUpQuantity !== undefined ? item.pickedUpQuantity : 0,
+        stagingLocation: item.stagingLocation || ''
+      }));
+
+      onUpdateOrder({
+        ...currentOrder,
+        customerName: customerName.trim() || currentOrder.customerName,
+        status: orderStatus,
+        type: fulfillment,
+        scheduledTime: scheduledDate,
+        holdingLocation: holdingLocation,
+        notes: orderNotes.trim(),
+        items: itemsWithPickup,
+        itemsCount: calculatedItemsCount,
+        total: calculatedTotal,
+        hasPartialPickup: hasRemaining,
+        remainingItemsCount: calculatedRemaining,
+        pickedUpItemsCount: calculatedPickedUp,
+        remainingPickupDate: remainingPickupDate,
+        partialPickupNotes: partialPickupNotes.trim()
+      });
+    }
+    onNavigate('scan');
+  };
+
   // Delete / Cancel entire order handlers
   const handleDeleteOrder = () => {
     setIsDeleteModalOpen(true);
@@ -1113,13 +1147,27 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             )}
           </div>
 
-          <div className="text-left sm:text-right">
-            <span className="text-xs font-bold text-[#717973] uppercase tracking-wider block">
-              Order Total ({calculatedItemsCount} items)
-            </span>
-            <div className="text-2xl sm:text-3xl font-extrabold text-[#012d1d]">
-              ${calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          <div className="flex flex-col sm:flex-row sm:items-center sm:text-right gap-3 sm:gap-4">
+            <div>
+              <span className="text-xs font-bold text-[#717973] uppercase tracking-wider block">
+                Order Total ({calculatedItemsCount} items)
+              </span>
+              <div className="text-2xl sm:text-3xl font-extrabold text-[#012d1d]">
+                ${calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
             </div>
+
+            {/* Second 'Scan & Add Plants' Button (Text 4 points larger: 18px font-extrabold) */}
+            <button
+              type="button"
+              id="btn-top-scan-and-add-plants"
+              onClick={handleScanAndAddPlants}
+              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[18px] sm:text-[19px] font-extrabold shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+              title="Open scan screen to scan barcodes and add plants to this order"
+            >
+              <Barcode className="w-5 h-5 text-[#a0f4c8] shrink-0" />
+              <span>Scan & Add Plants</span>
+            </button>
           </div>
         </div>
 
@@ -1685,27 +1733,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
 
             <button
               type="button"
-              onClick={() => {
-                if (onUpdateOrder && currentOrder) {
-                  onUpdateOrder({
-                    ...currentOrder,
-                    customerName: customerName.trim() || currentOrder.customerName,
-                    status: orderStatus,
-                    type: fulfillment,
-                    scheduledTime: scheduledDate,
-                    holdingLocation: holdingLocation,
-                    items: items,
-                    itemsCount: calculatedItemsCount,
-                    total: calculatedTotal,
-                    hasPartialPickup: totalRemainingQty > 0 && totalPickedUpQty > 0,
-                    remainingItemsCount: totalRemainingQty,
-                    pickedUpItemsCount: totalPickedUpQty,
-                    remainingPickupDate: remainingPickupDate,
-                    partialPickupNotes: partialPickupNotes
-                  });
-                }
-                onNavigate('scan');
-              }}
+              onClick={handleScanAndAddPlants}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs sm:text-sm font-extrabold shadow-sm transition-all cursor-pointer active:scale-95"
               title="Open scan screen to scan barcodes and add plants to this order"
             >
@@ -1722,22 +1750,7 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             <span className="text-xs">Use the barcode scanner or catalog to add plants.</span>
             <button
               type="button"
-              onClick={() => {
-                if (onUpdateOrder && currentOrder) {
-                  onUpdateOrder({
-                    ...currentOrder,
-                    customerName: customerName.trim() || currentOrder.customerName,
-                    status: orderStatus,
-                    type: fulfillment,
-                    scheduledTime: scheduledDate,
-                    holdingLocation: holdingLocation,
-                    items: items,
-                    itemsCount: calculatedItemsCount,
-                    total: calculatedTotal
-                  });
-                }
-                onNavigate('scan');
-              }}
+              onClick={handleScanAndAddPlants}
               className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs font-bold transition-all cursor-pointer"
             >
               <Barcode className="w-4 h-4" />

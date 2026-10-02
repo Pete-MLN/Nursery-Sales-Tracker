@@ -2363,6 +2363,33 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         </div>
       )}
 
+      {/* Camera Control Bar above Viewfinder */}
+      <div className="flex justify-center items-center py-1 -mb-1">
+        {cameraActive ? (
+          <button
+            type="button"
+            id="scanner-stop-camera-btn"
+            onClick={toggleCameraFeed}
+            className="bg-red-600 hover:bg-red-700 active:scale-95 text-white font-black text-xs sm:text-sm px-4 sm:px-5 py-1.5 rounded-full shadow-lg border-2 border-white/50 flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all tracking-wider"
+            title="Stop Camera / Scanner"
+          >
+            <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-white" />
+            <span>STOP</span>
+          </button>
+        ) : (
+          <button
+            type="button"
+            id="scanner-start-camera-btn"
+            onClick={toggleCameraFeed}
+            className="bg-[#012d1d]/85 hover:bg-[#012d1d] active:scale-95 text-[#a0f4c8] font-extrabold text-xs px-3.5 py-1.5 rounded-full shadow-md border border-[#a0f4c8]/30 flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all"
+            title="Start Camera Feed"
+          >
+            <Camera className="w-3.5 h-3.5 text-[#a0f4c8]" />
+            <span>Start Camera</span>
+          </button>
+        )}
+      </div>
+
       {/* Barcode Scanner Viewfinder Area */}
       <section 
         ref={scannerSectionRef}
@@ -2445,33 +2472,6 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   <span>{cameraTimeout === 0 ? 'Cont.' : `${cameraTimeLeft}s`}</span>
                   <span className="hidden md:inline">{cameraTimeout > 0 ? ' auto-off' : ''}</span>
                   {cameraTimeout > 0 && <RefreshCw className="w-2.5 h-2.5 opacity-70 ml-0.5" />}
-                </button>
-              )}
-            </div>
-
-            {/* STOP / START Button in the Middle at Top of Viewer */}
-            <div className="absolute left-1/2 -translate-x-1/2 top-0 pointer-events-auto z-20">
-              {cameraActive ? (
-                <button
-                  type="button"
-                  id="scanner-stop-camera-btn"
-                  onClick={toggleCameraFeed}
-                  className="bg-red-600 hover:bg-red-700 active:scale-95 text-white font-black text-xs sm:text-sm px-4 sm:px-5 py-1.5 rounded-full shadow-lg border-2 border-white/50 flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all tracking-wider"
-                  title="Stop Camera / Scanner"
-                >
-                  <Square className="w-3 h-3 sm:w-3.5 sm:h-3.5 fill-white" />
-                  <span>STOP</span>
-                </button>
-              ) : (
-                <button
-                  type="button"
-                  id="scanner-start-camera-btn"
-                  onClick={toggleCameraFeed}
-                  className="bg-[#012d1d]/85 hover:bg-[#012d1d] active:scale-95 text-[#a0f4c8] font-extrabold text-xs px-3.5 py-1.5 rounded-full shadow-md border border-[#a0f4c8]/30 flex items-center gap-1.5 cursor-pointer backdrop-blur-md transition-all"
-                  title="Start Camera Feed"
-                >
-                  <Camera className="w-3.5 h-3.5 text-[#a0f4c8]" />
-                  <span>Start Camera</span>
                 </button>
               )}
             </div>

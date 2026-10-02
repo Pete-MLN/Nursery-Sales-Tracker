@@ -350,6 +350,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const searchContainerRef = useRef<HTMLDivElement | null>(null);
   const lastScanTimeRef = useRef<number>(0);
   const zxingReaderRef = useRef<BrowserMultiFormatReader | null>(null);
+  const canvasesRef = useRef<{
+    cropCanvas: HTMLCanvasElement;
+    rotCanvas: HTMLCanvasElement;
+    fullCanvas: HTMLCanvasElement;
+  } | null>(null);
+  const nativeDetectorRef = useRef<any>(undefined);
 
   // Focus and center the camera scanner viewport when returning from verification
   const focusCameraScanner = () => {
@@ -605,16 +611,16 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     // 2. If barcode is NOT in catalog:
     // When scanning from LIVE CAMERA STREAM:
     if (!isManualInput) {
-      // Require 2 consecutive frame detections of the uncataloged code to prevent single-frame video noise on iOS
+      // Require 4 consecutive frame detections of the uncataloged code to prevent video noise and misreads on iOS
       if (unrecognizedCandidateRef.current.code === cleanCode) {
         unrecognizedCandidateRef.current.count += 1;
       } else {
         unrecognizedCandidateRef.current = { code: cleanCode, count: 1 };
-        return; // Wait for second frame verification
+        return; // Wait for frame verification
       }
 
-      if (unrecognizedCandidateRef.current.count < 2) {
-        return; // Wait for second frame verification
+      if (unrecognizedCandidateRef.current.count < 4) {
+        return; // Wait for frame verification
       }
 
       // Reset candidate ref once accepted
@@ -663,13 +669,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
   };
 
-  // Continuous Camera Frame Barcode Scanner Loop with Multi-Frame Consensus & iOS Safari Optimizations
-  useEffect(() => {
-    if (!cameraActive || !cameraStream) return;
-
-    let isCancelled = false;
-    let intervalId: NodeJS.Timeout;
-
+  // Reusable multi-format barcode reader instance
+  const getZxingReader = () => {
     if (!zxingReaderRef.current) {
       const hints = new Map();
       hints.set(DecodeHintType.POSSIBLE_FORMATS, [
@@ -687,174 +688,226 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       hints.set(DecodeHintType.ENABLE_CODE_39_EXTENDED_MODE, true);
       zxingReaderRef.current = new BrowserMultiFormatReader(hints);
     }
+    return zxingReaderRef.current;
+  };
 
-    const reader = zxingReaderRef.current;
-    let nativeDetector: any = null;
-    if ('BarcodeDetector' in window) {
+  const getNativeDetector = () => {
+    if (nativeDetectorRef.current === undefined) {
+      if (typeof window !== 'undefined' && 'BarcodeDetector' in window) {
+        try {
+          nativeDetectorRef.current = new (window as any).BarcodeDetector({
+            formats: ['code_128', 'code_39', 'itf', 'codabar', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code']
+          });
+        } catch (e) {
+          nativeDetectorRef.current = null;
+        }
+      } else {
+        nativeDetectorRef.current = null;
+      }
+    }
+    return nativeDetectorRef.current;
+  };
+
+  const getCanvases = () => {
+    if (!canvasesRef.current && typeof document !== 'undefined') {
+      canvasesRef.current = {
+        cropCanvas: document.createElement('canvas'),
+        rotCanvas: document.createElement('canvas'),
+        fullCanvas: document.createElement('canvas')
+      };
+    }
+    return canvasesRef.current;
+  };
+
+  // High-precision frame decoder supporting Native BarcodeDetector, ZXing multi-pass, vertical plant tags & outdoor contrast
+  const decodeBarcodeFromVideoElement = async (video: HTMLVideoElement): Promise<string | null> => {
+    if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+      return null;
+    }
+
+    // 1. Native BarcodeDetector (Ultra-fast hardware acceleration on Android Chrome & iOS 17+)
+    const nativeDetector = getNativeDetector();
+    if (nativeDetector) {
       try {
-        nativeDetector = new (window as any).BarcodeDetector({
-          formats: ['code_128', 'code_39', 'itf', 'codabar', 'ean_13', 'ean_8', 'upc_a', 'upc_e', 'qr_code']
-        });
+        const barcodes = await nativeDetector.detect(video);
+        if (barcodes && barcodes.length > 0) {
+          for (const b of barcodes) {
+            if (b.rawValue && isValidBarcodeString(b.rawValue)) {
+              return b.rawValue;
+            }
+          }
+        }
       } catch (e) {
-        nativeDetector = null;
+        // ignore frame error
       }
     }
 
-    // Reusable canvases to prevent iOS Safari garbage collection pauses & frame drops
-    const cropCanvas = document.createElement('canvas');
-    const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
-    const rotCanvas = document.createElement('canvas');
-    const rotCtx = rotCanvas.getContext('2d', { willReadFrequently: true });
-    const fullCanvas = document.createElement('canvas');
-    const fullCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
+    // 2. High-Precision ZXing Multi-Pass Decoder (Essential for iOS Safari & Counterpoint Code 39/ITF)
+    const canvases = getCanvases();
+    if (!canvases) return null;
+    const { cropCanvas, rotCanvas, fullCanvas } = canvases;
 
+    const cropCtx = cropCanvas.getContext('2d', { willReadFrequently: true });
+    const rotCtx = rotCanvas.getContext('2d', { willReadFrequently: true });
+    const fullCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
+    if (!cropCtx) return null;
+
+    const reader = getZxingReader();
+    const vw = video.videoWidth;
+    const vh = video.videoHeight;
+
+    // Crop to central 75% width, 60% height around viewfinder reticle
+    const cropW = Math.floor(vw * 0.75);
+    const cropH = Math.floor(vh * 0.60);
+    const cropX = Math.floor((vw - cropW) / 2);
+    const cropY = Math.floor((vh - cropH) / 2);
+
+    cropCanvas.width = Math.min(cropW, 1280);
+    cropCanvas.height = Math.min(cropH, 960);
+
+    // Pass 1: Standard high-res cropped frame
+    cropCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height);
+
+    try {
+      const result = reader.decodeFromCanvas(cropCanvas);
+      if (result && result.getText() && isValidBarcodeString(result.getText())) {
+        return result.getText();
+      }
+    } catch (err1) {
+      // Pass 2: 90-degree rotated canvas for vertical nursery pot stake tags (common on iPhone in portrait)
+      if (rotCtx) {
+        try {
+          rotCanvas.width = cropCanvas.height;
+          rotCanvas.height = cropCanvas.width;
+          rotCtx.save();
+          rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+          rotCtx.rotate((90 * Math.PI) / 180);
+          rotCtx.drawImage(cropCanvas, -cropCanvas.width / 2, -cropCanvas.height / 2);
+          rotCtx.restore();
+
+          const rotResult = reader.decodeFromCanvas(rotCanvas);
+          if (rotResult && rotResult.getText() && isValidBarcodeString(rotResult.getText())) {
+            return rotResult.getText();
+          }
+        } catch (rotErr) {
+          // Not vertical or not decodable
+        }
+      }
+
+      // Pass 2b: 270-degree rotated canvas for opposite orientation vertical tags
+      if (rotCtx) {
+        try {
+          rotCanvas.width = cropCanvas.height;
+          rotCanvas.height = cropCanvas.width;
+          rotCtx.save();
+          rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
+          rotCtx.rotate((270 * Math.PI) / 180);
+          rotCtx.drawImage(cropCanvas, -cropCanvas.width / 2, -cropCanvas.height / 2);
+          rotCtx.restore();
+
+          const rot270Result = reader.decodeFromCanvas(rotCanvas);
+          if (rot270Result && rot270Result.getText() && isValidBarcodeString(rot270Result.getText())) {
+            return rot270Result.getText();
+          }
+        } catch (rot270Err) {
+          // Not decodable at 270-deg
+        }
+      }
+
+      // Pass 3: High-contrast binarization for glossy tags & direct nursery sunlight
+      try {
+        const imgData = cropCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
+        const data = imgData.data;
+        const len = data.length;
+        for (let i = 0; i < len; i += 4) {
+          const lum = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
+          const enhanced = lum < 115 ? 0 : (lum > 155 ? 255 : (lum < 135 ? 25 : 235));
+          data[i] = enhanced;
+          data[i + 1] = enhanced;
+          data[i + 2] = enhanced;
+        }
+        cropCtx.putImageData(imgData, 0, 0);
+
+        const result2 = reader.decodeFromCanvas(cropCanvas);
+        if (result2 && result2.getText() && isValidBarcodeString(result2.getText())) {
+          return result2.getText();
+        }
+      } catch (binErr) {
+        // Pass 4: Full uncropped frame at scaled resolution
+        if (fullCtx) {
+          try {
+            fullCanvas.width = Math.min(vw, 1024);
+            fullCanvas.height = Math.min(vh, 768);
+            fullCtx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height);
+            const result3 = reader.decodeFromCanvas(fullCanvas);
+            if (result3 && result3.getText() && isValidBarcodeString(result3.getText())) {
+              return result3.getText();
+            }
+          } catch (fullErr) {
+            // No barcode in this frame
+          }
+        }
+      }
+    }
+
+    return null;
+  };
+
+  // Continuous Camera Frame Barcode Scanner Loop with Multi-Frame Consensus & iOS Safari Optimizations
+  useEffect(() => {
+    if (!cameraActive || !cameraStream) return;
+
+    let isCancelled = false;
+    let intervalId: NodeJS.Timeout;
     let isProcessing = false;
 
     const processFrame = async () => {
       if (isCancelled || isProcessing || verifyingPlantRef.current !== null) return;
       const video = videoRef.current;
+      if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) return;
 
-      if (video && video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-        isProcessing = true;
-        let detectedRawCode: string | null = null;
+      isProcessing = true;
+      try {
+        const detectedRawCode = await decodeBarcodeFromVideoElement(video);
 
-        // 1. Native BarcodeDetector (Ultra-fast hardware acceleration on Android Chrome and iOS 17+)
-        if (nativeDetector) {
-          try {
-            const barcodes = await nativeDetector.detect(video);
-            if (barcodes && barcodes.length > 0) {
-              for (const b of barcodes) {
-                if (b.rawValue && isValidBarcodeString(b.rawValue)) {
-                  detectedRawCode = b.rawValue;
-                  break;
-                }
-              }
-            }
-          } catch (e) {
-            // ignore frame error
-          }
-        }
-
-        // 2. High-Precision ZXing Multi-Pass Decoder (Essential for iOS Safari & Counterpoint Code 39/ITF)
-        if (!detectedRawCode && cropCtx) {
-          try {
-            const vw = video.videoWidth;
-            const vh = video.videoHeight;
-
-            // Crop to central 75% width, 60% height around viewfinder reticle
-            const cropW = Math.floor(vw * 0.75);
-            const cropH = Math.floor(vh * 0.60);
-            const cropX = Math.floor((vw - cropW) / 2);
-            const cropY = Math.floor((vh - cropH) / 2);
-
-            cropCanvas.width = Math.min(cropW, 1280);
-            cropCanvas.height = Math.min(cropH, 960);
-
-            // Pass 1: Standard high-res cropped frame
-            cropCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height);
-
-            try {
-              const result = reader.decodeFromCanvas(cropCanvas);
-              if (result && result.getText() && isValidBarcodeString(result.getText())) {
-                detectedRawCode = result.getText();
-              }
-            } catch (err1) {
-              // Pass 2: 90-degree rotated canvas for vertical nursery pot stake tags (common on iPhone in portrait)
-              if (rotCtx) {
-                try {
-                  rotCanvas.width = cropCanvas.height;
-                  rotCanvas.height = cropCanvas.width;
-                  rotCtx.save();
-                  rotCtx.translate(rotCanvas.width / 2, rotCanvas.height / 2);
-                  rotCtx.rotate((90 * Math.PI) / 180);
-                  rotCtx.drawImage(cropCanvas, -cropCanvas.width / 2, -cropCanvas.height / 2);
-                  rotCtx.restore();
-
-                  const rotResult = reader.decodeFromCanvas(rotCanvas);
-                  if (rotResult && rotResult.getText() && isValidBarcodeString(rotResult.getText())) {
-                    detectedRawCode = rotResult.getText();
-                  }
-                } catch (rotErr) {
-                  // Not vertical or not decodable
-                }
-              }
-
-              // Pass 3: High-contrast binarization for glossy tags & direct nursery sunlight
-              if (!detectedRawCode) {
-                try {
-                  const imgData = cropCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
-                  const data = imgData.data;
-                  const len = data.length;
-                  for (let i = 0; i < len; i += 4) {
-                    const lum = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
-                    const enhanced = lum < 115 ? 0 : (lum > 155 ? 255 : (lum < 135 ? 25 : 235));
-                    data[i] = enhanced;
-                    data[i + 1] = enhanced;
-                    data[i + 2] = enhanced;
-                  }
-                  cropCtx.putImageData(imgData, 0, 0);
-
-                  const result2 = reader.decodeFromCanvas(cropCanvas);
-                  if (result2 && result2.getText() && isValidBarcodeString(result2.getText())) {
-                    detectedRawCode = result2.getText();
-                  }
-                } catch (binErr) {
-                  // Pass 4: Full uncropped frame at scaled resolution
-                  if (fullCtx) {
-                    try {
-                      fullCanvas.width = Math.min(vw, 1024);
-                      fullCanvas.height = Math.min(vh, 768);
-                      fullCtx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height);
-                      const result3 = reader.decodeFromCanvas(fullCanvas);
-                      if (result3 && result3.getText() && isValidBarcodeString(result3.getText())) {
-                        detectedRawCode = result3.getText();
-                      }
-                    } catch (fullErr) {
-                      // No barcode in this frame
-                    }
-                  }
-                }
-              }
-            }
-          } catch (err) {
-            // Expected when frame has no barcode in ROI
-          }
-        }
-
-        isProcessing = false;
-
-        // Multi-frame comparison engine:
-        // Captures enough frames to compare candidates across a sliding window,
-        // preventing partial reads or single-frame noise while maintaining instant response for verified inventory
         if (detectedRawCode && !isCancelled) {
           const cleanCode = cleanCounterpointBarcode(detectedRawCode);
           const now = Date.now();
 
           // Push into temporal frame buffer
           recentFramesBufferRef.current.push({ code: cleanCode, timestamp: now });
-          // Retain frames within the last 600ms
-          recentFramesBufferRef.current = recentFramesBufferRef.current.filter(item => now - item.timestamp <= 600);
+          // Retain frames within the last 1200ms sliding window
+          recentFramesBufferRef.current = recentFramesBufferRef.current.filter(item => now - item.timestamp <= 1200);
+
+          // Count matching frames for this specific barcode string
+          const matchingFrames = recentFramesBufferRef.current.filter(item => item.code === cleanCode).length;
 
           // Check if candidate matches a known plant in the active catalog
           const directMatch = findPlantByBarcode(cleanCode, inventory);
 
           if (directMatch) {
-            // Known inventory plant: instant confirmation with zero delay
-            handleScannedBarcode(detectedRawCode, false);
+            // Known inventory plant: require at least 3 matching frames in the sliding window to confirm
+            // (Eliminates single-frame partial reads or motion blur on iPhone)
+            if (matchingFrames >= 3) {
+              recentFramesBufferRef.current = []; // Clear temporal buffer once verified
+              handleScannedBarcode(detectedRawCode, false);
+            }
           } else {
-            // Uncataloged or ambiguous code: require at least 2 frames in the sliding window to agree
-            const matchingFrames = recentFramesBufferRef.current.filter(item => item.code === cleanCode).length;
-            if (matchingFrames >= 2) {
+            // Uncataloged or ambiguous code: require at least 4 frames in the sliding window to agree
+            if (matchingFrames >= 4) {
+              recentFramesBufferRef.current = []; // Clear temporal buffer once verified
               handleScannedBarcode(detectedRawCode, false);
             }
           }
         }
-      } else {
+      } catch (err) {
+        // frame decode handled
+      } finally {
         isProcessing = false;
       }
     };
 
-    // 120ms polling interval: fast enough for rapid 2-frame consensus (~240ms) without CPU thermal throttling
+    // 120ms polling interval
     intervalId = setInterval(processFrame, 120);
 
     return () => {
@@ -972,7 +1025,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   };
 
   // Start camera stream with specific device or mode with iPhone high-res & autofocus optimizations
-  const startCameraStream = async (deviceId?: string, mode: 'environment' | 'user' = facingMode) => {
+  const startCameraStream = async (deviceId?: string, mode: 'environment' | 'user' = facingMode, silent: boolean = false) => {
     if (cameraStream) {
       cameraStream.getTracks().forEach(track => track.stop());
       setCameraStream(null);
@@ -1101,7 +1154,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     } catch (err: any) {
       console.error('Camera access error:', err);
       setCameraActive(false);
-      setCameraError('Camera access denied or unavailable. Click to simulate barcode scan.');
+      if (!silent) {
+        setCameraError('Camera access denied or unavailable. Please enable camera permissions or enter plant barcode/SKU above.');
+      }
     }
   };
 
@@ -1178,18 +1233,46 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }
   };
 
-  // Simulate Barcode Scanning
-  const simulateScanItem = () => {
-    setIsScanning(true);
-    setTimeout(() => {
-      // Pick next plant or random plant and pass its barcode
-      const unadded = inventory.filter(p => !cartItems.some(c => c.plant.id === p.id));
-      const nextPlant = unadded.length > 0 ? unadded[0] : inventory[Math.floor(Math.random() * inventory.length)];
-      if (nextPlant) {
-        handleScannedBarcode(nextPlant.barcode || nextPlant.itemNo || nextPlant.id, true);
+  // Real Barcode Scanning on Button Tap
+  const handleTapToScan = async () => {
+    // 1. If camera is NOT active, start the camera feed so user can scan
+    if (!cameraActive) {
+      setIsScanning(true);
+      try {
+        await startCameraStream(undefined, facingMode, false);
+        triggerScannedFeedback('Camera active. Align plant barcode within green reticle.', 'success', 3500);
+      } catch (err) {
+        console.warn('Could not start camera on tap:', err);
+      } finally {
+        setIsScanning(false);
       }
+      return;
+    }
+
+    // 2. Camera IS active: capture and decode the current video frame immediately
+    resetCameraTimer();
+    setIsScanning(true);
+
+    const video = videoRef.current;
+    if (!video || video.readyState < 2) {
+      triggerScannedFeedback('Camera feed starting, please hold steady...', 'warning', 2500);
       setIsScanning(false);
-    }, 500);
+      return;
+    }
+
+    try {
+      const detectedRawCode = await decodeBarcodeFromVideoElement(video);
+      if (detectedRawCode) {
+        handleScannedBarcode(detectedRawCode, true);
+      } else {
+        triggerScannedFeedback('No barcode detected in camera frame. Align plant barcode inside green reticle and hold steady.', 'warning', 3500);
+      }
+    } catch (err) {
+      console.warn('Manual tap scan error:', err);
+      triggerScannedFeedback('Could not read barcode. Ensure barcode is in focus and well lit.', 'warning', 3000);
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const updateQuantity = (plantId: string, delta: number) => {
@@ -2527,7 +2610,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             )}
             <button
               type="button"
-              onClick={simulateScanItem}
+              onClick={handleTapToScan}
               disabled={isScanning}
               className="bg-white/95 hover:bg-white text-[#1a1c1a] font-bold text-xs px-4 py-2 rounded-full shadow-lg flex items-center gap-2 backdrop-blur-xs transition-transform active:scale-95 cursor-pointer"
             >
@@ -2604,10 +2687,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <div className="p-8 text-center bg-[#f3f4f0] rounded-xl border border-dashed border-[#c1c8c2] text-[#717973]">
               <p className="text-sm">No items added to order yet.</p>
               <button
-                onClick={simulateScanItem}
-                className="mt-2 text-xs text-[#0e6c4a] font-bold hover:underline"
+                onClick={handleTapToScan}
+                className="mt-2 text-xs text-[#0e6c4a] font-bold hover:underline cursor-pointer"
               >
-                + Scan Item or Add Test Plant
+                + Scan Plant Barcode
               </button>
             </div>
           ) : (

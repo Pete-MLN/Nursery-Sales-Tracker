@@ -37,18 +37,26 @@ import {
   ChevronUp,
   Compass,
   Eye,
-  EyeOff
+  EyeOff,
+  ArrowLeft,
+  Home
 } from 'lucide-react';
 
 interface PlantMapModalProps {
   isOpen: boolean;
   onClose: () => void;
-  selectedItem: OrderCartItem | null;
+  selectedItem?: OrderCartItem | null;
   allItems?: OrderCartItem[];
   gpsLoggedMap?: Record<string, string>;
   onLogGPS?: (plantId: string) => void;
   orderId?: string;
   customerName?: string;
+  onBackToOrder?: () => void;
+  onNavigateHome?: () => void;
+  latitude?: number;
+  longitude?: number;
+  plantName?: string;
+  locationNotes?: string;
 }
 
 export interface ParsedPlantLocation {
@@ -727,14 +735,20 @@ const InteractiveTileMap: React.FC<{
 export const PlantMapModal: React.FC<PlantMapModalProps> = ({
   isOpen,
   onClose,
-  selectedItem,
+  selectedItem = null,
   allItems = [],
   gpsLoggedMap = {},
   onLogGPS,
   orderId,
-  customerName
+  customerName,
+  onBackToOrder,
+  onNavigateHome,
+  latitude,
+  longitude,
+  plantName,
+  locationNotes
 }) => {
-  const [activeItem, setActiveItem] = useState<OrderCartItem | null>(selectedItem);
+  const [activeItem, setActiveItem] = useState<OrderCartItem | null>(selectedItem || null);
   const [copiedCoords, setCopiedCoords] = useState<string | null>(null);
   const [mapTypeId, setMapTypeId] = useState<'hybrid' | 'satellite' | 'roadmap'>('hybrid');
   const [filterMode, setFilterMode] = useState<'all' | 'logged_only'>('all');
@@ -749,6 +763,22 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
   const [isLargerModal, setIsLargerModal] = useState<boolean>(false);
   const [isPlantListCollapsed, setIsPlantListCollapsed] = useState<boolean>(false);
 
+  const handleBackToOrder = () => {
+    if (onBackToOrder) {
+      onBackToOrder();
+    } else {
+      onClose();
+    }
+  };
+
+  const handleNavigateHome = () => {
+    if (onNavigateHome) {
+      onNavigateHome();
+    } else {
+      onClose();
+    }
+  };
+
   // Sync active item when selectedItem prop changes
   useEffect(() => {
     if (selectedItem) {
@@ -762,8 +792,37 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
     if (selectedItem && !list.some(i => i.plant.id === selectedItem.plant.id)) {
       list.unshift(selectedItem);
     }
+    if (list.length === 0 && typeof latitude === 'number' && typeof longitude === 'number') {
+      list.push({
+        plant: {
+          id: 'audit-loc',
+          name: plantName || 'Audit Plant Location',
+          category: 'Audit',
+          status: 'healthy',
+          price: 0,
+          image: DEFAULT_PLANT_IMAGE,
+          barcode: '',
+          lightRequirement: 'FULL SUN',
+          stock: 1,
+          gpsLocation: {
+            latitude,
+            longitude,
+            accuracy: 10,
+            timestamp: new Date().toISOString()
+          }
+        },
+        quantity: 1,
+        itemNotes: locationNotes,
+        gpsLocation: {
+          latitude,
+          longitude,
+          accuracy: 10,
+          timestamp: new Date().toISOString()
+        }
+      });
+    }
     return list;
-  }, [allItems, selectedItem]);
+  }, [allItems, selectedItem, latitude, longitude, plantName, locationNotes]);
 
   // Parse GPS coordinates for each plant (including multiple spots per plant)
   const parsedLocations = useMemo<ParsedPlantLocation[]>(() => {
@@ -1036,6 +1095,30 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
           </div>
 
           <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+            {/* Button to go back to order */}
+            <button
+              type="button"
+              id="gps-map-header-back-to-order-btn"
+              onClick={handleBackToOrder}
+              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-[#a0f4c8] hover:bg-white text-[#002113] border border-[#a0f4c8] text-xs font-black transition-all cursor-pointer flex items-center gap-1.5 shadow-sm active:scale-95"
+              title="Go back to the order"
+            >
+              <ArrowLeft className="w-3.5 h-3.5 text-[#002113]" />
+              <span className="whitespace-nowrap">Back to Order</span>
+            </button>
+
+            {/* Button to return to home page */}
+            <button
+              type="button"
+              id="gps-map-header-home-btn"
+              onClick={handleNavigateHome}
+              className="px-2.5 sm:px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-white border border-white/20 text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs active:scale-95"
+              title="Return to home page"
+            >
+              <Home className="w-3.5 h-3.5 text-[#a0f4c8]" />
+              <span className="hidden xs:inline whitespace-nowrap">Home</span>
+            </button>
+
             {/* Toggle Larger Fullscreen / Standard Pop-up view */}
             <button
               type="button"
@@ -1436,18 +1519,42 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
         </div>
 
         {/* MODAL FOOTER */}
-        <div className="bg-[#f3f4f0] px-3 sm:px-4 py-2 sm:py-2.5 border-t border-[#c1c8c2] flex justify-between items-center shrink-0">
+        <div className="bg-[#f3f4f0] px-3 sm:px-4 py-2 sm:py-2.5 border-t border-[#c1c8c2] flex justify-between items-center shrink-0 flex-wrap gap-2">
           <div className="flex items-center gap-2 text-xs text-[#414844]">
             <Building className="w-4 h-4 text-[#0e6c4a]" />
             <span className="hidden sm:inline">Maple Lane Nursery • High-Precision GPS Plant Locator (Sub-Meter Satellite Accuracy)</span>
             <span className="sm:hidden">Yard GPS Locator</span>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            {/* Button to go back to order */}
+            <button
+              type="button"
+              id="gps-map-footer-back-to-order-btn"
+              onClick={handleBackToOrder}
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white font-extrabold text-xs sm:text-sm rounded-xl transition-all cursor-pointer shadow-sm flex items-center gap-1.5 active:scale-95 border border-[#a0f4c8]/30"
+              title="Go back to the order"
+            >
+              <ArrowLeft className="w-4 h-4" />
+              <span>Back to Order</span>
+            </button>
+
+            {/* Button to return to home page */}
+            <button
+              type="button"
+              id="gps-map-footer-home-btn"
+              onClick={handleNavigateHome}
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-white hover:bg-[#e7e9e5] text-[#012d1d] font-extrabold text-xs sm:text-sm rounded-xl transition-all cursor-pointer shadow-2xs flex items-center gap-1.5 active:scale-95 border border-[#c1c8c2]"
+              title="Return to home page"
+            >
+              <Home className="w-4 h-4 text-[#0e6c4a]" />
+              <span>Home</span>
+            </button>
+
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-1.5 sm:px-6 sm:py-2 bg-[#0e6c4a] hover:bg-[#0b5338] text-white font-extrabold text-xs sm:text-sm rounded-xl transition-all cursor-pointer shadow-sm"
+              className="px-3.5 py-1.5 sm:px-4 sm:py-2 bg-[#0e6c4a] hover:bg-[#0b5338] text-white font-extrabold text-xs sm:text-sm rounded-xl transition-all cursor-pointer shadow-sm"
             >
               Close Map
             </button>

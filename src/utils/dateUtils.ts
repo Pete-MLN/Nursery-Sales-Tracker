@@ -41,6 +41,120 @@ export function formatOrderCreatedDate(order?: { date?: string; createdAt?: stri
 }
 
 /**
+ * Formats the modified date/time of an order if present.
+ */
+export function formatOrderModifiedDate(order?: { updatedAt?: string; modifiedAt?: string } | null): string {
+  if (!order) return '';
+  const dateStr = order.updatedAt || order.modifiedAt;
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (!isNaN(d.getTime())) {
+    return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' });
+  }
+  return dateStr;
+}
+
+/**
+ * Returns a numerical timestamp (epoch ms) representing the latest date
+ * the order was created or modified. Used for sorting newest to oldest.
+ */
+export function getOrderSortTimestamp(order?: {
+  id?: string;
+  date?: string;
+  createdAt?: string;
+  updatedAt?: string;
+  modifiedAt?: string;
+  completedAt?: string;
+  scheduledDate?: string;
+  items?: Array<{
+    gpsLocation?: { timestamp?: string };
+    gpsLocations?: Array<{ timestamp?: string }>;
+  }>;
+} | null): number {
+  if (!order) return 0;
+
+  const candidateTimestamps: number[] = [];
+
+  // 1. Explicit modification timestamps
+  if (order.updatedAt) {
+    const t = new Date(order.updatedAt).getTime();
+    if (!isNaN(t)) candidateTimestamps.push(t);
+  }
+  if (order.modifiedAt) {
+    const t = new Date(order.modifiedAt).getTime();
+    if (!isNaN(t)) candidateTimestamps.push(t);
+  }
+  if (order.completedAt) {
+    const t = new Date(order.completedAt).getTime();
+    if (!isNaN(t)) candidateTimestamps.push(t);
+  }
+
+  // 2. Item-level modifications (e.g. GPS tagging)
+  if (order.items && order.items.length > 0) {
+    for (const item of order.items) {
+      if (item.gpsLocation?.timestamp) {
+        const t = new Date(item.gpsLocation.timestamp).getTime();
+        if (!isNaN(t)) candidateTimestamps.push(t);
+      }
+      if (item.gpsLocations && item.gpsLocations.length > 0) {
+        for (const loc of item.gpsLocations) {
+          if (loc.timestamp) {
+            const t = new Date(loc.timestamp).getTime();
+            if (!isNaN(t)) candidateTimestamps.push(t);
+          }
+        }
+      }
+    }
+  }
+
+  // 3. Creation ISO timestamp
+  if (order.createdAt) {
+    const t = new Date(order.createdAt).getTime();
+    if (!isNaN(t)) candidateTimestamps.push(t);
+  }
+
+  // 4. Calendar date string (e.g. "Aug 18, 2026", "2026-08-18", "Today")
+  if (order.date) {
+    const trimmed = order.date.trim();
+    if (trimmed.toLowerCase() === 'today' || trimmed.toLowerCase() === 'just now') {
+      if (candidateTimestamps.length === 0) {
+        candidateTimestamps.push(Date.now());
+      }
+    } else {
+      const parsed = Date.parse(trimmed);
+      if (!isNaN(parsed)) {
+        candidateTimestamps.push(parsed);
+      }
+    }
+  }
+
+  // 5. Scheduled date if available
+  if (order.scheduledDate) {
+    const parsed = Date.parse(order.scheduledDate);
+    if (!isNaN(parsed)) {
+      candidateTimestamps.push(parsed);
+    }
+  }
+
+  // If any valid timestamp was found, the newest one is the latest created/modified moment
+  if (candidateTimestamps.length > 0) {
+    return Math.max(...candidateTimestamps);
+  }
+
+  // 6. Fallback: Check numeric ID for epoch millis or numeric string
+  if (order.id) {
+    const digitsMatch = order.id.match(/\d{6,}/);
+    if (digitsMatch) {
+      const val = Number(digitsMatch[0]);
+      if (val > 1000000000000) return val;
+      if (val > 1000000000) return val * 1000;
+    }
+  }
+
+  return 0;
+}
+
+/**
  * Formats the scheduled fulfillment date and time for an order.
  * Handles ISO dates (YYYY-MM-DD), times (2:00 PM), windows (Morning 8am-12pm), and combined strings.
  */

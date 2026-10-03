@@ -611,6 +611,8 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       scheduledDate: scheduledDate.trim(),
       date: currentOrder.date ? formatOrderCreatedDate(currentOrder) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
       createdAt: currentOrder.createdAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      modifiedAt: new Date().toISOString(),
       status: finalStatus,
       holdingLocation: holdingLocation,
       notes: orderNotes.trim(),
@@ -1157,15 +1159,15 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               </div>
             </div>
 
-            {/* Second 'Scan & Add Plants' Button (Text 4 points larger: 18px font-extrabold) */}
+            {/* Second 'Scan & Add Plants' Button (Text adjusted 2 points smaller) */}
             <button
               type="button"
               id="btn-top-scan-and-add-plants"
               onClick={handleScanAndAddPlants}
-              className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[18px] sm:text-[19px] font-extrabold shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[16px] sm:text-[17px] font-extrabold shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
               title="Open scan screen to scan barcodes and add plants to this order"
             >
-              <Barcode className="w-5 h-5 text-[#a0f4c8] shrink-0" />
+              <Barcode className="w-4.5 h-4.5 text-[#a0f4c8] shrink-0" />
               <span>Scan & Add Plants</span>
             </button>
           </div>
@@ -3348,6 +3350,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
         onLogGPS={handleLogGPS}
         orderId={currentOrder.id}
         customerName={customerName || currentOrder.customerName}
+        onBackToOrder={() => setMapModalItem(null)}
+        onNavigateHome={() => {
+          setMapModalItem(null);
+          onNavigate('home');
+        }}
       />
     </div>
   );

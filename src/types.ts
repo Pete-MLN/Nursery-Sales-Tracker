@@ -99,6 +99,8 @@ export interface Order {
   status: 'Pending' | 'Ready for Pickup' | 'Completed' | 'In Transit' | 'Cancelled' | 'Partial Pickup';
   date: string; // Date entered/created (e.g. "Aug 18, 2026")
   createdAt?: string; // ISO 8601 creation timestamp
+  updatedAt?: string; // ISO 8601 modification timestamp
+  modifiedAt?: string; // ISO 8601 modification timestamp alias
   items?: OrderCartItem[];
   holdingLocation?: string;
   notes?: string;

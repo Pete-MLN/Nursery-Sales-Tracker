@@ -654,6 +654,8 @@ export default function App() {
       status: overrides?.status || (isDirectTaken ? 'Completed' : 'Pending'),
       date: formattedCreatedDate,
       createdAt: now.toISOString(),
+      updatedAt: now.toISOString(),
+      modifiedAt: now.toISOString(),
       items: isDirectTaken ? cartItems.map(i => ({ ...i, pickedUpQuantity: i.quantity })) : (overrides?.items || cartItems),
       holdingLocation: overrides?.holdingLocation || 'Left in Place (Current Row)',
       ...overrides
@@ -668,10 +670,13 @@ export default function App() {
   // Update holding location from HoldingLocationScreen
   const handleConfirmLocation = (locationName: string) => {
     if (activeOrder) {
+      const nowIso = new Date().toISOString();
       const updatedOrder = {
         ...activeOrder,
         holdingLocation: locationName,
-        status: 'Ready for Pickup' as const
+        status: 'Ready for Pickup' as const,
+        updatedAt: nowIso,
+        modifiedAt: nowIso
       };
       setActiveOrder(updatedOrder);
       setOrders(prev => prev.map(o => o.id === activeOrder.id ? updatedOrder : o));
@@ -682,12 +687,18 @@ export default function App() {
 
   // Full order update (items, quantities, customer, location, status)
   const handleUpdateOrder = (updatedOrder: Order) => {
-    setOrders(prev => prev.map(o => o.id === updatedOrder.id ? updatedOrder : o));
-    if (activeOrder && activeOrder.id === updatedOrder.id) {
-      setActiveOrder(updatedOrder);
+    const nowIso = new Date().toISOString();
+    const stampedOrder: Order = {
+      ...updatedOrder,
+      updatedAt: updatedOrder.updatedAt || nowIso,
+      modifiedAt: updatedOrder.modifiedAt || nowIso
+    };
+    setOrders(prev => prev.map(o => o.id === stampedOrder.id ? stampedOrder : o));
+    if (activeOrder && activeOrder.id === stampedOrder.id) {
+      setActiveOrder(stampedOrder);
     }
-    clearActiveDraft(updatedOrder.id);
-    saveOrderToFirestore(updatedOrder);
+    clearActiveDraft(stampedOrder.id);
+    saveOrderToFirestore(stampedOrder);
   };
 
   // Cancel / delete order from list and Firestore
@@ -753,6 +764,8 @@ export default function App() {
         status: draft.orderStatus || (existing ? existing.status : 'Pending'),
         date: existing ? existing.date : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
         createdAt: existing ? existing.createdAt : new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+        modifiedAt: new Date().toISOString(),
         items: draft.cartItems && draft.cartItems.length > 0 ? draft.cartItems : (existing ? existing.items : []),
         holdingLocation: draft.holdingLocation || (existing ? existing.holdingLocation : 'Left in Place (Current Row)'),
         notes: draft.notes !== undefined ? draft.notes : (existing ? existing.notes : ''),
@@ -788,6 +801,8 @@ export default function App() {
         status: draft.orderStatus || 'Pending',
         date: formattedCreatedDate,
         createdAt: now.toISOString(),
+        updatedAt: now.toISOString(),
+        modifiedAt: now.toISOString(),
         items: draft.cartItems || [],
         holdingLocation: draft.holdingLocation || 'Left in Place (Current Row)',
         notes: draft.notes || ''

@@ -2532,6 +2532,11 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
           longitude={mapModalGps.longitude}
           plantName={mapModalGps.title}
           locationNotes={mapModalGps.subtitle}
+          onBackToOrder={() => setMapModalGps(null)}
+          onNavigateHome={() => {
+            setMapModalGps(null);
+            onNavigate('home');
+          }}
         />
       )}
     </div>

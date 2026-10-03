@@ -913,6 +913,11 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
           }}
           orderId={activeOrder.id}
           customerName={activeOrder.customerName}
+          onBackToOrder={() => setIsPlantMapOpen(false)}
+          onNavigateHome={() => {
+            setIsPlantMapOpen(false);
+            onNavigate('home');
+          }}
         />
       )}
     </div>

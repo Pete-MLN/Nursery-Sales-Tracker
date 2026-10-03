@@ -1359,6 +1359,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     const totalAmt = calculateTotal();
 
     if (activeOrder && onUpdateActiveOrder) {
+      const nowIso = new Date().toISOString();
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
@@ -1366,7 +1367,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         items: cartItems,
         itemsCount: totalCount,
         total: totalAmt,
-        notes: orderNotes
+        notes: orderNotes,
+        updatedAt: nowIso,
+        modifiedAt: nowIso
       };
       onUpdateActiveOrder(updated);
       clearActiveDraft(activeOrder.id);
@@ -1392,6 +1395,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     if (activeOrder && onUpdateActiveOrder) {
       const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
       const totalAmt = calculateTotal();
+      const nowIso = new Date().toISOString();
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
@@ -1399,7 +1403,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         items: cartItems,
         itemsCount: totalCount,
         total: totalAmt,
-        notes: orderNotes
+        notes: orderNotes,
+        updatedAt: nowIso,
+        modifiedAt: nowIso
       };
       onUpdateActiveOrder(updated);
       clearActiveDraft(activeOrder.id);
@@ -1426,6 +1432,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     }));
 
     if (activeOrder && onUpdateActiveOrder) {
+      const nowIso = new Date().toISOString();
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
@@ -1436,7 +1443,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         type: 'Take Now',
         holdingLocation: 'Taken by Customer / No Staging',
         status: 'Completed',
-        notes: orderNotes
+        notes: orderNotes,
+        updatedAt: nowIso,
+        modifiedAt: nowIso
       };
       onUpdateActiveOrder(updated);
       clearActiveDraft(activeOrder.id);
@@ -1464,6 +1473,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     if (activeOrder && onUpdateActiveOrder) {
       const totalCount = cartItems.reduce((acc, item) => acc + item.quantity, 0);
       const totalAmt = calculateTotal();
+      const nowIso = new Date().toISOString();
       const updated: Order = {
         ...activeOrder,
         customerName: finalCustomer,
@@ -1471,7 +1481,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         items: cartItems,
         itemsCount: totalCount,
         total: totalAmt,
-        notes: orderNotes
+        notes: orderNotes,
+        updatedAt: nowIso,
+        modifiedAt: nowIso
       };
       onUpdateActiveOrder(updated);
       clearActiveDraft(activeOrder.id);
@@ -3655,6 +3667,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         onLogGPS={handleLogGPS}
         orderId={activeOrder?.id}
         customerName={selectedCustomer || customerSearch}
+        onBackToOrder={() => setMapModalItem(null)}
+        onNavigateHome={() => {
+          setMapModalItem(null);
+          onNavigate('home');
+        }}
       />
     </div>
   );

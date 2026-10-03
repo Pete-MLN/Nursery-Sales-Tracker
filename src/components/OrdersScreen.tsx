@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { ScreenType, Order } from '../types';
-import { formatOrderCreatedDate, formatOrderScheduledTime } from '../utils/dateUtils';
+import { formatOrderCreatedDate, formatOrderScheduledTime, formatOrderModifiedDate, getOrderSortTimestamp } from '../utils/dateUtils';
 import { PlantMapModal } from './PlantMapModal';
 import { saveOrderToFirestore, savePlantToFirestore } from '../services/firebaseService';
 import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
@@ -85,6 +85,13 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       ));
 
     return matchesTab && matchesSearch;
+  }).sort((a, b) => {
+    const timeA = getOrderSortTimestamp(a);
+    const timeB = getOrderSortTimestamp(b);
+    if (timeB !== timeA) {
+      return timeB - timeA; // newest to oldest
+    }
+    return (b.id || '').localeCompare(a.id || '', undefined, { numeric: true });
   });
 
   const getFulfillmentIcon = (type: string) => {
@@ -99,11 +106,14 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
   const handleConfirmComplete = (order: Order) => {
     if (onUpdateOrder) {
       const now = new Date();
+      const nowIso = now.toISOString();
       const updatedOrder: Order = {
         ...order,
         status: 'Completed',
         archived: true,
-        completedAt: now.toISOString(),
+        completedAt: nowIso,
+        updatedAt: nowIso,
+        modifiedAt: nowIso,
         hasPartialPickup: false,
         remainingItemsCount: 0,
         pickedUpItemsCount: order.itemsCount,
@@ -120,11 +130,14 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
   const handleReopenOrder = (order: Order) => {
     if (onUpdateOrder) {
+      const nowIso = new Date().toISOString();
       const updatedOrder: Order = {
         ...order,
         status: 'Ready for Pickup',
         archived: false,
-        completedAt: undefined
+        completedAt: undefined,
+        updatedAt: nowIso,
+        modifiedAt: nowIso
       };
       onUpdateOrder(updatedOrder);
       showToast(`Order #${order.id} restored to Active orders queue.`);
@@ -141,9 +154,12 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
   const handleMarkAsCancelled = (order: Order) => {
     if (onUpdateOrder) {
+      const nowIso = new Date().toISOString();
       onUpdateOrder({
         ...order,
-        status: 'Cancelled'
+        status: 'Cancelled',
+        updatedAt: nowIso,
+        modifiedAt: nowIso
       });
       showToast(`Order #${order.id} marked as Cancelled.`);
     }
@@ -179,7 +195,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
       const updatedOrder: Order = {
         ...mapModalOrder,
-        items: updatedItems
+        items: updatedItems,
+        updatedAt: timestamp,
+        modifiedAt: timestamp
       };
 
       const targetItem = (mapModalOrder.items || []).find(item => item.plant.id === plantId);
@@ -487,6 +505,15 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         <Calendar className="w-3 h-3 text-[#0e6c4a]" />
                         <span>Created: <strong>{formatOrderCreatedDate(order)}</strong></span>
                       </span>
+                      {(order.updatedAt || order.modifiedAt) && formatOrderModifiedDate(order) && (
+                        <>
+                          <span className="text-[#c1c8c2]">•</span>
+                          <span className="inline-flex items-center gap-1 bg-[#f3f4f0] px-2 py-0.5 rounded-md text-[#313733]" title={`Last modified: ${order.updatedAt || order.modifiedAt}`}>
+                            <RotateCcw className="w-3 h-3 text-[#0e6c4a]" />
+                            <span>Modified: <strong>{formatOrderModifiedDate(order)}</strong></span>
+                          </span>
+                        </>
+                      )}
                       <span className="text-[#c1c8c2]">•</span>
                       <span className="inline-flex items-center gap-1 bg-[#f3f4f0] px-2 py-0.5 rounded-md text-[#313733]">
                         <Clock className="w-3 h-3 text-[#461702]" />
@@ -839,6 +866,17 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           onLogGPS={handleLogOrderGPS}
           orderId={mapModalOrder.id}
           customerName={mapModalOrder.customerName}
+          onBackToOrder={() => {
+            if (mapModalOrder) {
+              onSelectOrder(mapModalOrder);
+              onNavigate('finalization');
+            }
+            setMapModalOrder(null);
+          }}
+          onNavigateHome={() => {
+            setMapModalOrder(null);
+            onNavigate('home');
+          }}
         />
       )}
     </div>

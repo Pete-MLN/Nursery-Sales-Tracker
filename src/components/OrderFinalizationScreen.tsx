@@ -1938,16 +1938,17 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           </span>
                         )}
                         
-                        {/* Pricing Tier Dropdown & Unit Price */}
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                        {/* Pricing Tier Dropdown & Unit Price (Text 2 points larger) */}
+                        <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
                           <PricingDropdown
                             plant={item.plant}
                             currentPrice={unitPrice}
                             selectedLevelKey={item.selectedPriceLevel}
                             onSelectPriceLevel={(levelKey, newPrice) => handleUpdateItemPriceLevel(item.plant.id, levelKey, newPrice)}
-                            size="sm"
+                            size="md"
+                            largerText={true}
                           />
-                          <span className="text-xs font-bold text-[#012d1d]">
+                          <span className="text-sm sm:text-[14.5px] font-extrabold text-[#012d1d]">
                             ${unitPrice.toFixed(2)} ea
                           </span>
                         </div>

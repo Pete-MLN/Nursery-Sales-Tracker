@@ -1159,15 +1159,15 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               </div>
             </div>
 
-            {/* Second 'Scan & Add Plants' Button (Text adjusted 2 points smaller) */}
+            {/* 'Scan & Add Plants' Button (Text 2 points smaller: 13.5px / 14.5px) */}
             <button
               type="button"
               id="btn-top-scan-and-add-plants"
               onClick={handleScanAndAddPlants}
-              className="inline-flex items-center justify-center gap-2 px-3.5 py-2.5 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[16px] sm:text-[17px] font-extrabold shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
+              className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[13.5px] sm:text-[14.5px] font-extrabold shadow-sm transition-all cursor-pointer active:scale-95 shrink-0"
               title="Open scan screen to scan barcodes and add plants to this order"
             >
-              <Barcode className="w-4.5 h-4.5 text-[#a0f4c8] shrink-0" />
+              <Barcode className="w-4 h-4 text-[#a0f4c8] shrink-0" />
               <span>Scan & Add Plants</span>
             </button>
           </div>

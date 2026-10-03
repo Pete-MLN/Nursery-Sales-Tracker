@@ -167,33 +167,26 @@ const InteractiveTileMap: React.FC<{
     }
   }, [activeLocation]);
 
-  // Center on user location when triggered
+  // Center on user location ONLY when manually triggered by the user
+  const lastCenterOnUserTriggerRef = useRef<number>(centerOnUserTrigger);
   useEffect(() => {
-    if (centerOnUserTrigger > 0 && userLocation) {
-      setCenter({ lat: userLocation.lat, lng: userLocation.lng });
-      setZoom(prev => Math.max(prev, 18));
+    if (centerOnUserTrigger > lastCenterOnUserTriggerRef.current) {
+      lastCenterOnUserTriggerRef.current = centerOnUserTrigger;
+      if (userLocation) {
+        setCenter({ lat: userLocation.lat, lng: userLocation.lng });
+        setZoom(prev => Math.max(prev, 18));
+      }
     }
   }, [centerOnUserTrigger, userLocation]);
 
-  // Fit bounds when triggered
+  // Fit bounds ONLY when explicitly triggered by the user ("Fit All Pins")
+  // Do NOT include user location and do NOT re-center automatically as user walks
   useEffect(() => {
-    if (locations.length === 0) {
-      if (userLocation) {
-        setCenter({ lat: userLocation.lat, lng: userLocation.lng });
-      }
-      return;
-    }
+    if (fitBoundsTrigger === 0) return;
+    if (locations.length === 0) return;
 
     const allPoints = [...locations];
     let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
-    
-    // Include user location in bounds calculation if present
-    if (userLocation) {
-      minLat = Math.min(minLat, userLocation.lat);
-      maxLat = Math.max(maxLat, userLocation.lat);
-      minLng = Math.min(minLng, userLocation.lng);
-      maxLng = Math.max(maxLng, userLocation.lng);
-    }
 
     allPoints.forEach(l => {
       if (l.lat < minLat) minLat = l.lat;
@@ -215,7 +208,7 @@ const InteractiveTileMap: React.FC<{
     else if (maxDiff < 0.005) setZoom(17);
     else if (maxDiff < 0.01) setZoom(16);
     else setZoom(15);
-  }, [fitBoundsTrigger, locations, userLocation]);
+  }, [fitBoundsTrigger, locations]);
 
   // Pan and pinch-to-zoom interaction handlers
   const handlePointerDown = (e: React.PointerEvent) => {
@@ -1116,7 +1109,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
               title="Return to home page"
             >
               <Home className="w-3.5 h-3.5 text-[#a0f4c8]" />
-              <span className="hidden xs:inline whitespace-nowrap">Home</span>
+              <span className="whitespace-nowrap">Home</span>
             </button>
 
             {/* Toggle Larger Fullscreen / Standard Pop-up view */}
@@ -1225,22 +1218,23 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
                   <span className="hidden sm:inline">Fit All Pins</span>
                 </button>
 
-                {/* Center on User button */}
+                {/* Center on My Location manual button */}
                 <button
                   type="button"
+                  id="gps-map-center-my-location-btn"
                   onClick={handleCenterOrAcquireUserLocation}
-                  className={`px-2.5 py-1.5 bg-black/80 hover:bg-[#0e6c4a] backdrop-blur-md rounded-xl border border-white/20 text-xs font-bold flex items-center gap-1 shadow-lg transition-all cursor-pointer ${
+                  className={`px-2.5 sm:px-3 py-1.5 bg-black/85 hover:bg-[#0e6c4a] backdrop-blur-md rounded-xl border border-white/20 text-xs font-black flex items-center gap-1.5 shadow-lg transition-all cursor-pointer active:scale-95 ${
                     userLocation 
-                      ? 'text-blue-300 hover:text-white' 
+                      ? 'text-blue-300 hover:text-white bg-blue-950/80 border-blue-400/40' 
                       : isLocatingUser 
-                        ? 'animate-pulse text-amber-300' 
+                        ? 'animate-pulse text-amber-300 bg-amber-950/80 border-amber-400/40' 
                         : 'text-[#a0f4c8] hover:text-white'
                   }`}
-                  title="Center map on your live GPS location"
+                  title="Center map on my GPS location manually"
                 >
-                  <LocateFixed className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">
-                    {isLocatingUser ? 'Locking GPS...' : userLocation ? 'My Location' : 'Locate Me'}
+                  <LocateFixed className="w-3.5 h-3.5 shrink-0" />
+                  <span>
+                    {isLocatingUser ? 'Finding GPS...' : 'Center on My Location'}
                   </span>
                 </button>
 
@@ -1527,6 +1521,24 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
           </div>
 
           <div className="flex items-center gap-2 flex-wrap">
+            {/* Center on My Location Button */}
+            <button
+              type="button"
+              id="gps-map-footer-center-location-btn"
+              onClick={handleCenterOrAcquireUserLocation}
+              className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95 border ${
+                userLocation
+                  ? 'bg-blue-50 hover:bg-blue-100 text-blue-900 border-blue-300'
+                  : isLocatingUser
+                    ? 'bg-amber-50 text-amber-900 border-amber-300 animate-pulse'
+                    : 'bg-[#e8f5e9] hover:bg-[#d0edd8] text-[#012d1d] border-[#a0f4c8]'
+              }`}
+              title="Center map on my location manually"
+            >
+              <LocateFixed className="w-4 h-4 text-[#0e6c4a]" />
+              <span>{isLocatingUser ? 'Finding GPS...' : 'Center on My Location'}</span>
+            </button>
+
             {/* Button to go back to order */}
             <button
               type="button"

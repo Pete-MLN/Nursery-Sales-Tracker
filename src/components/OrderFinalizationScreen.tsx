@@ -984,52 +984,59 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
       )}
 
       {/* Top Breadcrumb & Navigation */}
-      <div className="flex items-center justify-between gap-3 border-b border-[#e2e3df] pb-3">
-        <button
-          type="button"
-          onClick={() => onNavigate('orders')}
-          className="inline-flex items-center gap-1.5 text-xs font-bold text-[#414844] hover:text-[#012d1d] transition-colors cursor-pointer"
-        >
-          <ArrowLeft className="w-4 h-4" />
-          <span>Back to All Orders</span>
-        </button>
+      <div className="border-b border-[#e2e3df] pb-2 flex flex-col gap-1.5">
+        {/* Row 1: Back to All Orders + Next Customer / Autosave */}
+        <div className="flex items-center justify-between gap-3">
+          <button
+            type="button"
+            onClick={() => onNavigate('orders')}
+            className="inline-flex items-center gap-1.5 text-xs font-bold text-[#414844] hover:text-[#012d1d] transition-colors cursor-pointer"
+          >
+            <ArrowLeft className="w-4 h-4" />
+            <span>Back to All Orders</span>
+          </button>
 
-        <div className="flex items-center gap-2">
-          <AutoSaveBadge />
-          {hasUnsavedChanges && (
-            <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse hidden sm:inline">
-              Unsaved Edits
-            </span>
-          )}
-          {onStartNewOrder && (
-            <button
-              type="button"
-              id="btn-top-next-customer"
-              onClick={onStartNewOrder}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0e6c4a] hover:bg-[#0b5338] text-white text-[13.5px] sm:text-[15.5px] font-extrabold shadow-sm transition-all cursor-pointer border border-[#a0f4c8]/30 active:scale-95"
-              title="Start a fresh order for the next customer"
-            >
-              <Plus className="w-4 h-4 text-[#a0f4c8]" />
-              <span className="text-[13.5px] sm:text-[15.5px]">Next Customer</span>
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            <AutoSaveBadge />
+            {hasUnsavedChanges && (
+              <span className="text-[11px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full animate-pulse hidden sm:inline">
+                Unsaved Edits
+              </span>
+            )}
+            {onStartNewOrder && (
+              <button
+                type="button"
+                id="btn-top-next-customer"
+                onClick={onStartNewOrder}
+                className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#0e6c4a] hover:bg-[#0b5338] text-white text-[13.5px] sm:text-[15.5px] font-extrabold shadow-sm transition-all cursor-pointer border border-[#a0f4c8]/30 active:scale-95"
+                title="Start a fresh order for the next customer"
+              >
+                <Plus className="w-4 h-4 text-[#a0f4c8]" />
+                <span className="text-[13.5px] sm:text-[15.5px]">Next Customer</span>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Row 2: Cancel / Delete & Save Order on their own line with minimal vertical space */}
+        <div className="flex items-center justify-end gap-2 pt-0.5">
           <button
             type="button"
             id="btn-order-finalization-cancel-delete"
             onClick={handleDeleteOrder}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[17px] font-bold transition-colors cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[17px] font-bold transition-colors cursor-pointer shadow-2xs leading-tight active:scale-95"
             title="Cancel or Delete this order"
           >
-            <Trash2 className="w-5 h-5 text-red-600 shrink-0" />
+            <Trash2 className="w-4.5 h-4.5 text-red-600 shrink-0" />
             <span className="text-[17px]">Cancel / Delete</span>
           </button>
           <button
             type="button"
             id="btn-order-finalization-save-order"
             onClick={handleSaveChanges}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[17px] font-extrabold shadow-sm transition-all cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[17px] font-extrabold shadow-sm transition-all cursor-pointer leading-tight active:scale-95"
           >
-            <Save className="w-5 h-5 shrink-0" />
+            <Save className="w-4.5 h-4.5 shrink-0" />
             <span className="text-[17px]">Save Order</span>
           </button>
         </div>

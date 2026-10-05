@@ -1006,31 +1006,31 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               type="button"
               id="btn-top-next-customer"
               onClick={onStartNewOrder}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0e6c4a] hover:bg-[#0b5338] text-white text-xs sm:text-sm font-extrabold shadow-sm transition-all cursor-pointer border border-[#a0f4c8]/30 active:scale-95"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#0e6c4a] hover:bg-[#0b5338] text-white text-[13.5px] sm:text-[15.5px] font-extrabold shadow-sm transition-all cursor-pointer border border-[#a0f4c8]/30 active:scale-95"
               title="Start a fresh order for the next customer"
             >
               <Plus className="w-4 h-4 text-[#a0f4c8]" />
-              <span>Next Customer</span>
+              <span className="text-[13.5px] sm:text-[15.5px]">Next Customer</span>
             </button>
           )}
           <button
             type="button"
             id="btn-order-finalization-cancel-delete"
             onClick={handleDeleteOrder}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[21px] font-bold transition-colors cursor-pointer shadow-2xs"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 text-[17px] font-bold transition-colors cursor-pointer shadow-2xs"
             title="Cancel or Delete this order"
           >
             <Trash2 className="w-5 h-5 text-red-600 shrink-0" />
-            <span>Cancel / Delete</span>
+            <span className="text-[17px]">Cancel / Delete</span>
           </button>
           <button
             type="button"
             id="btn-order-finalization-save-order"
             onClick={handleSaveChanges}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[21px] font-extrabold shadow-sm transition-all cursor-pointer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-[17px] font-extrabold shadow-sm transition-all cursor-pointer"
           >
             <Save className="w-5 h-5 shrink-0" />
-            <span>Save Order</span>
+            <span className="text-[17px]">Save Order</span>
           </button>
         </div>
       </div>
@@ -1060,11 +1060,11 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                 type="button"
                 id="btn-take-now-next-customer"
                 onClick={onStartNewOrder}
-                className="w-full sm:w-auto px-4 py-2.5 bg-[#a0f4c8] hover:bg-white text-[#012d1d] font-black text-xs sm:text-sm rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
+                className="w-full sm:w-auto px-4 py-2.5 bg-[#a0f4c8] hover:bg-white text-[#012d1d] font-black text-[13.5px] sm:text-[15.5px] rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
                 title="Finish and start a fresh order for the next customer"
               >
                 <Plus className="w-4 h-4 text-[#012d1d]" />
-                <span>Next Customer</span>
+                <span className="text-[13.5px] sm:text-[15.5px]">Next Customer</span>
               </button>
             )}
           </div>

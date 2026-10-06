@@ -2767,18 +2767,21 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                           )}
                         </div>
 
-                        {/* Interactive 4-Tier Pricing Dropdown */}
-                        <div className="flex items-center gap-2 mt-1.5 flex-wrap" onClick={(e) => e.stopPropagation()}>
+                        {/* Interactive 4-Tier Pricing Dropdown (Text matches Product Number box: 20px / 22px font-black) */}
+                        <div className="flex items-center gap-2.5 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
                           <PricingDropdown
                             plant={item.plant}
                             currentPrice={unitPrice}
                             selectedLevelKey={item.selectedPriceLevel}
                             onSelectPriceLevel={(levelKey, newPrice) => updateItemPriceLevel(item.plant.id, levelKey, newPrice)}
-                            size="sm"
+                            size="md"
+                            largerText={true}
+                            priceClassName="text-[20px] sm:text-[22px] font-black tracking-tight"
+                            buttonClassName="py-1 px-3 shadow-xs"
                           />
                           
                           {item.quantity > 1 && (
-                            <span className="text-xs font-bold text-[#012d1d]">
+                            <span className="text-sm sm:text-base font-bold text-[#012d1d]">
                               Total: ${lineTotal.toFixed(2)}
                             </span>
                           )}
@@ -3605,7 +3608,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                               addPlantToCart(plant, 1, levelKey);
                             }}
                             size="xs"
-                            priceClassName="text-[22px] font-black tracking-tight leading-none"
+                            priceClassName="text-[20px] sm:text-[22px] font-black tracking-tight leading-none"
                             buttonClassName="py-1 px-2.5"
                             align="right"
                           />

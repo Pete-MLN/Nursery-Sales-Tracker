@@ -132,7 +132,7 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
         } ${buttonClassName}`}
         title="Click to view and switch between all 4 POS price levels"
       >
-        <span className={`font-black ${largerText ? 'text-[15px] sm:text-[16.5px]' : 'font-extrabold'} ${saleSavings && activeLevel.key === 'retail' ? 'text-rose-700' : 'text-[#012d1d]'} group-hover:text-[#0e6c4a] ${priceClassName}`}>
+        <span className={`font-black ${priceClassName ? priceClassName : (largerText ? 'text-[15px] sm:text-[16.5px]' : 'font-extrabold')} ${saleSavings && activeLevel.key === 'retail' ? 'text-rose-700' : 'text-[#012d1d]'} group-hover:text-[#0e6c4a]`}>
           ${displayPrice.toFixed(2)}
         </span>
 

@@ -1,6 +1,7 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import * as XLSX from 'xlsx';
 import { ScreenType, RecentUpload, Employee, PlantItem, Customer } from '../types';
+import { LastUploadDatesInfo } from './AppStartupProgressRing';
 import { parsePosCsvToPlants, parsePosFileToPlants } from '../utils/posCsvParser';
 import { parseCustomerFileToCustomers } from '../utils/customerParser';
 import { 
@@ -30,6 +31,7 @@ import {
 interface DataManagementScreenProps {
   onNavigate: (screen: ScreenType) => void;
   uploads: RecentUpload[];
+  lastUploads?: LastUploadDatesInfo;
   onAddUpload: (filename: string, size?: string, recordsCount?: number, type?: 'inventory' | 'customer' | 'employee') => void;
   employees: Employee[];
   onAddEmployee: (employee: Omit<Employee, 'id'>) => void;
@@ -48,6 +50,7 @@ interface DataManagementScreenProps {
 export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
   onNavigate,
   uploads,
+  lastUploads,
   onAddUpload,
   employees,
   onAddEmployee,
@@ -407,7 +410,32 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     (cust.accountNo && cust.accountNo.toLowerCase().includes(customerSearch.toLowerCase()))
   );
 
-  const lastInventoryUpload = uploads.find(u => 
+  const getUploadTimestamp = (u: RecentUpload): number => {
+    const idMatch = (u.id || '').match(/^u-(\d+)$/);
+    if (idMatch) return parseInt(idMatch[1], 10);
+    const parsed = Date.parse(`${u.date} ${u.time || ''}`);
+    if (!isNaN(parsed)) return parsed;
+    return 0;
+  };
+
+  const sortedUploads = useMemo(() => {
+    return [...uploads].sort((a, b) => getUploadTimestamp(b) - getUploadTimestamp(a));
+  }, [uploads]);
+
+  const cachedUploadDates = useMemo<Partial<LastUploadDatesInfo>>(() => {
+    if (lastUploads) return lastUploads;
+    try {
+      const cached = localStorage.getItem('nursery_last_upload_dates');
+      if (cached) {
+        return JSON.parse(cached);
+      }
+    } catch {
+      // ignore
+    }
+    return {};
+  }, [lastUploads]);
+
+  const lastInventoryUpload = sortedUploads.find(u => 
     u.type === 'inventory' ||
     u.filename.toLowerCase().includes('inventory') || 
     u.filename.toLowerCase().includes('avail') ||
@@ -416,34 +444,39 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
     u.filename.toLowerCase().endsWith('.csv') ||
     u.filename.toLowerCase().endsWith('.xlsx') ||
     u.filename.toLowerCase().endsWith('.xls')
-  ) || uploads[0];
+  );
 
-  const lastInventoryDate = lastInventoryUpload ? lastInventoryUpload.date : 'Sep 14, 2026';
+  const lastInventoryDate = 
+    lastInventoryUpload?.date || 
+    cachedUploadDates.inventoryDate || 
+    'Sep 14, 2026';
 
-  const cachedInventoryCount = (() => {
-    try {
-      const cached = localStorage.getItem('nursery_last_upload_dates');
-      if (cached) {
-        const parsed = JSON.parse(cached);
-        if (parsed?.inventoryCount) return Number(parsed.inventoryCount);
-      }
-    } catch {
-      // ignore
-    }
-    return 0;
-  })();
+  const lastInventoryTime = 
+    lastInventoryUpload?.time || 
+    cachedUploadDates.inventoryTime || 
+    '';
+
+  const cachedInventoryCount = cachedUploadDates.inventoryCount || 0;
 
   const inventoryRecordsCount = inventory.length > 0 
     ? inventory.length 
     : (lastInventoryUpload?.recordsCount || cachedInventoryCount || 0);
 
-  const lastCustomerUpload = uploads.find(u => 
+  const lastCustomerUpload = sortedUploads.find(u => 
     u.type === 'customer' ||
     u.filename.toLowerCase().includes('customer') || 
     u.filename.toLowerCase().includes('client')
   );
 
-  const lastCustomerDate = lastCustomerUpload ? lastCustomerUpload.date : 'Oct 22, 2023';
+  const lastCustomerDate = 
+    lastCustomerUpload?.date || 
+    cachedUploadDates.customerDate || 
+    'Sep 10, 2026';
+
+  const lastCustomerTime = 
+    lastCustomerUpload?.time || 
+    cachedUploadDates.customerTime || 
+    '';
 
   return (
     <div className="flex-1 px-4 py-6 w-full max-w-3xl mx-auto pb-44 animate-fade-in flex flex-col gap-6">
@@ -534,8 +567,11 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                   {inventoryRecordsCount.toLocaleString()} Records
                 </span>
               </div>
-              <span className="text-[11px] text-[#717973] font-medium">
-                Last sync: {lastInventoryDate}
+              <span 
+                className="text-[11px] text-[#717973] font-medium"
+                title={lastInventoryUpload?.filename ? `Uploaded file: ${lastInventoryUpload.filename}` : undefined}
+              >
+                Upload Date: <span className="font-semibold text-[#1a1c1a]">{lastInventoryDate}</span>{lastInventoryTime ? ` at ${lastInventoryTime}` : ''}
               </span>
             </div>
           </div>
@@ -572,8 +608,11 @@ export const DataManagementScreen: React.FC<DataManagementScreenProps> = ({
                   {customers.length.toLocaleString()} Records
                 </span>
               </div>
-              <span className="text-[11px] text-[#717973] font-medium">
-                Last sync: {lastCustomerDate}
+              <span 
+                className="text-[11px] text-[#717973] font-medium"
+                title={lastCustomerUpload?.filename ? `Uploaded file: ${lastCustomerUpload.filename}` : undefined}
+              >
+                Upload Date: <span className="font-semibold text-[#1a1c1a]">{lastCustomerDate}</span>{lastCustomerTime ? ` at ${lastCustomerTime}` : ''}
               </span>
             </div>
           </div>

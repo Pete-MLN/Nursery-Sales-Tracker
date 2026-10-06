@@ -1165,6 +1165,7 @@ export default function App() {
           <DataManagementScreen
             onNavigate={navigateTo}
             uploads={uploads}
+            lastUploads={lastUploads}
             onAddUpload={handleAddUpload}
             employees={employees}
             onAddEmployee={handleAddEmployee}

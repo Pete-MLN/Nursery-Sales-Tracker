@@ -662,11 +662,12 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
             <div className="mt-1.5 flex justify-end">
               <button
                 type="button"
+                id="btn-confirm-plant-set-sale-discount"
                 onClick={() => setIsSaleModalOpen(true)}
-                className="text-xs font-bold text-[#0e6c4a] hover:text-[#012d1d] flex items-center gap-1 cursor-pointer transition-colors px-1 py-0.5"
+                className="text-[15px] sm:text-[16px] font-bold text-[#0e6c4a] hover:text-[#012d1d] flex items-center gap-1.5 cursor-pointer transition-colors px-2 py-1 rounded-lg hover:bg-[#a0f4c8]/20"
                 title="Apply a special discount or sale price to this plant"
               >
-                <Flame className="w-3.5 h-3.5 text-rose-600" />
+                <Flame className="w-4 h-4 text-rose-600" />
                 <span>+ Set Sale / Discount</span>
               </button>
             </div>

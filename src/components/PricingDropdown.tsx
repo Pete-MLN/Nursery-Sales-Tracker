@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { PlantItem } from '../types';
+import { PlantItem, OrderItemMarkdown } from '../types';
 import { getPlantPriceTiers, PriceLevelKey, PriceTierInfo, isPlantOnSale, getPlantSaleSavings } from '../utils/pricingUtils';
 import { ChevronDown, Check, Tag, DollarSign, Layers, Flame } from 'lucide-react';
 
@@ -7,6 +7,7 @@ interface PricingDropdownProps {
   plant: PlantItem;
   currentPrice?: number;
   selectedLevelKey?: PriceLevelKey;
+  orderMarkdown?: OrderItemMarkdown | null;
   onSelectPriceLevel?: (level: PriceLevelKey, price: number) => void;
   isInteractive?: boolean;
   size?: 'xs' | 'sm' | 'md';
@@ -21,6 +22,7 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
   plant,
   currentPrice,
   selectedLevelKey,
+  orderMarkdown,
   onSelectPriceLevel,
   isInteractive = true,
   size = 'sm',
@@ -136,7 +138,12 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
           ${displayPrice.toFixed(2)}
         </span>
 
-        {saleSavings && activeLevel.key === 'retail' ? (
+        {orderMarkdown ? (
+          <span className={`bg-amber-700 text-white ${largerText ? 'text-[11px] px-2 py-0.5' : 'text-[9px] px-1.5 py-0.2'} uppercase tracking-wider font-black rounded flex items-center gap-0.5 shadow-2xs`}>
+            <Tag className={`${largerText ? 'w-3 h-3' : 'w-2.5 h-2.5'} text-amber-200`} />
+            <span>M/D</span>
+          </span>
+        ) : saleSavings && activeLevel.key === 'retail' ? (
           <span className={`bg-rose-600 text-white ${largerText ? 'text-[11px] px-2 py-0.5' : 'text-[9px] px-1.5 py-0.2'} uppercase tracking-wider font-black rounded flex items-center gap-0.5`}>
             <Flame className={`${largerText ? 'w-3 h-3' : 'w-2.5 h-2.5'} text-amber-300`} />
             <span>SALE</span>
@@ -175,13 +182,34 @@ export const PricingDropdown: React.FC<PricingDropdownProps> = ({
                 4 Price Levels
               </span>
             </div>
-            {saleSavings && (
+            {orderMarkdown ? (
+              <span className={`bg-amber-100 text-amber-900 border border-amber-300 ${largerText ? 'text-xs px-2 py-0.5' : 'text-[10px] px-1.5 py-0.5'} font-black rounded flex items-center gap-1`}>
+                <Tag className={`${largerText ? 'w-3.5 h-3.5' : 'w-3 h-3'} text-amber-700`} />
+                <span>Order Markdown</span>
+              </span>
+            ) : saleSavings ? (
               <span className={`bg-rose-100 text-rose-800 ${largerText ? 'text-xs px-2 py-0.5' : 'text-[10px] px-1.5 py-0.5'} font-black rounded flex items-center gap-1`}>
                 <Flame className={`${largerText ? 'w-3.5 h-3.5' : 'w-3 h-3'} text-rose-600`} />
                 <span>Sale Active</span>
               </span>
-            )}
+            ) : null}
           </div>
+
+          {orderMarkdown && (
+            <div className="p-2.5 bg-amber-50 border-b border-amber-200 text-xs flex items-center justify-between gap-2">
+              <div className="min-w-0">
+                <span className="font-extrabold text-amber-950 block truncate">
+                  ⚡ Active Markdown: ${orderMarkdown.markdownPrice.toFixed(2)}/unit
+                </span>
+                <span className="text-[11px] text-amber-800 block truncate">
+                  {orderMarkdown.reason || 'One-time discount for this order'}
+                </span>
+              </div>
+              <span className="text-[10px] font-bold text-amber-700 bg-white px-1.5 py-0.5 rounded border border-amber-200 shrink-0">
+                Ticket Only
+              </span>
+            </div>
+          )}
 
           {/* 4 Price Level Options */}
           <div className="p-1.5 flex flex-col gap-1">

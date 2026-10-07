@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { createPortal } from 'react-dom';
-import { PlantItem, OrderCartItem, GPSLocationEntry } from '../types';
+import { PlantItem, OrderCartItem, GPSLocationEntry, OrderItemMarkdown } from '../types';
 import { PriceLevelKey, getPlantPriceTiers, isPlantOnSale, getPlantSaleSavings, getPlantSalePrice } from '../utils/pricingUtils';
 import { PricingDropdown } from './PricingDropdown';
 import { PlantSaleModal } from './PlantSaleModal';
+import { OrderMarkdownModal } from './OrderMarkdownModal';
 import { 
   acquireHighPrecisionGps, 
   formatGpsCoordinates, 
@@ -49,7 +50,8 @@ interface PlantVerificationModalProps {
     fulfillment: 'Take Now' | 'Pick-up/Delivery',
     gpsLocation?: { latitude: number; longitude: number; accuracy?: number; timestamp: string },
     gpsLocations?: GPSLocationEntry[],
-    itemNotes?: string
+    itemNotes?: string,
+    orderMarkdown?: OrderItemMarkdown | null
   ) => void;
   onClose: () => void;
 }
@@ -67,6 +69,10 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 }) => {
   const [activePlant, setActivePlant] = useState<PlantItem | null>(plant);
   const [isSaleModalOpen, setIsSaleModalOpen] = useState<boolean>(false);
+  const [isOrderMarkdownModalOpen, setIsOrderMarkdownModalOpen] = useState<boolean>(false);
+  const [orderMarkdown, setOrderMarkdown] = useState<OrderItemMarkdown | null>(
+    existingCartItem?.orderMarkdown || null
+  );
   const [saleUpdateNotice, setSaleUpdateNotice] = useState<string | null>(null);
   const [isUpdatingPlantRecord, setIsUpdatingPlantRecord] = useState<boolean>(false);
   const [plantRecordProgress, setPlantRecordProgress] = useState<number>(0);
@@ -189,9 +195,15 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       const plantTiers = getPlantPriceTiers(plant);
       const match = plantTiers.find(t => t.key === tierKey) || plantTiers[0];
       const salePrc = isPlantOnSale(plant) ? getPlantSalePrice(plant) : null;
-      const initialEffectivePrice = existingCartItem?.selectedPrice 
-        ?? (salePrc !== null && tierKey === 'retail' ? salePrc : match.price);
-      setSelectedUnitPrice(initialEffectivePrice);
+      if (existingCartItem?.orderMarkdown) {
+        setOrderMarkdown(existingCartItem.orderMarkdown);
+        setSelectedUnitPrice(existingCartItem.orderMarkdown.markdownPrice);
+      } else {
+        setOrderMarkdown(null);
+        const initialEffectivePrice = existingCartItem?.selectedPrice 
+          ?? (salePrc !== null && tierKey === 'retail' ? salePrc : match.price);
+        setSelectedUnitPrice(initialEffectivePrice);
+      }
 
       // Initialize multiple GPS locations
       let initialLocs: GPSLocationEntry[] = [];
@@ -259,7 +271,30 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
 
   const handlePriceChange = (levelKey: PriceLevelKey, newPrice: number) => {
     setSelectedPriceLevel(levelKey);
+    setOrderMarkdown(null);
     setSelectedUnitPrice(newPrice);
+  };
+
+  const handleApplyMarkdown = (markdown: OrderItemMarkdown) => {
+    setOrderMarkdown(markdown);
+    setSelectedUnitPrice(markdown.markdownPrice);
+    setSaleUpdateNotice(`Order Markdown applied: $${markdown.markdownPrice.toFixed(2)}/unit (${markdown.reason}) — This order only`);
+    setTimeout(() => {
+      setSaleUpdateNotice(null);
+    }, 5000);
+  };
+
+  const handleRemoveMarkdown = () => {
+    setOrderMarkdown(null);
+    const plantTiers = getPlantPriceTiers(currentPlant);
+    const match = plantTiers.find(t => t.key === selectedPriceLevel) || plantTiers[0];
+    const salePrc = isPlantOnSale(currentPlant) ? getPlantSalePrice(currentPlant) : null;
+    const regularEffective = (salePrc !== null && selectedPriceLevel === 'retail') ? salePrc : match.price;
+    setSelectedUnitPrice(regularEffective);
+    setSaleUpdateNotice('Order markdown removed — restored standard pricing');
+    setTimeout(() => {
+      setSaleUpdateNotice(null);
+    }, 4000);
   };
 
   // Capture satellite lock GPS: either re-tags an existing spot or adds a new spot
@@ -456,7 +491,8 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
       fulfillment, 
       primaryGps,
       gpsLocations,
-      itemNotes.trim() || undefined
+      itemNotes.trim() || undefined,
+      orderMarkdown
     );
     onClose();
   };
@@ -658,20 +694,78 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
                 Edit Sale
               </button>
             </div>
-          ) : (
-            <div className="mt-1.5 flex justify-end">
+          ) : null}
+          {/* Active Order Markdown Banner */}
+          {orderMarkdown && (
+            <div className="mt-2 p-3 bg-amber-50 border border-amber-300 rounded-xl flex items-center justify-between gap-2 shadow-2xs">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-7 h-7 rounded-lg bg-amber-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                  <Tag className="w-4 h-4 text-amber-200" />
+                </div>
+                <div className="min-w-0">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="text-xs font-black text-amber-950 uppercase tracking-wide">
+                      One-Time Order Markdown
+                    </span>
+                    <span className="bg-amber-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded">
+                      ${orderMarkdown.markdownPrice.toFixed(2)} ea
+                    </span>
+                    <span className="text-[10px] font-bold text-amber-800 bg-white px-1.5 py-0.5 rounded border border-amber-200">
+                      Ticket Only
+                    </span>
+                  </div>
+                  <div className="text-xs text-amber-900 font-semibold truncate mt-0.5">
+                    {orderMarkdown.reason} · <span className="font-extrabold text-amber-950">Save ${orderMarkdown.savingsPerUnit.toFixed(2)}/unit</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsOrderMarkdownModalOpen(true)}
+                  className="px-2.5 py-1 rounded-lg border border-amber-400 bg-white hover:bg-amber-100 text-amber-900 text-xs font-black transition-colors cursor-pointer"
+                >
+                  Edit
+                </button>
+                <button
+                  type="button"
+                  onClick={handleRemoveMarkdown}
+                  className="p-1.5 rounded-lg text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+                  title="Remove order markdown"
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Pricing Action Row: Order Markdown + Set Sale/Discount */}
+          <div className="mt-2 flex items-center justify-between gap-2 flex-wrap">
+            <button
+              type="button"
+              id="btn-confirm-plant-order-markdown"
+              onClick={() => setIsOrderMarkdownModalOpen(true)}
+              className="text-xs sm:text-[13px] font-extrabold text-amber-900 bg-amber-100 hover:bg-amber-200 border border-amber-300 flex items-center gap-1.5 cursor-pointer transition-all px-3 py-1.5 rounded-xl shadow-2xs"
+              title="Markdown this plant for this customer ticket only without changing master inventory"
+            >
+              <Tag className="w-4 h-4 text-amber-700" />
+              <span>{orderMarkdown ? 'Edit Order Markdown' : '⚡ Markdown (This Order Only)'}</span>
+            </button>
+
+            {!saleSavings && (
               <button
                 type="button"
                 id="btn-confirm-plant-set-sale-discount"
                 onClick={() => setIsSaleModalOpen(true)}
                 className="text-[15px] sm:text-[16px] font-bold text-[#0e6c4a] hover:text-[#012d1d] flex items-center gap-1.5 cursor-pointer transition-colors px-2 py-1 rounded-lg hover:bg-[#a0f4c8]/20"
-                title="Apply a special discount or sale price to this plant"
+                title="Apply a permanent catalog sale or markdown to this plant in master inventory"
               >
                 <Flame className="w-4 h-4 text-rose-600" />
                 <span>+ Set Sale / Discount</span>
               </button>
-            </div>
-          )}
+            )}
+          </div>
 
           {/* Sale update progress indicator or confirmation notice */}
           {isUpdatingPlantRecord && (
@@ -1140,13 +1234,27 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
           </div>
         </div>
 
-        {/* Plant Sale / Discount Modal */}
+        {/* Plant Sale / Discount Modal (Master Inventory) */}
         {isSaleModalOpen && currentPlant && (
           <PlantSaleModal
             isOpen={isSaleModalOpen}
             plant={currentPlant}
             onSaveDiscount={handleSaveSaleDiscount}
             onClose={() => setIsSaleModalOpen(false)}
+          />
+        )}
+
+        {/* Order Markdown Modal (This Specific Ticket / Order Only) */}
+        {isOrderMarkdownModalOpen && currentPlant && (
+          <OrderMarkdownModal
+            isOpen={isOrderMarkdownModalOpen}
+            plant={currentPlant}
+            quantity={quantity}
+            currentMarkdown={orderMarkdown}
+            basePrice={selectedPriceLevel === 'retail' ? (currentPlant.prices?.retail ?? currentPlant.price) : matchedTier.price}
+            onApplyMarkdown={handleApplyMarkdown}
+            onRemoveMarkdown={handleRemoveMarkdown}
+            onClose={() => setIsOrderMarkdownModalOpen(false)}
           />
         )}
       </div>

@@ -151,9 +151,14 @@ export function getPlantPriceTiers(plant: PlantItem): PriceTierInfo[] {
 }
 
 /**
- * Calculates the exact effective unit price for a cart item based on selected level and sale status
+ * Calculates the exact effective unit price for a cart item based on selected level, markdown, and sale status
  */
 export function getItemEffectiveUnitPrice(item: OrderCartItem): number {
+  // 1. One-time Order Markdown takes highest priority for this specific customer order
+  if (item.orderMarkdown && item.orderMarkdown.markdownPrice !== undefined && item.orderMarkdown.markdownPrice > 0) {
+    return item.orderMarkdown.markdownPrice;
+  }
+
   if (item.selectedPrice !== undefined && item.selectedPrice > 0) {
     return item.selectedPrice;
   }
@@ -175,6 +180,40 @@ export function getItemEffectiveUnitPrice(item: OrderCartItem): number {
   }
 
   return item.plant.price || 0;
+}
+
+/**
+ * Checks whether an order cart item has a one-time order markdown applied
+ */
+export function hasOrderMarkdown(item?: OrderCartItem | null): boolean {
+  if (!item || !item.orderMarkdown) return false;
+  return item.orderMarkdown.markdownPrice > 0;
+}
+
+/**
+ * Returns breakdown details of one-time order markdown savings
+ */
+export function getItemMarkdownSavings(item?: OrderCartItem | null): {
+  markdownPrice: number;
+  regularPrice: number;
+  savingsAmount: number;
+  savingsPercent: number;
+  reason?: string;
+  type: string;
+} | null {
+  if (!item || !item.orderMarkdown) return null;
+  const regular = item.orderMarkdown.originalPrice || item.originalPrice || (item.plant.prices?.retail ?? item.plant.price);
+  const markdownPrice = item.orderMarkdown.markdownPrice;
+  const savingsAmount = Math.max(0, Number((regular - markdownPrice).toFixed(2)));
+  const savingsPercent = regular > 0 ? Math.round((savingsAmount / regular) * 100) : 0;
+  return {
+    markdownPrice,
+    regularPrice: regular,
+    savingsAmount,
+    savingsPercent,
+    reason: item.orderMarkdown.reason,
+    type: item.orderMarkdown.type
+  };
 }
 
 /**

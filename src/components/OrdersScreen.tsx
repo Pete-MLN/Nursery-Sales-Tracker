@@ -590,6 +590,11 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         <span className="font-bold text-amber-100 bg-[#461702] px-1.5 py-0.2 rounded text-[10px]">
                           {item.plant.size || 'Std'}
                         </span>
+                        {item.orderMarkdown && (
+                          <span className="font-bold text-amber-900 bg-amber-200 px-1.5 py-0.2 rounded text-[10px]">
+                            M/D
+                          </span>
+                        )}
                       </span>
                     ))}
                     {order.items.length > 4 && (

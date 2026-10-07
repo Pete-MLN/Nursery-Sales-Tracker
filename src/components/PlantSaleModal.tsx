@@ -27,7 +27,7 @@ interface PlantSaleModalProps {
   onClose: () => void;
 }
 
-const PERCENTAGE_PRESETS = [10, 15, 20, 25, 30, 40, 50, 75];
+const PERCENTAGE_PRESETS = [5, 10, 20, 23.08, 30, 50];
 const COMMON_LABELS = [
   'End of Season Clearance',
   'Fall Sale',
@@ -427,7 +427,7 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
                         setErrorText('');
                       }}
                       className={`px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer border ${
-                        discountValueInput === pct.toString()
+                        discountValueInput === pct.toString() || parseFloat(discountValueInput) === pct
                           ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
                           : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#f3f4f0]'
                       }`}

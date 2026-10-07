@@ -24,6 +24,18 @@ export interface GPSLocationEntry {
 }
 
 export type DiscountType = 'fixed_price' | 'percentage';
+export type MarkdownMethodType = 'percentage' | 'fixed_price' | 'dollar_off';
+
+export interface OrderItemMarkdown {
+  type: MarkdownMethodType;
+  value: number; // percentage (e.g. 20), fixed price ($15.00), or dollar off ($5.00)
+  reason?: string; // Reason description e.g. "Plant Imperfection / Blemish", "Volume / Quantity Deal"
+  customReason?: string;
+  originalPrice: number; // Base unit price before markdown
+  markdownPrice: number; // Final discounted unit price for this order
+  savingsPerUnit: number; // Dollar savings per unit
+  appliedAt: string; // ISO date timestamp
+}
 
 export interface PlantSaleDiscount {
   type: DiscountType; // 'fixed_price' (e.g. $29.99 specific lower price) or 'percentage' (e.g. 20% off)
@@ -76,6 +88,7 @@ export interface OrderCartItem {
   selectedPriceLevel?: 'retail' | 'wholesale' | 'gardenCenter' | 'elite';
   selectedPrice?: number;
   saleDiscount?: PlantSaleDiscount; // Snapshot of discount applied to this line item
+  orderMarkdown?: OrderItemMarkdown; // Current order only markdown (one-time discount, does NOT touch master inventory)
   originalPrice?: number; // Base retail price prior to discount
   pickedUpQuantity?: number; // Number of units customer has taken (0 to quantity)
   gpsLocation?: {

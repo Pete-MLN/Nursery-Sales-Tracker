@@ -1,13 +1,14 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
-import { ScreenType, PlantItem, OrderCartItem, Customer, Order, GPSLocationEntry } from '../types';
+import { ScreenType, PlantItem, OrderCartItem, Customer, Order, GPSLocationEntry, OrderItemMarkdown } from '../types';
 import { DEFAULT_PLANT_IMAGE, DEFAULT_CUSTOMER } from '../data/mockData';
 import { Search, Trash2, Plus, Minus, MapPin, CheckCircle, Camera, QrCode, Sparkles, User, RefreshCw, ChevronDown, ChevronUp, Check, X, ArrowRightLeft, Volume2, AlertCircle, Barcode, CheckCircle2, BookOpen, Leaf, Filter, Truck, Save, Zap, ZapOff, ZoomIn, Tag, Package, Clock, Timer, Map as MapIcon, Compass, Radio, ExternalLink, Square, Flame, FileText } from 'lucide-react';
 import { BrowserMultiFormatReader, DecodeHintType, BarcodeFormat } from '@zxing/library';
 import { findPlantByBarcode, isValidBarcodeString, cleanCounterpointBarcode } from '../utils/barcodeUtils';
 import { PricingDropdown } from './PricingDropdown';
-import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers, isPlantOnSale, getPlantSalePrice } from '../utils/pricingUtils';
+import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers, isPlantOnSale, getPlantSalePrice, getPlantSaleSavings, getItemMarkdownSavings } from '../utils/pricingUtils';
 import { PlantVerificationModal } from './PlantVerificationModal';
 import { PlantMapModal } from './PlantMapModal';
+import { OrderMarkdownModal } from './OrderMarkdownModal';
 import { AutoSaveBadge } from './AutoSaveBadge';
 import { 
   autoSaveDraft, 
@@ -85,6 +86,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     initialDraft?.itemFulfillmentMap || {}
   );
   const [mapModalItem, setMapModalItem] = useState<OrderCartItem | null>(null);
+  const [markdownTargetItem, setMarkdownTargetItem] = useState<OrderCartItem | null>(null);
   const [isLoggingGpsId, setIsLoggingGpsId] = useState<string | null>(null);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState<boolean>(Boolean(initialDraft && initialDraft.cartItems && initialDraft.cartItems.length > 0));
 
@@ -443,7 +445,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     fulfillmentChoice: 'Take Now' | 'Pick-up/Delivery',
     gpsLoc?: { latitude: number; longitude: number; timestamp: string },
     gpsLocationsList?: GPSLocationEntry[],
-    notes?: string
+    notes?: string,
+    markdown?: OrderItemMarkdown | null
   ) => {
     setHasUnsavedChanges(true);
     const resolvedGps = gpsLoc || plant.gpsLocation || undefined;
@@ -453,6 +456,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       const existingIndex = prev.findIndex(i => i.plant.id === plant.id);
       const isSale = Boolean(plant.saleDiscount?.active);
       const regPrice = plant.prices?.retail ?? plant.price;
+      const resolvedMarkdown = markdown !== undefined ? (markdown || undefined) : prev[existingIndex]?.orderMarkdown;
       if (existingIndex >= 0) {
         const updated = [...prev];
         updated[existingIndex] = {
@@ -461,8 +465,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           quantity: quantity,
           selectedPriceLevel: priceLevel,
           selectedPrice: unitPrice,
-          originalPrice: isSale ? regPrice : undefined,
+          originalPrice: isSale || resolvedMarkdown ? regPrice : undefined,
           saleDiscount: plant.saleDiscount,
+          orderMarkdown: resolvedMarkdown,
           gpsLocation: resolvedGps || updated[existingIndex].gpsLocation,
           gpsLocations: resolvedGpsList || updated[existingIndex].gpsLocations,
           itemNotes: notes !== undefined ? notes : updated[existingIndex].itemNotes
@@ -476,8 +481,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             quantity,
             selectedPriceLevel: priceLevel,
             selectedPrice: unitPrice,
-            originalPrice: isSale ? regPrice : undefined,
+            originalPrice: isSale || resolvedMarkdown ? regPrice : undefined,
             saleDiscount: plant.saleDiscount,
+            orderMarkdown: resolvedMarkdown,
             gpsLocation: resolvedGps,
             gpsLocations: resolvedGpsList,
             itemNotes: notes
@@ -549,7 +555,43 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         return {
           ...item,
           selectedPriceLevel: levelKey,
-          selectedPrice: newPrice
+          selectedPrice: newPrice,
+          orderMarkdown: undefined // Revert any custom markdown if user explicitly picks standard tier
+        };
+      }
+      return item;
+    }));
+  };
+
+  // Helper to apply a one-time markdown for this customer order only
+  const handleApplyOrderMarkdown = (plantId: string, markdown: OrderItemMarkdown) => {
+    setHasUnsavedChanges(true);
+    setCartItems(prev => prev.map(item => {
+      if (item.plant.id === plantId) {
+        return {
+          ...item,
+          orderMarkdown: markdown,
+          selectedPrice: markdown.markdownPrice,
+          originalPrice: item.originalPrice ?? (item.plant.prices?.retail ?? item.plant.price)
+        };
+      }
+      return item;
+    }));
+  };
+
+  // Helper to remove an order markdown and restore normal pricing
+  const handleRemoveOrderMarkdown = (plantId: string) => {
+    setHasUnsavedChanges(true);
+    setCartItems(prev => prev.map(item => {
+      if (item.plant.id === plantId) {
+        const tiers = getPlantPriceTiers(item.plant);
+        const match = tiers.find(t => t.key === item.selectedPriceLevel) || tiers[0];
+        const salePrc = isPlantOnSale(item.plant) ? getPlantSalePrice(item.plant) : null;
+        const fallbackPrice = (salePrc !== null && (!item.selectedPriceLevel || item.selectedPriceLevel === 'retail')) ? salePrc : match.price;
+        return {
+          ...item,
+          orderMarkdown: undefined,
+          selectedPrice: fallbackPrice
         };
       }
       return item;
@@ -2710,11 +2752,21 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               const gpsLocation = gpsLoggedMap[item.plant.id] || (item.gpsLocation ? `${item.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(item.gpsLocation.longitude).toFixed(4)}° W` : null);
               const unitPrice = getItemEffectiveUnitPrice(item);
               const lineTotal = unitPrice * item.quantity;
+              const activeSaleDiscount = item.saleDiscount || item.plant.saleDiscount;
+              const plantWithSale = activeSaleDiscount ? { ...item.plant, saleDiscount: activeSaleDiscount } : item.plant;
+              const itemSaleSavings = getPlantSaleSavings(plantWithSale);
+              const itemOrderMarkdownSavings = getItemMarkdownSavings(item);
 
               return (
                 <div
                   key={item.plant.id}
-                  className="bg-white rounded-xl p-3.5 border border-[#c1c8c2] shadow-2xs flex flex-col gap-2.5 transition-all"
+                  className={`rounded-xl p-3.5 border shadow-2xs flex flex-col gap-2.5 transition-all ${
+                    itemOrderMarkdownSavings
+                      ? 'bg-white border-amber-400 ring-2 ring-amber-200/80'
+                      : itemSaleSavings 
+                      ? 'bg-white border-rose-300 ring-2 ring-rose-200/80' 
+                      : 'bg-white border-[#c1c8c2]'
+                  }`}
                 >
                   <div className="flex justify-between items-start gap-2">
                     <div 
@@ -2722,13 +2774,26 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       className="flex gap-3 items-start min-w-0 flex-1 cursor-pointer group"
                       title="Tap to verify plant details & adjust quantity"
                     >
-                      <img
-                        src={item.plant.image || DEFAULT_PLANT_IMAGE}
-                        alt={item.plant.name}
-                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]/60 mt-0.5 group-hover:border-[#0e6c4a] transition-colors"
-                        referrerPolicy="no-referrer"
-                        onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                      />
+                      <div className="relative shrink-0">
+                        <img
+                          src={item.plant.image || DEFAULT_PLANT_IMAGE}
+                          alt={item.plant.name}
+                          className="w-14 h-14 sm:w-16 sm:h-16 rounded-xl object-cover bg-[#f3f4f0] shrink-0 border border-[#c1c8c2]/60 mt-0.5 group-hover:border-[#0e6c4a] transition-colors"
+                          referrerPolicy="no-referrer"
+                          onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
+                        />
+                        {itemOrderMarkdownSavings ? (
+                          <span className="absolute -top-1.5 -left-1.5 bg-amber-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-sm uppercase tracking-wider flex items-center gap-0.5 border border-white">
+                            <Tag className="w-3 h-3 text-amber-200" />
+                            M/D
+                          </span>
+                        ) : itemSaleSavings ? (
+                          <span className="absolute -top-1.5 -left-1.5 bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded-md shadow-sm uppercase tracking-wider flex items-center gap-0.5 border border-white">
+                            <Flame className="w-3 h-3 text-amber-300" />
+                            SALE
+                          </span>
+                        ) : null}
+                      </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-center gap-1.5 flex-wrap">
                           <h3 className="font-black text-[24px] sm:text-[27px] text-[#1a1c1a] group-hover:text-[#0e6c4a] transition-colors leading-tight">
@@ -2753,6 +2818,22 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             SIZE: {item.plant.size || 'Standard'}
                           </span>
 
+                          {/* High-Visibility One-Time Order Markdown Indicator */}
+                          {itemOrderMarkdownSavings && (
+                            <span className="bg-amber-700 text-white text-[18px] sm:text-[20px] font-black px-3 py-1 rounded-xl flex items-center gap-1.5 border border-amber-800 shadow-2xs">
+                              <Tag className="w-5 h-5 text-amber-200" />
+                              <span>ORDER MARKDOWN · {itemOrderMarkdownSavings.savingsPercent}% OFF</span>
+                            </span>
+                          )}
+
+                          {/* High-Visibility On Sale Indicator (Catalog Wide) */}
+                          {!itemOrderMarkdownSavings && itemSaleSavings && (
+                            <span className="bg-rose-600 text-white text-[18px] sm:text-[20px] font-black px-3 py-1 rounded-xl flex items-center gap-1.5 border border-rose-700 shadow-2xs">
+                              <Flame className="w-5 h-5 text-amber-300" />
+                              <span>ON SALE · {itemSaleSavings.savingsPercent}% OFF</span>
+                            </span>
+                          )}
+
                           {/* GPS Logged Status Indicator Badge */}
                           {gpsLocation ? (
                             <span className="bg-[#0e6c4a] text-[#a0f4c8] text-xs font-black px-2.5 py-1 rounded-lg flex items-center gap-1 border border-[#0e6c4a] shadow-2xs">
@@ -2767,18 +2848,34 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                           )}
                         </div>
 
-                        {/* Interactive 4-Tier Pricing Dropdown (Text matches Product Number box: 20px / 22px font-black) */}
+                        {/* Interactive 4-Tier Pricing Dropdown & Order Markdown Button */}
                         <div className="flex items-center gap-2.5 mt-2 flex-wrap" onClick={(e) => e.stopPropagation()}>
                           <PricingDropdown
                             plant={item.plant}
                             currentPrice={unitPrice}
                             selectedLevelKey={item.selectedPriceLevel}
+                            orderMarkdown={item.orderMarkdown}
                             onSelectPriceLevel={(levelKey, newPrice) => updateItemPriceLevel(item.plant.id, levelKey, newPrice)}
                             size="md"
                             largerText={true}
                             priceClassName="text-[20px] sm:text-[22px] font-black tracking-tight"
                             buttonClassName="py-1 px-3 shadow-xs"
                           />
+
+                          {/* One-Time Order Markdown Button */}
+                          <button
+                            type="button"
+                            onClick={() => setMarkdownTargetItem(item)}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs sm:text-[13px] font-black border transition-all cursor-pointer shadow-2xs ${
+                              item.orderMarkdown
+                                ? 'bg-amber-100 text-amber-950 border-amber-300 hover:bg-amber-200'
+                                : 'bg-[#a0f4c8]/30 hover:bg-[#a0f4c8]/70 text-[#012d1d] border-[#0e6c4a]/30'
+                            }`}
+                            title="Apply one-time markdown for this customer order only (does NOT change master inventory)"
+                          >
+                            <Tag className={`w-4 h-4 ${item.orderMarkdown ? 'text-amber-700' : 'text-[#0e6c4a]'}`} />
+                            <span>{item.orderMarkdown ? 'Edit Markdown' : 'Order Markdown'}</span>
+                          </button>
                           
                           {item.quantity > 1 && (
                             <span className="text-sm sm:text-base font-bold text-[#012d1d]">
@@ -2786,6 +2883,72 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             </span>
                           )}
                         </div>
+
+                        {/* Informational Order Markdown Details Banner */}
+                        {itemOrderMarkdownSavings && (
+                          <div className="mt-2 bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 flex items-center justify-between gap-2 shadow-2xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-6 h-6 rounded-lg bg-amber-700 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <Tag className="w-3.5 h-3.5 text-amber-200" />
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                <span className="text-xs sm:text-[13px] font-black text-amber-950 uppercase tracking-wide">
+                                  One-Time Order Markdown
+                                </span>
+                                <span className="bg-amber-700 text-white text-[10px] font-black px-1.5 py-0.5 rounded">
+                                  {itemOrderMarkdownSavings.savingsPercent}% OFF
+                                </span>
+                                <span className="text-xs text-amber-900 font-bold">
+                                  Save ${itemOrderMarkdownSavings.savingsAmount.toFixed(2)}/unit · Reg: <span className="line-through">${itemOrderMarkdownSavings.regularPrice.toFixed(2)}</span>
+                                </span>
+                                {itemOrderMarkdownSavings.reason && (
+                                  <span className="text-xs text-amber-800 italic truncate">
+                                    ({itemOrderMarkdownSavings.reason})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1.5 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setMarkdownTargetItem(item)}
+                                className="px-2 py-0.5 rounded-lg text-xs font-black text-amber-900 bg-white hover:bg-amber-100 border border-amber-300 transition-colors cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOrderMarkdown(item.plant.id)}
+                                className="p-1 rounded-lg text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+                                title="Remove order markdown"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
+
+                        {/* Informational Sale / Markdown Details Banner (Catalog Wide) */}
+                        {!itemOrderMarkdownSavings && itemSaleSavings && (
+                          <div className="mt-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-1.5 flex items-center justify-between gap-2 shadow-2xs">
+                            <div className="flex items-center gap-2 min-w-0">
+                              <div className="w-6 h-6 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-2xs">
+                                <Flame className="w-3.5 h-3.5 text-amber-300" />
+                              </div>
+                              <div className="flex items-center gap-2 flex-wrap min-w-0">
+                                <span className="text-xs sm:text-[13px] font-black text-rose-950 uppercase tracking-wide">
+                                  {itemSaleSavings.label || 'Active Sale / Markdown'}
+                                </span>
+                                <span className="bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded">
+                                  {itemSaleSavings.savingsPercent}% OFF
+                                </span>
+                                <span className="text-xs text-rose-800 font-bold">
+                                  Save ${itemSaleSavings.savingsAmount.toFixed(2)}/unit · Reg: <span className="line-through">${itemSaleSavings.regularPrice.toFixed(2)}</span>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </div>
 
@@ -3544,21 +3707,36 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 return matches.map((plant) => {
                   const inCartCount = cartItems.find(i => i.plant.id === plant.id)?.quantity || 0;
                   const activePriceTierKey = catalogPriceLevels[plant.id] || (customerType === 'WHOLESALE' ? 'wholesale' : 'retail');
+                  const catalogSaleSavings = getPlantSaleSavings(plant);
 
                   return (
                     <div
                       key={plant.id}
-                      className="p-3 bg-white hover:bg-[#f9faf6] rounded-2xl border border-[#c1c8c2] flex flex-col gap-2.5 transition-colors shadow-xs"
+                      className={`p-3 rounded-2xl border flex flex-col gap-2.5 transition-colors shadow-xs ${
+                        inCartCount > 0
+                          ? 'bg-[#e7f8ef] border-[#0e6c4a]/40'
+                          : catalogSaleSavings
+                          ? 'bg-rose-50/30 border-rose-300 ring-1 ring-rose-200/70 hover:bg-rose-50/50'
+                          : 'bg-white hover:bg-[#f9faf6] border-[#c1c8c2]'
+                      }`}
                     >
                       {/* Top Header: Plant Name clearly visible at the top across the full width */}
-                      <div className="border-b border-[#f3f4f0] pb-2">
-                        <h4 className="font-extrabold text-sm sm:text-base text-[#1a1c1a] leading-snug break-words">
-                          {plant.name}
-                        </h4>
-                        {(plant.botanicalName || plant.commonName) && (
-                          <p className="text-xs text-[#525a55] italic mt-0.5 break-words">
-                            {plant.botanicalName || plant.commonName}
-                          </p>
+                      <div className="border-b border-[#f3f4f0] pb-2 flex items-start justify-between gap-2">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-extrabold text-sm sm:text-base text-[#1a1c1a] leading-snug break-words">
+                            {plant.name}
+                          </h4>
+                          {(plant.botanicalName || plant.commonName) && (
+                            <p className="text-xs text-[#525a55] italic mt-0.5 break-words">
+                              {plant.botanicalName || plant.commonName}
+                            </p>
+                          )}
+                        </div>
+                        {catalogSaleSavings && (
+                          <span className="bg-rose-600 text-white text-[11px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0 shadow-2xs">
+                            <Flame className="w-3 h-3 text-amber-300" />
+                            <span>{catalogSaleSavings.savingsPercent}% OFF</span>
+                          </span>
                         )}
                       </div>
 
@@ -3574,6 +3752,12 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                               <Package className="w-4 h-4 text-amber-300" />
                               SIZE: {plant.size || 'Standard'}
                             </span>
+                            {catalogSaleSavings && (
+                              <span className="bg-rose-600 text-white text-[16px] sm:text-[18px] font-black px-2.5 py-0.5 rounded-lg flex items-center gap-1 shrink-0 shadow-2xs">
+                                <Flame className="w-4 h-4 text-amber-300" />
+                                <span>ON SALE · {catalogSaleSavings.savingsPercent}% OFF</span>
+                              </span>
+                            )}
                           </div>
                           <div>
                             <span className={`text-xs font-bold px-2 py-0.5 rounded-md inline-flex ${
@@ -3653,8 +3837,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         existingCartItem={verifyingPlant?.existingCartItem}
         customerType={customerType}
         onUpdatePlant={handleUpdatePlantFromVerification}
-        onConfirm={(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes) => {
-          handleConfirmPlantVerification(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes);
+        onConfirm={(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes, markdown) => {
+          handleConfirmPlantVerification(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes, markdown);
           setVerifyingPlant(null);
         }}
         onClose={handleCloseVerificationModal}
@@ -3676,6 +3860,26 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           onNavigate('home');
         }}
       />
+
+      {/* One-Time Order Markdown Modal */}
+      {markdownTargetItem && (
+        <OrderMarkdownModal
+          isOpen={markdownTargetItem !== null}
+          plant={markdownTargetItem.plant}
+          quantity={markdownTargetItem.quantity}
+          currentMarkdown={markdownTargetItem.orderMarkdown}
+          basePrice={markdownTargetItem.originalPrice || (markdownTargetItem.plant.prices?.retail ?? markdownTargetItem.plant.price)}
+          onApplyMarkdown={(markdown) => {
+            handleApplyOrderMarkdown(markdownTargetItem.plant.id, markdown);
+            setMarkdownTargetItem(null);
+          }}
+          onRemoveMarkdown={() => {
+            handleRemoveOrderMarkdown(markdownTargetItem.plant.id);
+            setMarkdownTargetItem(null);
+          }}
+          onClose={() => setMarkdownTargetItem(null)}
+        />
+      )}
     </div>
   );
 };

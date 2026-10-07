@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { ScreenType, Order, PlantItem, Customer, HoldingArea, OrderCartItem, Employee } from '../types';
+import { ScreenType, Order, PlantItem, Customer, HoldingArea, OrderCartItem, Employee, OrderItemMarkdown } from '../types';
 import { DEFAULT_PLANT_IMAGE, INITIAL_EMPLOYEES } from '../data/mockData';
 import { normalizeHoldingArea, compareYardLocations } from '../data/yardLocations';
 import { 
@@ -24,35 +24,36 @@ import {
   Package, 
   AlertTriangle, 
   Printer, 
-  Clock,
-  UserCheck,
-  PlusCircle,
-  FileText,
-  Barcode,
-  CheckSquare,
-  Square,
-  Copy,
-  Sparkles,
-  ClipboardCheck,
-  Layers,
-  CheckCircle2,
-  AlertCircle,
-  Users,
-  User,
-  Smartphone,
-  Star,
-  Check,
-  Tag,
-  Send,
-  RefreshCw,
-  Map as MapIcon,
-  Zap,
-  Flame,
+  Clock, 
+  UserCheck, 
+  PlusCircle, 
+  FileText, 
+  Barcode, 
+  CheckSquare, 
+  Square, 
+  Copy, 
+  Sparkles, 
+  ClipboardCheck, 
+  Layers, 
+  CheckCircle2, 
+  AlertCircle, 
+  Users, 
+  User, 
+  Smartphone, 
+  Star, 
+  Check, 
+  Tag, 
+  Send, 
+  RefreshCw, 
+  Map as MapIcon, 
+  Zap, 
+  Flame, 
 } from 'lucide-react';
 import { PricingDropdown } from './PricingDropdown';
-import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers } from '../utils/pricingUtils';
+import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers, getItemMarkdownSavings } from '../utils/pricingUtils';
 import { formatOrderCreatedDate, formatOrderScheduledTime, extractDateForInput, getTodayDateInputValue, formatRawDateString } from '../utils/dateUtils';
 import { PlantMapModal } from './PlantMapModal';
+import { OrderMarkdownModal } from './OrderMarkdownModal';
 import { AutoSaveBadge } from './AutoSaveBadge';
 import { 
   autoSaveDraft, 
@@ -341,6 +342,8 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     return sum;
   }, 0);
 
+  const [markdownTargetItem, setMarkdownTargetItem] = useState<OrderCartItem | null>(null);
+
   // Helper to switch or set price tier for a specific item in the order
   const handleUpdateItemPriceLevel = (plantId: string, levelKey: PriceLevelKey, newPrice: number) => {
     setItems(prev => {
@@ -349,12 +352,46 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
           return {
             ...item,
             selectedPriceLevel: levelKey,
-            selectedPrice: newPrice
+            selectedPrice: newPrice,
+            orderMarkdown: undefined // Revert custom markdown if standard tier is explicitly chosen
           };
         }
         return item;
       });
     });
+    setHasUnsavedChanges(true);
+  };
+
+  // Helper to apply a one-time order markdown on this specific order item
+  const handleApplyOrderMarkdown = (plantId: string, markdown: OrderItemMarkdown) => {
+    setItems(prev => prev.map(item => {
+      if (item.plant.id === plantId) {
+        return {
+          ...item,
+          orderMarkdown: markdown,
+          selectedPrice: markdown.markdownPrice,
+          originalPrice: item.originalPrice ?? (item.plant.prices?.retail ?? item.plant.price)
+        };
+      }
+      return item;
+    }));
+    setHasUnsavedChanges(true);
+  };
+
+  // Helper to remove order markdown on this specific order item
+  const handleRemoveOrderMarkdown = (plantId: string) => {
+    setItems(prev => prev.map(item => {
+      if (item.plant.id === plantId) {
+        const tiers = getPlantPriceTiers(item.plant);
+        const match = tiers.find(t => t.key === item.selectedPriceLevel) || tiers[0];
+        return {
+          ...item,
+          orderMarkdown: undefined,
+          selectedPrice: match.price
+        };
+      }
+      return item;
+    }));
     setHasUnsavedChanges(true);
   };
 
@@ -1830,6 +1867,14 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                             <Package className="w-3 h-3 text-amber-300" />
                             SIZE: {item.plant.size || 'Standard'}
                           </span>
+
+                          {/* Order Markdown Badge */}
+                          {item.orderMarkdown && (
+                            <span className="bg-amber-700 text-white text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-amber-800 shadow-2xs">
+                              <Tag className="w-3 h-3 text-amber-200" />
+                              <span>ORDER M/D · {item.orderMarkdown.type === 'percentage' ? `${item.orderMarkdown.value}% OFF` : `$${item.orderMarkdown.markdownPrice.toFixed(2)}`}</span>
+                            </span>
+                          )}
                         </div>
 
                         {/* Plant GPS Location Controls & Badges */}
@@ -1946,11 +1991,12 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                         )}
                         
                         {/* Pricing Tier Dropdown & Unit Price (Text 2 points larger) */}
-                        <div className="flex items-center gap-2.5 mt-1.5 flex-wrap">
+                        <div className="flex items-center gap-2 mt-1.5 flex-wrap">
                           <PricingDropdown
                             plant={item.plant}
                             currentPrice={unitPrice}
                             selectedLevelKey={item.selectedPriceLevel}
+                            orderMarkdown={item.orderMarkdown}
                             onSelectPriceLevel={(levelKey, newPrice) => handleUpdateItemPriceLevel(item.plant.id, levelKey, newPrice)}
                             size="md"
                             largerText={true}
@@ -1958,7 +2004,54 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           <span className="text-sm sm:text-[14.5px] font-extrabold text-[#012d1d]">
                             ${unitPrice.toFixed(2)} ea
                           </span>
+                          <button
+                            type="button"
+                            onClick={() => setMarkdownTargetItem(item)}
+                            className={`flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border transition-all cursor-pointer shadow-2xs ${
+                              item.orderMarkdown
+                                ? 'bg-amber-100 text-amber-950 border-amber-300 hover:bg-amber-200'
+                                : 'bg-[#a0f4c8]/30 hover:bg-[#a0f4c8]/70 text-[#012d1d] border-[#0e6c4a]/30'
+                            }`}
+                            title="Apply one-time markdown for this customer order only"
+                          >
+                            <Tag className={`w-3.5 h-3.5 ${item.orderMarkdown ? 'text-amber-700' : 'text-[#0e6c4a]'}`} />
+                            <span>{item.orderMarkdown ? 'Edit Markdown' : 'Order Markdown'}</span>
+                          </button>
                         </div>
+
+                        {/* Order Markdown Notice on Item Card */}
+                        {item.orderMarkdown && (
+                          <div className="bg-amber-50 border border-amber-300 rounded-xl px-2.5 py-1.5 text-xs flex items-center justify-between gap-2 mt-1 shadow-2xs">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <Tag className="w-3.5 h-3.5 text-amber-700 shrink-0" />
+                              <span className="font-extrabold text-amber-950">
+                                One-Time Markdown: ${item.orderMarkdown.markdownPrice.toFixed(2)} ea
+                              </span>
+                              {item.orderMarkdown.reason && (
+                                <span className="text-amber-800 italic truncate">
+                                  — {item.orderMarkdown.reason}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <button
+                                type="button"
+                                onClick={() => setMarkdownTargetItem(item)}
+                                className="px-2 py-0.5 rounded text-[11px] font-bold text-amber-900 bg-white hover:bg-amber-100 border border-amber-300 transition-colors cursor-pointer"
+                              >
+                                Edit
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveOrderMarkdown(item.plant.id)}
+                                className="p-1 rounded text-rose-700 hover:bg-rose-100 transition-colors cursor-pointer"
+                                title="Remove markdown"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        )}
 
                         {/* Pickup State Badge */}
                         <div className="flex items-center gap-2 mt-1 flex-wrap">
@@ -3364,6 +3457,26 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
           onNavigate('home');
         }}
       />
+
+      {/* One-Time Order Markdown Modal */}
+      {markdownTargetItem && (
+        <OrderMarkdownModal
+          isOpen={markdownTargetItem !== null}
+          plant={markdownTargetItem.plant}
+          quantity={markdownTargetItem.quantity}
+          currentMarkdown={markdownTargetItem.orderMarkdown}
+          basePrice={markdownTargetItem.originalPrice || (markdownTargetItem.plant.prices?.retail ?? markdownTargetItem.plant.price)}
+          onApplyMarkdown={(markdown) => {
+            handleApplyOrderMarkdown(markdownTargetItem.plant.id, markdown);
+            setMarkdownTargetItem(null);
+          }}
+          onRemoveMarkdown={() => {
+            handleRemoveOrderMarkdown(markdownTargetItem.plant.id);
+            setMarkdownTargetItem(null);
+          }}
+          onClose={() => setMarkdownTargetItem(null)}
+        />
+      )}
     </div>
   );
 };

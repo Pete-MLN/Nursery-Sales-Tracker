@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { ScreenType, User, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings, HoldingArea, InventoryAuditSession } from './types';
-import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, DEFAULT_CUSTOMER, INITIAL_EMPLOYEES, HOLDING_AREAS } from './data/mockData';
+import { ScreenType, User, UserAccount, Order, OrderCartItem, PlantItem, RecentUpload, Customer, Employee, StockAlertSettings, HoldingArea, InventoryAuditSession } from './types';
+import { INITIAL_PLANTS, INITIAL_ORDERS, INITIAL_UPLOADS, INITIAL_CUSTOMERS, DEFAULT_CUSTOMER, INITIAL_EMPLOYEES, HOLDING_AREAS, INITIAL_USER_ACCOUNTS } from './data/mockData';
 import { normalizeHoldingArea, normalizeYardLocationCode } from './data/yardLocations';
 import { Header } from './components/Header';
 import { BottomNav } from './components/BottomNav';
@@ -16,6 +16,8 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { StockNotificationsScreen } from './components/StockNotificationsScreen';
 import { InstructionsScreen } from './components/InstructionsScreen';
 import { LoginScreen } from './components/LoginScreen';
+import { UserProfileModal } from './components/UserProfileModal';
+import { UserManagementModal } from './components/UserManagementModal';
 import { AppStartupProgressRing, LastUploadDatesInfo } from './components/AppStartupProgressRing';
 import { auth } from './lib/firebase';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
@@ -28,6 +30,9 @@ import {
   subscribeToUploads,
   subscribeToHoldingLocations,
   subscribeToAuditSessions,
+  subscribeToUsers,
+  saveUserToFirestore,
+  deleteUserFromFirestore,
   savePlantToFirestore,
   batchSavePlantsToFirestore,
   syncImportedInventoryToFirestore,
@@ -134,12 +139,31 @@ export default function App() {
     }
     // Default active demo user session
     return {
+      id: 'usr-pete',
       name: 'Pete',
       email: 'pete@maplelanenursery.com',
-      role: 'General Manager',
+      role: 'General Manager / Owner',
+      isAdmin: true,
+      avatarIcon: 'crown',
+      avatarColor: '#012d1d',
+      department: 'Management',
+      phone: '518-227-1235',
       isLoggedIn: true
     };
   });
+
+  const [allUsers, setAllUsers] = useState<UserAccount[]>(() => {
+    const cached = localStorage.getItem('nursery_all_users');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_USER_ACCOUNTS;
+  });
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState<boolean>(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
 
   const [inventory, setInventory] = useState<PlantItem[]>([]);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
@@ -517,6 +541,33 @@ export default function App() {
         setAuditSessions(data);
       }
     });
+    const unsubUsers = subscribeToUsers((data) => {
+      if (data && data.length > 0) {
+        setAllUsers(data);
+        localStorage.setItem('nursery_all_users', JSON.stringify(data));
+        setUser(prev => {
+          const fresh = data.find(u => (prev.id && u.id === prev.id) || (u.email.toLowerCase() === prev.email.toLowerCase()));
+          if (fresh) {
+            const merged = {
+              ...prev,
+              id: fresh.id,
+              name: fresh.name,
+              email: fresh.email,
+              role: fresh.role,
+              isAdmin: fresh.isAdmin,
+              avatarIcon: fresh.avatarIcon,
+              avatarColor: fresh.avatarColor,
+              phone: fresh.phone,
+              department: fresh.department,
+              status: fresh.status
+            };
+            localStorage.setItem('nursery_user_session', JSON.stringify(merged));
+            return merged;
+          }
+          return prev;
+        });
+      }
+    });
 
     return () => {
       clearInterval(progressInterval);
@@ -528,6 +579,7 @@ export default function App() {
       unsubUploads();
       unsubHoldingLocations();
       unsubAudits();
+      unsubUsers();
     };
   }, []);
 
@@ -598,6 +650,54 @@ export default function App() {
   const handleUpdateEmployee = (updatedEmp: Employee) => {
     setEmployees(prev => prev.map(e => e.id === updatedEmp.id ? updatedEmp : e));
     saveEmployeeToFirestore(updatedEmp);
+  };
+
+  const handleUpdateCurrentUser = async (partial: Partial<User>) => {
+    setUser(prev => {
+      const updated: User = { ...prev, ...partial };
+      localStorage.setItem('nursery_user_session', JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  const handleSaveUserAccount = async (account: UserAccount) => {
+    setAllUsers(prev => {
+      const exists = prev.some(u => u.id === account.id);
+      const next = exists ? prev.map(u => u.id === account.id ? account : u) : [account, ...prev];
+      localStorage.setItem('nursery_all_users', JSON.stringify(next));
+      return next;
+    });
+
+    if ((user.id && user.id === account.id) || (user.email.toLowerCase() === account.email.toLowerCase())) {
+      setUser(prev => {
+        const merged: User = {
+          ...prev,
+          id: account.id,
+          name: account.name,
+          email: account.email,
+          role: account.role,
+          isAdmin: account.isAdmin,
+          avatarIcon: account.avatarIcon,
+          avatarColor: account.avatarColor,
+          phone: account.phone,
+          department: account.department,
+          status: account.status
+        };
+        localStorage.setItem('nursery_user_session', JSON.stringify(merged));
+        return merged;
+      });
+    }
+
+    await saveUserToFirestore(account);
+  };
+
+  const handleDeleteUserAccount = async (userId: string) => {
+    setAllUsers(prev => {
+      const next = prev.filter(u => u.id !== userId);
+      localStorage.setItem('nursery_all_users', JSON.stringify(next));
+      return next;
+    });
+    await deleteUserFromFirestore(userId);
   };
 
   const handleUpdateStock = (id: string, newStock: number) => {
@@ -1036,7 +1136,7 @@ export default function App() {
   };
 
   if (!user.isLoggedIn || currentScreen === 'login') {
-    return <LoginScreen onLogin={handleLogin} />;
+    return <LoginScreen onLogin={handleLogin} allUsers={allUsers} />;
   }
 
   return (
@@ -1065,7 +1165,7 @@ export default function App() {
         onNavigate={navigateTo}
         onBack={screenHistory.length > 1 ? handleBack : undefined}
         user={user}
-        onOpenProfile={() => navigateTo('settings')}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
       />
 
       {/* Main Content Render Area */}
@@ -1205,6 +1305,10 @@ export default function App() {
             onUpdateStockAlertSettings={handleUpdateStockAlertSettings}
             cameraTimeout={cameraTimeout}
             onUpdateCameraTimeout={handleUpdateCameraTimeout}
+            onOpenProfileModal={() => setIsProfileModalOpen(true)}
+            onOpenAdminManagement={() => setIsAdminModalOpen(true)}
+            totalUsersCount={allUsers.length}
+            totalAdminsCount={allUsers.filter(u => u.isAdmin).length}
           />
         )}
 
@@ -1225,6 +1329,31 @@ export default function App() {
             ? inventory.filter(i => i.stock <= stockAlertSettings.criticalThreshold).length
             : 0
         }
+      />
+
+      {/* User Profile & Icon Selection Modal */}
+      <UserProfileModal
+        currentUser={user}
+        allUsers={allUsers}
+        isOpen={isProfileModalOpen}
+        onClose={() => setIsProfileModalOpen(false)}
+        onUpdateCurrentUser={handleUpdateCurrentUser}
+        onUpdateUserAccount={handleSaveUserAccount}
+        onOpenAdminConsole={() => {
+          setIsProfileModalOpen(false);
+          setIsAdminModalOpen(true);
+        }}
+        onLogout={handleLogout}
+      />
+
+      {/* Administrator Accounts & Permissions Console Modal */}
+      <UserManagementModal
+        currentUser={user}
+        allUsers={allUsers}
+        isOpen={isAdminModalOpen}
+        onClose={() => setIsAdminModalOpen(false)}
+        onSaveUser={handleSaveUserAccount}
+        onDeleteUser={handleDeleteUserAccount}
       />
     </div>
   );

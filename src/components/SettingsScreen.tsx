@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ScreenType, User, StockAlertSettings } from '../types';
-import { User as UserIcon, LogOut, FileSpreadsheet, MapPin, Database, Bell, Shield, Moon, Sun, Check, Smartphone, QrCode, Copy, ExternalLink, Wifi, AlertTriangle, Plus, Minus, Sliders, CheckCircle2, BookOpen, Camera, Clock, Timer, BatteryCharging } from 'lucide-react';
+import { User as UserIcon, LogOut, FileSpreadsheet, MapPin, Database, Bell, Shield, Moon, Sun, Check, Smartphone, QrCode, Copy, ExternalLink, Wifi, AlertTriangle, Plus, Minus, Sliders, CheckCircle2, BookOpen, Camera, Clock, Timer, BatteryCharging, Crown, Users, Key, Edit3, Palette } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { UserAvatar } from './UserAvatar';
 
 interface SettingsScreenProps {
   user: User;
@@ -11,6 +12,10 @@ interface SettingsScreenProps {
   onUpdateStockAlertSettings: (newSettings: StockAlertSettings) => void;
   cameraTimeout?: number;
   onUpdateCameraTimeout?: (seconds: number) => void;
+  onOpenProfileModal?: () => void;
+  onOpenAdminManagement?: () => void;
+  totalUsersCount?: number;
+  totalAdminsCount?: number;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
@@ -20,7 +25,11 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   stockAlertSettings,
   onUpdateStockAlertSettings,
   cameraTimeout = 15,
-  onUpdateCameraTimeout
+  onUpdateCameraTimeout,
+  onOpenProfileModal,
+  onOpenAdminManagement,
+  totalUsersCount,
+  totalAdminsCount
 }) => {
   const [gpsEnabled, setGpsEnabled] = useState<boolean>(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
@@ -82,21 +91,46 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
         {/* Profile Row: User Info, Live Status, Sign Out */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-white/10">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-10 h-10 rounded-full bg-[#a0f4c8] text-[#002113] flex items-center justify-center font-bold text-base border border-[#19724f]/20 shrink-0">
-              {user.name.split(' ').map(n => n[0]).join('') || 'A'}
-            </div>
+            <UserAvatar
+              icon={user.avatarIcon}
+              color={user.avatarColor}
+              name={user.name}
+              isAdmin={user.isAdmin}
+              size="md"
+              showAdminBadge={true}
+              borderClass="border-[#a0f4c8]/30"
+            />
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="font-bold text-sm sm:text-base text-white truncate">{user.name}</h3>
-                <span className="text-[10px] font-bold text-[#002113] bg-[#a0f4c8] px-2 py-0.5 rounded-full">
-                  {user.role}
-                </span>
+                {user.isAdmin ? (
+                  <span className="text-[10px] font-black uppercase tracking-wider text-amber-950 bg-amber-400 px-2 py-0.5 rounded-full flex items-center gap-1 shadow-2xs">
+                    <Crown className="w-3 h-3" />
+                    Administrator
+                  </span>
+                ) : (
+                  <span className="text-[10px] font-bold text-[#002113] bg-[#a0f4c8] px-2 py-0.5 rounded-full">
+                    {user.role}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-[#a3c9b7] truncate">{user.email}</p>
             </div>
           </div>
 
-          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0">
+          <div className="flex items-center gap-2 self-end sm:self-auto shrink-0 flex-wrap">
+            {onOpenProfileModal && (
+              <button
+                type="button"
+                onClick={onOpenProfileModal}
+                className="px-2.5 py-1 text-[#012d1d] hover:bg-white bg-[#a0f4c8] rounded-lg transition-colors flex items-center gap-1.5 text-xs font-bold cursor-pointer shadow-xs active:scale-95"
+                title="Choose your personal icon, update password & profile"
+              >
+                <Palette className="w-3.5 h-3.5" />
+                <span>My Profile & Icon</span>
+              </button>
+            )}
+
             <div className="inline-flex items-center gap-1.5 bg-[#a0f4c8]/20 text-[#a0f4c8] text-[10px] font-bold px-2.5 py-1 rounded-full border border-[#a0f4c8]/30">
               <Wifi className="w-3 h-3 animate-pulse" />
               <span className="hidden sm:inline">Live Firestore</span>
@@ -201,6 +235,44 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Administrator Accounts & Permissions Card */}
+      {user.isAdmin && (
+        <div className="bg-gradient-to-r from-[#012d1d] via-[#0e6c4a] to-[#012d1d] text-white rounded-2xl p-4 sm:p-5 shadow-lg border border-[#a0f4c8]/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-3.5">
+            <div className="w-12 h-12 rounded-2xl bg-amber-400 text-amber-950 flex items-center justify-center shrink-0 shadow-md">
+              <Crown className="w-7 h-7 stroke-[2.5]" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2 flex-wrap">
+                <h3 className="font-extrabold text-base sm:text-lg text-white">Staff & Administrator Accounts</h3>
+                <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full">
+                  Admin Only
+                </span>
+              </div>
+              <p className="text-xs text-[#a0f4c8] mt-0.5">
+                Setup new accounts, reset passwords, manage existing staff, and assign other administrators.
+              </p>
+              <div className="flex items-center gap-2 mt-1.5 text-[11px] text-[#e8f5e9]">
+                <span>{totalUsersCount !== undefined ? `${totalUsersCount} Registered Users` : 'All Accounts'}</span>
+                <span>•</span>
+                <span className="text-amber-300 font-bold">{totalAdminsCount !== undefined ? `${totalAdminsCount} Admins` : 'Active Admins'}</span>
+              </div>
+            </div>
+          </div>
+
+          {onOpenAdminManagement && (
+            <button
+              type="button"
+              onClick={onOpenAdminManagement}
+              className="w-full sm:w-auto bg-[#a0f4c8] hover:bg-white text-[#012d1d] font-black text-xs sm:text-sm px-4 py-3 rounded-xl shadow-md transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap"
+            >
+              <Users className="w-4 h-4 text-[#012d1d]" />
+              <span>Manage All Accounts</span>
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Quick Navigation Cards */}
       <div className="flex flex-col gap-2">

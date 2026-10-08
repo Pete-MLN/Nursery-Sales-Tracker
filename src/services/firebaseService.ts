@@ -10,7 +10,7 @@ import {
   writeBatch 
 } from 'firebase/firestore';
 import { db } from '../lib/firebase';
-import { PlantItem, Customer, Employee, Order, RecentUpload, HoldingArea, InventoryAuditSession } from '../types';
+import { PlantItem, Customer, Employee, Order, RecentUpload, HoldingArea, InventoryAuditSession, UserAccount } from '../types';
 import { 
   INITIAL_PLANTS, 
   INITIAL_CUSTOMERS, 
@@ -18,7 +18,8 @@ import {
   INITIAL_EMPLOYEES, 
   INITIAL_ORDERS, 
   INITIAL_UPLOADS,
-  HOLDING_AREAS
+  HOLDING_AREAS,
+  INITIAL_USER_ACCOUNTS
 } from '../data/mockData';
 
 const PLANTS_COL = 'plants';
@@ -28,6 +29,7 @@ const ORDERS_COL = 'orders';
 const UPLOADS_COL = 'uploads';
 const HOLDING_LOCATIONS_COL = 'holding_locations';
 const INVENTORY_AUDITS_COL = 'inventory_audits';
+const USERS_COL = 'users';
 
 const handleSnapshotError = (colName: string, err: any) => {
   if (err?.code === 'unavailable' || err?.message?.includes('offline') || err?.message?.includes('unavailable') || err?.message?.includes('Could not reach Cloud Firestore')) {
@@ -130,6 +132,26 @@ export async function seedInitialFirestoreData() {
       });
       await batch.commit();
       console.log('Firestore: Orders initialized');
+    }
+
+    const usersSnap = await getDocs(collection(db, USERS_COL));
+    if (usersSnap.empty) {
+      const batch = writeBatch(db);
+      INITIAL_USER_ACCOUNTS.forEach((account) => {
+        const ref = doc(db, USERS_COL, account.id);
+        batch.set(ref, cleanForFirestore(account));
+      });
+      await batch.commit();
+      console.log('Firestore: User accounts initialized');
+    } else {
+      // Ensure Pete's master admin record always exists with admin rights
+      const peteUserDoc = await getDoc(doc(db, USERS_COL, 'usr-pete'));
+      if (!peteUserDoc.exists()) {
+        const peteAcct = INITIAL_USER_ACCOUNTS.find(u => u.id === 'usr-pete');
+        if (peteAcct) {
+          await setDoc(doc(db, USERS_COL, 'usr-pete'), cleanForFirestore(peteAcct));
+        }
+      }
     }
   } catch (err: any) {
     if (err?.code === 'unavailable' || err?.message?.includes('offline') || err?.message?.includes('Could not reach Cloud Firestore')) {
@@ -263,6 +285,16 @@ export function subscribeToAuditSessions(callback: (audits: InventoryAuditSessio
     });
     callback(items);
   }, (err) => handleSnapshotError(INVENTORY_AUDITS_COL, err));
+}
+
+export function subscribeToUsers(callback: (users: UserAccount[]) => void) {
+  return onSnapshot(collection(db, USERS_COL), (snapshot) => {
+    const items: UserAccount[] = [];
+    snapshot.forEach((doc) => {
+      items.push(doc.data() as UserAccount);
+    });
+    callback(items);
+  }, (err) => handleSnapshotError(USERS_COL, err));
 }
 
 /* --- CRUD Helpers --- */
@@ -584,4 +616,29 @@ export async function saveAuditSessionToFirestore(audit: InventoryAuditSession) 
 
 export async function deleteAuditSessionFromFirestore(id: string) {
   await deleteDoc(doc(db, INVENTORY_AUDITS_COL, id));
+}
+
+export async function saveUserToFirestore(user: UserAccount) {
+  await setDoc(doc(db, USERS_COL, user.id), cleanForFirestore(user), { merge: true });
+}
+
+export async function deleteUserFromFirestore(id: string) {
+  await deleteDoc(doc(db, USERS_COL, id));
+}
+
+export async function batchSaveUsersToFirestore(users: UserAccount[]) {
+  try {
+    const chunkSize = 400;
+    for (let i = 0; i < users.length; i += chunkSize) {
+      const chunk = users.slice(i, i + chunkSize);
+      const batch = writeBatch(db);
+      chunk.forEach((user) => {
+        const ref = doc(db, USERS_COL, user.id);
+        batch.set(ref, cleanForFirestore(user), { merge: true });
+      });
+      await batch.commit();
+    }
+  } catch (err) {
+    console.error('Error batch saving users to Firestore:', err);
+  }
 }

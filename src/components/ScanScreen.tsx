@@ -19,7 +19,7 @@ import {
   getDraftForOrderId 
 } from '../services/orderAutoSaveService';
 import { savePlantToFirestore, saveOrderToFirestore, isDefaultMockItem } from '../services/firebaseService';
-import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
+import { acquireHighPrecisionGps, formatGpsCoordinates, getPlantGpsYearStatus, formatGpsDateString } from '../utils/gpsUtils';
 
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -3078,9 +3078,19 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                   {item.gpsLocations && item.gpsLocations.length > 0 ? (
                     <div className="flex flex-col gap-2 bg-[#e8f5e9] text-[#012d1d] p-3 rounded-xl border border-[#a0f4c8] shadow-2xs">
                       <div className="flex items-center justify-between gap-2 flex-wrap">
-                        <div className="flex items-center gap-1.5 font-black text-xs text-[#0e6c4a]">
+                        <div className="flex items-center gap-1.5 font-black text-xs text-[#0e6c4a] flex-wrap">
                           <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
                           <span>{item.gpsLocations.length} Nursery GPS Spots Logged</span>
+                          {item.gpsLocations.some(l => l.timestamp && new Date(l.timestamp).getFullYear() === new Date().getFullYear()) ? (
+                            <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-black px-1.5 py-0.2 rounded-full flex items-center gap-0.5">
+                              <CheckCircle className="w-3 h-3 text-[#a0f4c8]" />
+                              <span>Tagged {new Date().getFullYear()}</span>
+                            </span>
+                          ) : (
+                            <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                              Needs {new Date().getFullYear()} Tag
+                            </span>
+                          )}
                         </div>
                         <div className="flex items-center gap-2">
                           <button
@@ -3778,6 +3788,34 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                                 <span className="text-[10px] text-red-600 font-extrabold mt-0.5">(Out of stock)</span>
                               ) : null}
                             </span>
+                          </div>
+                          <div>
+                            {(() => {
+                              const currentYear = new Date().getFullYear();
+                              const gpsYearStatus = getPlantGpsYearStatus(plant, currentYear);
+                              if (gpsYearStatus.isTaggedThisYear) {
+                                return (
+                                  <span className="bg-emerald-50 text-emerald-900 border border-emerald-300 text-[11px] font-black px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-2xs">
+                                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                    <span>📍 GPS Tagged ({currentYear})</span>
+                                  </span>
+                                );
+                              } else if (gpsYearStatus.hasAnyGps) {
+                                return (
+                                  <span className="bg-amber-50 text-amber-900 border border-amber-300 text-[11px] font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-2xs">
+                                    <Clock className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                    <span>GPS: Tagged {gpsYearStatus.latestYear || 'Prior'}</span>
+                                  </span>
+                                );
+                              } else {
+                                return (
+                                  <span className="bg-[#f3f4f0] text-[#717973] border border-[#c1c8c2] text-[11px] font-medium px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                    <MapPin className="w-3.5 h-3.5 text-[#717973] shrink-0" />
+                                    <span>No GPS Tag</span>
+                                  </span>
+                                );
+                              }
+                            })()}
                           </div>
                         </div>
 

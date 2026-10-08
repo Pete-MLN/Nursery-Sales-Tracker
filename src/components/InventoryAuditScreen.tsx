@@ -12,7 +12,8 @@ import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { 
   acquireHighPrecisionGps, 
   formatGpsCoordinates, 
-  getGpsAccuracyRating 
+  getGpsAccuracyRating,
+  getPlantGpsYearStatus 
 } from '../utils/gpsUtils';
 import { 
   consolidateAuditItems, 
@@ -900,17 +901,45 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
   };
 
   // Open email report modal (for active or any selected session)
-  const handleOpenEmailModal = (session?: InventoryAuditSession) => {
-    const targetSession = session || activeSession;
-    if (targetSession.items.length === 0) {
-      showToast('No plants counted yet in this session.');
-      return;
+  const handleOpenEmailModal = (session?: InventoryAuditSession | any) => {
+    // Check if session passed is an actual audit session object with an items array (not a click event)
+    const isAuditSession = session && typeof session === 'object' && 'items' in session && Array.isArray(session.items);
+    let targetSession: InventoryAuditSession = isAuditSession ? (session as InventoryAuditSession) : activeSession;
+
+    // If target session has no items, check if there's any other session in history that has items
+    if (!targetSession || !targetSession.items || targetSession.items.length === 0) {
+      const altWithItems = savedLocalSessions.find(s => s && s.items && s.items.length > 0) || 
+                           auditSessions.find(s => s && s.items && s.items.length > 0);
+      if (altWithItems) {
+        targetSession = altWithItems;
+      } else {
+        showToast('⚠️ No plants counted yet in this audit session. Please record at least one plant to finalize and email.');
+        return;
+      }
     }
+
     setSelectedSessionForEmail(targetSession);
     const { subject, body } = generateAuditEmailReport(targetSession);
     setEmailSubject(subject);
     setEmailBodyPreview(body);
     setShowEmailModal(true);
+  };
+
+  // Send email report handler with clipboard copy and safe mailto URL
+  const handleSendEmail = () => {
+    const email = recipientEmail.trim() || 'pete@maplelanenursery.com';
+    // URL-safe body for mail clients
+    const safeBody = emailBodyPreview.length > 1800
+      ? emailBodyPreview.substring(0, 1800) + '\n\n[...Report summary truncated for email client. Complete report details have been copied to your clipboard & available in attached CSV...]'
+      : emailBodyPreview;
+
+    navigator.clipboard.writeText(emailBodyPreview).catch(() => {});
+    setCopiedReport(true);
+    setTimeout(() => setCopiedReport(false), 2500);
+
+    const mailto = `mailto:${encodeURIComponent(email)}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(safeBody)}`;
+    window.location.href = mailto;
+    showToast('📧 Opening email client & report copied to clipboard!');
   };
 
   // Copy report to clipboard
@@ -1009,16 +1038,40 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
   };
 
   // Finalize and mark completed
-  const handleFinalizeSession = () => {
+  const handleFinalizeSession = (andSendEmail = false) => {
     const targetSession = selectedSessionForEmail || activeSession;
+    if (!targetSession || !targetSession.items || targetSession.items.length === 0) {
+      showToast('⚠️ No plants recorded in this session to finalize.');
+      return;
+    }
     const completedSession: InventoryAuditSession = {
       ...targetSession,
       status: 'completed',
       completedAt: new Date().toISOString()
     };
-    updateActiveSession(completedSession);
+
+    if (targetSession.id === activeSession.id) {
+      updateActiveSession(completedSession);
+    } else {
+      setSavedLocalSessions(prev => {
+        const next = prev.map(s => s.id === completedSession.id ? completedSession : s);
+        localStorage.setItem('maple_saved_audit_sessions', JSON.stringify(next));
+        return next;
+      });
+      saveAuditSessionToFirestore(completedSession).catch(err => {
+        console.warn('Could not sync completed audit session to Firestore:', err);
+      });
+      if (onSaveAuditSession) {
+        onSaveAuditSession(completedSession);
+      }
+    }
+
     setShowEmailModal(false);
-    showToast('🎉 Physical Inventory Audit finalized and saved.');
+    showToast(`🎉 Audit "${completedSession.title || 'Session'}" finalized & marked completed!`);
+
+    if (andSendEmail) {
+      handleSendEmail();
+    }
   };
 
   // Consolidated items & stats
@@ -1219,14 +1272,9 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
                   <button
                     type="button"
-                    onClick={handleOpenEmailModal}
-                    disabled={activeSession.items.length === 0}
-                    className={`flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer ${
-                      activeSession.items.length > 0
-                        ? 'bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] shadow-xs active:scale-95'
-                        : 'bg-[#c1c8c2] text-white opacity-60 cursor-not-allowed'
-                    }`}
-                    title={activeSession.items.length === 0 ? 'Log at least one plant to finalize' : 'Finalize session and email count report'}
+                    onClick={() => handleOpenEmailModal(activeSession)}
+                    className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-extrabold transition-all cursor-pointer bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] shadow-xs active:scale-95"
+                    title="Finalize session and email count report"
                   >
                     <Send className="w-3.5 h-3.5" />
                     <span>Finalize & Email Report</span>
@@ -1395,8 +1443,8 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
               </div>
 
               {/* 2. Plant Search & Selection Section */}
-              <div className="flex flex-col gap-2">
-                <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider flex items-center justify-between">
+              <div className="bg-[#eaf5ed] border-2 border-[#a4dcba] rounded-2xl p-4 sm:p-4.5 shadow-xs flex flex-col gap-3">
+                <label className="text-sm sm:text-[15px] font-black text-[#012d1d] uppercase tracking-wider flex items-center justify-between">
                   <span>2. Plant SKU / Botanical / Common Name</span>
                   <div className="flex items-center gap-2">
                     <button
@@ -1405,7 +1453,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                         setIsManualEntry(!isManualEntry);
                         setSelectedPlant(null);
                       }}
-                      className="text-[11px] font-bold text-[#0e6c4a] hover:underline flex items-center gap-1 cursor-pointer"
+                      className="text-xs sm:text-[13px] font-black text-[#0e6c4a] hover:text-[#012d1d] hover:underline flex items-center gap-1 cursor-pointer bg-white/70 px-2.5 py-1 rounded-lg border border-[#a4dcba] shadow-2xs"
                     >
                       {isManualEntry ? 'Search Catalog Plants' : '+ Unlisted Yard Plant'}
                     </button>
@@ -1416,7 +1464,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                   <div ref={plantSearchContainerRef} className="relative">
                     <div className="flex gap-2">
                       <div className="relative flex-1">
-                        <Search className="w-4 h-4 text-[#717973] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                        <Search className="w-5 h-5 text-[#525a55] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                         <input
                           type="text"
                           value={searchQuery}
@@ -1426,7 +1474,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                           }}
                           onFocus={() => setIsSearchOpen(true)}
                           placeholder="Search plant name, SKU #1000, barcode, or container size..."
-                          className="w-full bg-[#f9faf6] border-2 border-[#012d1d] text-[#012d1d] rounded-xl pl-9 pr-4 py-2.5 text-sm font-medium focus:bg-white outline-hidden shadow-2xs"
+                          className="w-full bg-white border-2 border-[#012d1d] text-[#012d1d] rounded-xl pl-10 pr-9 py-2.5 text-base font-semibold placeholder:text-sm placeholder:text-[#525a55] focus:bg-white focus:ring-2 focus:ring-[#0e6c4a] outline-hidden shadow-xs"
                         />
                         {searchQuery && (
                           <button
@@ -1443,7 +1491,7 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                       <button
                         type="button"
                         onClick={startCameraScanner}
-                        className="flex items-center gap-1.5 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] px-3.5 py-2.5 rounded-xl text-xs font-extrabold transition-all shadow-2xs cursor-pointer shrink-0"
+                        className="flex items-center gap-1.5 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] px-3.5 py-2.5 rounded-xl text-sm font-black transition-all shadow-2xs cursor-pointer shrink-0"
                         title="Scan plant barcode with camera"
                       >
                         <Camera className="w-4 h-4" />
@@ -1509,56 +1557,56 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                   </div>
                 ) : (
                   /* Manual Unlisted Plant Input Grid */
-                  <div className="bg-[#f9faf6] p-3.5 rounded-xl border border-[#c1c8c2] grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div className="bg-white/90 p-3.5 rounded-xl border border-[#a4dcba] shadow-2xs grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <div className="sm:col-span-2">
-                      <label className="text-[11px] font-bold text-[#012d1d]">Plant Common Name *</label>
+                      <label className="text-xs sm:text-[13px] font-black text-[#012d1d]">Plant Common Name *</label>
                       <input
                         type="text"
                         required
                         value={manualName}
                         onChange={(e) => setManualName(e.target.value)}
                         placeholder="e.g. Emerald Green Arborvitae"
-                        className="w-full bg-white border border-[#c1c8c2] rounded-lg px-3 py-2 text-xs font-bold text-[#012d1d] mt-1"
+                        className="w-full bg-[#f9faf6] border-2 border-[#012d1d] rounded-lg px-3 py-2 text-sm font-bold text-[#012d1d] mt-1 focus:bg-white"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-[#012d1d]">Item # / SKU</label>
+                      <label className="text-xs sm:text-[13px] font-black text-[#012d1d]">Item # / SKU</label>
                       <input
                         type="text"
                         value={manualItemNo}
                         onChange={(e) => setManualItemNo(e.target.value)}
                         placeholder="e.g. 1045"
-                        className="w-full bg-white border border-[#c1c8c2] rounded-lg px-3 py-2 text-xs font-bold text-[#012d1d] mt-1"
+                        className="w-full bg-[#f9faf6] border-2 border-[#012d1d] rounded-lg px-3 py-2 text-sm font-bold text-[#012d1d] mt-1 focus:bg-white"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-[#012d1d]">Container / Pot Size</label>
+                      <label className="text-xs sm:text-[13px] font-black text-[#012d1d]">Container / Pot Size</label>
                       <input
                         type="text"
                         value={manualSize}
                         onChange={(e) => setManualSize(e.target.value)}
                         placeholder="e.g. 5 GAL"
-                        className="w-full bg-white border border-[#c1c8c2] rounded-lg px-3 py-2 text-xs text-[#012d1d] mt-1"
+                        className="w-full bg-[#f9faf6] border border-[#c1c8c2] rounded-lg px-3 py-2 text-sm text-[#012d1d] mt-1 focus:bg-white"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-[#012d1d]">Botanical Name</label>
+                      <label className="text-xs sm:text-[13px] font-black text-[#012d1d]">Botanical Name</label>
                       <input
                         type="text"
                         value={manualBotanical}
                         onChange={(e) => setManualBotanical(e.target.value)}
                         placeholder="e.g. Thuja occidentalis"
-                        className="w-full bg-white border border-[#c1c8c2] rounded-lg px-3 py-2 text-xs text-[#012d1d] mt-1"
+                        className="w-full bg-[#f9faf6] border border-[#c1c8c2] rounded-lg px-3 py-2 text-sm text-[#012d1d] mt-1 focus:bg-white"
                       />
                     </div>
                     <div>
-                      <label className="text-[11px] font-bold text-[#012d1d]">Retail Unit Price ($)</label>
+                      <label className="text-xs sm:text-[13px] font-black text-[#012d1d]">Retail Unit Price ($)</label>
                       <input
                         type="number"
                         step="0.01"
                         value={manualPrice}
                         onChange={(e) => setManualPrice(parseFloat(e.target.value) || 0)}
-                        className="w-full bg-white border border-[#c1c8c2] rounded-lg px-3 py-2 text-xs font-bold text-[#012d1d] mt-1"
+                        className="w-full bg-[#f9faf6] border-2 border-[#012d1d] rounded-lg px-3 py-2 text-sm font-bold text-[#012d1d] mt-1 focus:bg-white"
                       />
                     </div>
                   </div>
@@ -1566,34 +1614,88 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
 
                 {/* Selected Plant Card Preview */}
                 {selectedPlant && !isManualEntry && (
-                  <div className="bg-[#f0fdf4] border border-[#a0f4c8] rounded-xl p-2.5 flex items-center justify-between gap-3">
+                  <div className="bg-white border-2 border-[#0e6c4a] rounded-xl p-3 flex items-center justify-between gap-3 shadow-xs">
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs font-black text-[#012d1d] bg-white px-2 py-0.5 rounded-md border border-[#c1c8c2]">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-sm font-black text-[#012d1d] bg-[#f0fdf4] px-2.5 py-1 rounded-md border border-[#a0f4c8]">
                           SKU #{selectedPlant.itemNo || selectedPlant.id}
                         </span>
-                        <span className="text-xs font-bold text-[#0e6c4a]">
+                        <span className="text-sm font-extrabold text-[#0e6c4a]">
                           Size: {selectedPlant.size || '3 GAL'}
                         </span>
+                        {(() => {
+                          const currentYear = new Date().getFullYear();
+                          const gpsStatus = getPlantGpsYearStatus(selectedPlant, currentYear);
+                          if (gpsStatus.isTaggedThisYear) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (selectedPlant.gpsLocation) {
+                                    setMapModalGps({
+                                      latitude: selectedPlant.gpsLocation.latitude,
+                                      longitude: selectedPlant.gpsLocation.longitude,
+                                      title: selectedPlant.name,
+                                      subtitle: `Tagged in ${currentYear} (${gpsStatus.totalCount} spots)`
+                                    });
+                                  }
+                                }}
+                                className="bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 text-xs font-black px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                title="Click to view locations on nursery GPS map"
+                              >
+                                <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                                <span>📍 GPS Tagged ({currentYear})</span>
+                              </button>
+                            );
+                          } else if (gpsStatus.hasAnyGps) {
+                            return (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (selectedPlant.gpsLocation) {
+                                    setMapModalGps({
+                                      latitude: selectedPlant.gpsLocation.latitude,
+                                      longitude: selectedPlant.gpsLocation.longitude,
+                                      title: selectedPlant.name,
+                                      subtitle: `Tagged ${gpsStatus.latestYear || 'Prior Season'}`
+                                    });
+                                  }
+                                }}
+                                className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 text-xs font-bold px-2 py-0.5 rounded-md inline-flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                                title="Click to view locations on nursery GPS map"
+                              >
+                                <MapPin className="w-3.5 h-3.5 text-amber-600 shrink-0" />
+                                <span>GPS: Tagged {gpsStatus.latestYear || 'Prior'}</span>
+                              </button>
+                            );
+                          } else {
+                            return (
+                              <span className="bg-[#f3f4f0] text-[#717973] border border-[#c1c8c2] text-xs font-medium px-2 py-0.5 rounded-md inline-flex items-center gap-1">
+                                <MapPin className="w-3.5 h-3.5 text-[#717973] shrink-0" />
+                                <span>No GPS Tag</span>
+                              </span>
+                            );
+                          }
+                        })()}
                       </div>
-                      <h3 className="font-extrabold text-sm text-[#012d1d] truncate mt-0.5">
+                      <h3 className="font-black text-base sm:text-lg text-[#012d1d] truncate mt-1">
                         {selectedPlant.name}
                       </h3>
                       {selectedPlant.botanicalName && (
-                        <p className="text-[11px] text-[#525a55] italic truncate">
+                        <p className="text-xs italic text-[#525a55] truncate">
                           {selectedPlant.botanicalName}
                         </p>
                       )}
                     </div>
 
                     <div className="text-right shrink-0 flex flex-col items-end">
-                      <div className="text-[10px] uppercase font-bold text-[#525a55]">
+                      <div className="text-xs uppercase font-extrabold text-[#525a55]">
                         Uploaded Baseline
                       </div>
-                      <div className="text-base font-black text-[#012d1d]">
+                      <div className="text-lg font-black text-[#012d1d]">
                         {selectedPlant.stock} units
                       </div>
-                      <div className="text-[11px] font-bold text-[#0e6c4a]">
+                      <div className="text-xs sm:text-sm font-bold text-[#0e6c4a]">
                         ${selectedPlant.price?.toFixed(2)} ea
                       </div>
                     </div>
@@ -2367,6 +2469,35 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
             </div>
 
             <div className="flex flex-col gap-4">
+              {/* Optional Session Selector if multiple sessions have items */}
+              {savedLocalSessions.filter(s => s && s.items && s.items.length > 0).length > 1 && (
+                <div className="bg-[#f3f4f0] p-3 rounded-xl border border-[#c1c8c2] flex flex-col gap-1">
+                  <label className="text-xs font-bold text-[#012d1d] uppercase tracking-wider">
+                    Audited Session Selected
+                  </label>
+                  <select
+                    value={selectedSessionForEmail?.id || activeSession.id}
+                    onChange={(e) => {
+                      const all = [activeSession, ...savedLocalSessions, ...auditSessions];
+                      const found = all.find(s => s.id === e.target.value);
+                      if (found) {
+                        setSelectedSessionForEmail(found);
+                        const { subject, body } = generateAuditEmailReport(found);
+                        setEmailSubject(subject);
+                        setEmailBodyPreview(body);
+                      }
+                    }}
+                    className="w-full bg-white border border-[#c1c8c2] rounded-lg px-3 py-2 text-xs font-bold text-[#012d1d] focus:outline-none focus:border-[#012d1d]"
+                  >
+                    {[activeSession, ...savedLocalSessions.filter(s => s.id !== activeSession.id)].map(s => (
+                      <option key={s.id} value={s.id}>
+                        {s.title} ({s.items.length} items • {s.status === 'completed' ? 'Completed' : 'In Progress'})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
               <div>
                 <label className="text-xs font-bold text-[#012d1d]">Recipient Email Address</label>
                 <input
@@ -2429,20 +2560,21 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                   </button>
                 </div>
 
-                <div className="flex items-center gap-2">
-                  <a
-                    href={createAuditMailtoUrl(recipientEmail, selectedSessionForEmail || activeSession)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="flex items-center gap-1.5 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-extrabold px-4 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+                <div className="flex items-center gap-2 flex-wrap">
+                  <button
+                    type="button"
+                    onClick={handleSendEmail}
+                    className="flex items-center gap-1.5 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-xs font-extrabold px-3.5 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+                    title="Open default email application and copy report to clipboard"
                   >
                     <Send className="w-4 h-4" />
                     <span>Open in Email Client</span>
-                  </a>
+                  </button>
                   <button
                     type="button"
-                    onClick={handleFinalizeSession}
+                    onClick={() => handleFinalizeSession(false)}
                     className="flex items-center gap-1.5 bg-[#0e6c4a] hover:bg-[#012d1d] text-white text-xs font-extrabold px-4 py-2.5 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer"
+                    title="Mark this physical audit session as completed"
                   >
                     <CheckCircle2 className="w-4 h-4 text-[#a0f4c8]" />
                     <span>Mark Audit Completed</span>

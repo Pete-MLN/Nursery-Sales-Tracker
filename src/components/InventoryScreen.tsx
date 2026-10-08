@@ -1,8 +1,11 @@
 import React, { useState } from 'react';
-import { ScreenType, PlantItem, StockAlertSettings } from '../types';
+import { ScreenType, PlantItem, StockAlertSettings, OrderCartItem } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { isPlantOnSale, getPlantSaleSavings } from '../utils/pricingUtils';
+import { getPlantGpsYearStatus } from '../utils/gpsUtils';
 import { PlantSaleModal } from './PlantSaleModal';
+import { PlantGpsHistoryModal } from './PlantGpsHistoryModal';
+import { PlantMapModal } from './PlantMapModal';
 import { 
   AlertTriangle, 
   Search, 
@@ -13,6 +16,7 @@ import {
   Sun,
   CheckCircle2,
   AlertCircle,
+  Clock,
   Tag,
   MapPin,
   DollarSign,
@@ -41,10 +45,14 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   stockAlertSettings
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy' | 'sale'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy' | 'sale' | 'gps_tagged_year' | 'gps_not_tagged_year'>('all');
   const [minQtyOneOnly, setMinQtyOneOnly] = useState<boolean>(false);
   const [expandedPricesItemId, setExpandedPricesItemId] = useState<string | null>(null);
   const [saleModalPlant, setSaleModalPlant] = useState<PlantItem | null>(null);
+  const [gpsModalPlant, setGpsModalPlant] = useState<PlantItem | null>(null);
+  const [mapModalPlant, setMapModalPlant] = useState<PlantItem | null>(null);
+
+  const currentYear = new Date().getFullYear();
 
   const critThreshold = stockAlertSettings?.criticalThreshold ?? 0;
   const warnThreshold = stockAlertSettings?.warningThreshold ?? 5;
@@ -59,6 +67,8 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   const warningCount = inventory.filter(i => getItemStatus(i) === 'warning').length;
   const healthyCount = inventory.filter(i => getItemStatus(i) === 'healthy').length;
   const saleCount = inventory.filter(i => isPlantOnSale(i)).length;
+  const gpsTaggedThisYearCount = inventory.filter(i => getPlantGpsYearStatus(i, currentYear).isTaggedThisYear).length;
+  const gpsNotTaggedThisYearCount = inventory.filter(i => !getPlantGpsYearStatus(i, currentYear).isTaggedThisYear).length;
 
   const filteredInventory = inventory.filter(item => {
     if (minQtyOneOnly && item.stock < 1) {
@@ -73,6 +83,8 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     
     if (statusFilter === 'all') return matchesSearch;
     if (statusFilter === 'sale') return matchesSearch && isPlantOnSale(item);
+    if (statusFilter === 'gps_tagged_year') return matchesSearch && getPlantGpsYearStatus(item, currentYear).isTaggedThisYear;
+    if (statusFilter === 'gps_not_tagged_year') return matchesSearch && !getPlantGpsYearStatus(item, currentYear).isTaggedThisYear;
     return matchesSearch && getItemStatus(item) === statusFilter;
   });
 
@@ -179,6 +191,36 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               <span>On Sale ({saleCount})</span>
             </button>
 
+            {/* GPS Tagged This Year Filter Chip */}
+            <button
+              onClick={() => setStatusFilter(statusFilter === 'gps_tagged_year' ? 'all' : 'gps_tagged_year')}
+              className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+                statusFilter === 'gps_tagged_year'
+                  ? 'bg-emerald-700 text-white border-emerald-700 shadow-xs ring-2 ring-emerald-300'
+                  : gpsTaggedThisYearCount > 0
+                  ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
+                  : 'bg-[#f3f4f0] text-[#717973] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+              }`}
+              title={`Filter inventory to plants tagged with GPS during ${currentYear}`}
+            >
+              <CheckCircle2 className={`w-3.5 h-3.5 ${statusFilter === 'gps_tagged_year' ? 'text-[#a0f4c8]' : 'text-emerald-700'}`} />
+              <span>📍 Tagged {currentYear} ({gpsTaggedThisYearCount})</span>
+            </button>
+
+            {/* GPS Needs Tagging Filter Chip */}
+            <button
+              onClick={() => setStatusFilter(statusFilter === 'gps_not_tagged_year' ? 'all' : 'gps_not_tagged_year')}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+                statusFilter === 'gps_not_tagged_year'
+                  ? 'bg-amber-700 text-white border-amber-700 shadow-xs ring-2 ring-amber-300'
+                  : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+              }`}
+              title={`Filter inventory to plants not yet tagged with GPS in ${currentYear}`}
+            >
+              <Clock className={`w-3.5 h-3.5 ${statusFilter === 'gps_not_tagged_year' ? 'text-amber-300' : 'text-amber-700'}`} />
+              <span>Needs {currentYear} Tag ({gpsNotTaggedThisYearCount})</span>
+            </button>
+
             <button
               onClick={() => setStatusFilter('critical')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
@@ -247,6 +289,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
               const isPricesExpanded = expandedPricesItemId === item.id;
               const saleSavings = getPlantSaleSavings(item);
+              const gpsYearStatus = getPlantGpsYearStatus(item, currentYear);
 
               return (
                 <div
@@ -301,6 +344,44 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                               )}
                             </span>
                           )}
+
+                          {/* GPS Tagged This Year Status Badge */}
+                          {gpsYearStatus.isTaggedThisYear ? (
+                            <button
+                              type="button"
+                              onClick={() => setGpsModalPlant(item)}
+                              className="bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                              title={`GPS Tagged in ${currentYear} (${gpsYearStatus.thisYearCount} spot${gpsYearStatus.thisYearCount === 1 ? '' : 's'} this year). Click to view history and map`}
+                            >
+                              <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                              <span>GPS Tagged ({currentYear})</span>
+                              {gpsYearStatus.totalCount > 1 && (
+                                <span className="bg-emerald-200 text-emerald-900 px-1 rounded-full text-[9px] font-mono">
+                                  {gpsYearStatus.totalCount} spots
+                                </span>
+                              )}
+                            </button>
+                          ) : gpsYearStatus.hasAnyGps ? (
+                            <button
+                              type="button"
+                              onClick={() => setGpsModalPlant(item)}
+                              className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
+                              title={`Tagged in ${gpsYearStatus.latestYear || 'prior season'}. Needs ${currentYear} re-tag. Click to view history & map`}
+                            >
+                              <Clock className="w-3 h-3 text-amber-600 shrink-0" />
+                              <span>GPS: Tagged {gpsYearStatus.latestYear || 'Prior'}</span>
+                            </button>
+                          ) : (
+                            <button
+                              type="button"
+                              onClick={() => setGpsModalPlant(item)}
+                              className="bg-[#f3f4f0] hover:bg-[#e7e9e5] text-[#717973] hover:text-[#012d1d] border border-[#c1c8c2] px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
+                              title="No GPS coordinates logged yet. Click to tag GPS and show on map"
+                            >
+                              <MapPin className="w-3 h-3 text-[#717973] shrink-0" />
+                              <span>No GPS (Tag)</span>
+                            </button>
+                          )}
                         </div>
 
                         {item.botanicalName && item.botanicalName !== item.name && (
@@ -346,7 +427,29 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                     </div>
 
                     {/* Stock & Pricing Actions */}
-                    <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-0 border-[#e2e3df]">
+                    <div className="flex items-center justify-between sm:justify-end gap-2 pt-2 sm:pt-0 border-t sm:border-0 border-[#e2e3df] flex-wrap">
+                      {/* Yard GPS History & Map Button */}
+                      <button
+                        type="button"
+                        onClick={() => setGpsModalPlant(item)}
+                        className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+                          gpsYearStatus.isTaggedThisYear
+                            ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
+                            : gpsYearStatus.hasAnyGps
+                            ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                            : 'bg-white text-[#012d1d] border-[#c1c8c2] hover:bg-[#f3f4f0]'
+                        }`}
+                        title={`View GPS tagging history, dates, and show on satellite map (${gpsYearStatus.isTaggedThisYear ? `Tagged in ${currentYear}` : `Not tagged in ${currentYear}`})`}
+                      >
+                        <MapPin className={`w-3.5 h-3.5 ${gpsYearStatus.isTaggedThisYear ? 'text-emerald-700' : 'text-[#0e6c4a]'}`} />
+                        <span>GPS</span>
+                        {gpsYearStatus.isTaggedThisYear ? (
+                          <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
+                        ) : (
+                          <span className="text-[10px] text-[#717973]">({gpsYearStatus.totalCount})</span>
+                        )}
+                      </button>
+
                       {/* Sale / Discount Button */}
                       <button
                         onClick={() => setSaleModalPlant(item)}
@@ -455,6 +558,48 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
             }
           }}
           onClose={() => setSaleModalPlant(null)}
+        />
+      )}
+
+      {/* Plant GPS History & Tagging Modal */}
+      {gpsModalPlant && (
+        <PlantGpsHistoryModal
+          isOpen={Boolean(gpsModalPlant)}
+          plant={gpsModalPlant}
+          onClose={() => setGpsModalPlant(null)}
+          onUpdatePlant={(updatedPlant) => {
+            if (onUpdatePlant) {
+              onUpdatePlant(updatedPlant);
+            }
+            setGpsModalPlant(updatedPlant);
+          }}
+          onOpenGpsMap={(targetPlant) => {
+            setMapModalPlant(targetPlant);
+          }}
+        />
+      )}
+
+      {/* Interactive Satellite Yard Map Modal */}
+      {mapModalPlant && (
+        <PlantMapModal
+          isOpen={Boolean(mapModalPlant)}
+          onClose={() => setMapModalPlant(null)}
+          selectedItem={{
+            plant: mapModalPlant,
+            quantity: mapModalPlant.stock || 1,
+            gpsLocation: mapModalPlant.gpsLocation,
+            gpsLocations: mapModalPlant.gpsLocations
+          }}
+          allItems={[{
+            plant: mapModalPlant,
+            quantity: mapModalPlant.stock || 1,
+            gpsLocation: mapModalPlant.gpsLocation,
+            gpsLocations: mapModalPlant.gpsLocations
+          }]}
+          latitude={mapModalPlant.gpsLocation?.latitude}
+          longitude={mapModalPlant.gpsLocation?.longitude}
+          plantName={mapModalPlant.name}
+          locationNotes={mapModalPlant.holdingLocation ? `Holding Bay: ${mapModalPlant.holdingLocation}` : undefined}
         />
       )}
     </div>

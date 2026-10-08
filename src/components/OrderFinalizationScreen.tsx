@@ -1882,9 +1882,18 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           {item.gpsLocations && item.gpsLocations.length > 0 ? (
                             <div className="flex flex-col gap-1.5 w-full bg-[#e8f5e9] p-2.5 rounded-xl border border-[#a0f4c8] shadow-2xs">
                               <div className="flex items-center justify-between gap-2 flex-wrap">
-                                <span className="text-xs font-black text-[#0e6c4a] flex items-center gap-1">
+                                <span className="text-xs font-black text-[#0e6c4a] flex items-center gap-1.5 flex-wrap">
                                   <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
                                   <span>{item.gpsLocations.length} Yard Locations Logged:</span>
+                                  {item.gpsLocations.some(l => l.timestamp && new Date(l.timestamp).getFullYear() === new Date().getFullYear()) ? (
+                                    <span className="bg-[#012d1d] text-[#a0f4c8] text-[10px] font-black px-1.5 py-0.2 rounded-full">
+                                      ✓ Tagged {new Date().getFullYear()}
+                                    </span>
+                                  ) : (
+                                    <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-1.5 py-0.2 rounded-full">
+                                      Needs {new Date().getFullYear()} Tag
+                                    </span>
+                                  )}
                                 </span>
                                 <div className="flex items-center gap-2">
                                   <button

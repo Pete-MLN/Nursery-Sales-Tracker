@@ -8,7 +8,8 @@ import { OrderMarkdownModal } from './OrderMarkdownModal';
 import { 
   acquireHighPrecisionGps, 
   formatGpsCoordinates, 
-  getGpsAccuracyRating 
+  getGpsAccuracyRating,
+  formatGpsDateString
 } from '../utils/gpsUtils';
 import { 
   Check, 
@@ -31,7 +32,9 @@ import {
   Layers,
   Flame,
   Percent,
-  Loader2
+  Loader2,
+  Calendar,
+  Clock
 } from 'lucide-react';
 
 interface PlantVerificationModalProps {
@@ -969,6 +972,17 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
                       {gpsLocations.length} {gpsLocations.length === 1 ? 'Spot' : 'Spots'} Tagged
                     </span>
                   )}
+                  {gpsLocations.some(l => l.timestamp && new Date(l.timestamp).getFullYear() === new Date().getFullYear()) ? (
+                    <span className="bg-[#0e6c4a] text-[#a0f4c8] text-[10px] font-black px-2 py-0.5 rounded-full flex items-center gap-1 border border-[#a0f4c8]/40">
+                      <CheckCircle2 className="w-3 h-3 text-[#a0f4c8]" />
+                      <span>Tagged {new Date().getFullYear()}</span>
+                    </span>
+                  ) : gpsLocations.length > 0 ? (
+                    <span className="bg-amber-100 text-amber-900 text-[10px] font-bold px-2 py-0.5 rounded-full flex items-center gap-1 border border-amber-300">
+                      <Clock className="w-3 h-3 text-amber-700" />
+                      <span>Needs {new Date().getFullYear()} Tag</span>
+                    </span>
+                  ) : null}
                 </div>
                 <p className="text-[11px] text-[#717973]">
                   Tag multiple nursery spots if this plant is stored in different places.
@@ -1131,9 +1145,17 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
                     </div>
 
                     <div className="flex items-center justify-between text-[11px] gap-2 flex-wrap">
-                      <span className="font-mono text-[11px] font-bold text-[#002113]">
-                        {formatGpsCoordinates(loc.latitude, loc.longitude, loc.accuracy)}
-                      </span>
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-mono text-[11px] font-bold text-[#002113]">
+                          {formatGpsCoordinates(loc.latitude, loc.longitude, loc.accuracy)}
+                        </span>
+                        {loc.timestamp && (
+                          <span className="text-[10px] font-semibold text-[#414844] bg-[#f3f4f0] px-1.5 py-0.5 rounded flex items-center gap-1">
+                            <Calendar className="w-3 h-3 text-[#0e6c4a]" />
+                            <span>{formatGpsDateString(loc.timestamp)}</span>
+                          </span>
+                        )}
+                      </div>
 
                       {loc.accuracy !== undefined && (
                         <span className={`text-[9px] font-bold px-1.5 py-0.2 rounded-full border ${rating.colorClass} ${rating.badgeClass}`}>

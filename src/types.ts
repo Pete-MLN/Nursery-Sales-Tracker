@@ -163,11 +163,69 @@ export interface RecentUpload {
 }
 
 export interface User {
+  id?: string;
   name: string;
   email: string;
   role: string;
+  isAdmin?: boolean;
+  avatarIcon?: string; // e.g. 'crown', 'sprout', 'tree', 'flower', 'leaf', 'shield', etc.
+  avatarColor?: string; // hex code
+  phone?: string;
+  department?: string;
+  status?: 'active' | 'inactive';
+  password?: string;
+  createdAt?: string;
+  lastLoginAt?: string;
   isLoggedIn: boolean;
 }
+
+export interface UserAccount {
+  id: string;
+  name: string;
+  email: string;
+  password: string;
+  role: string;
+  isAdmin: boolean;
+  avatarIcon: string;
+  avatarColor: string;
+  phone?: string;
+  department?: string;
+  status: 'active' | 'inactive';
+  createdAt: string;
+  lastLoginAt?: string;
+}
+
+export const AVATAR_ICON_OPTIONS = [
+  { id: 'crown', label: 'Crown / Admin', emoji: '👑' },
+  { id: 'sprout', label: 'Sprout', emoji: '🌱' },
+  { id: 'tree', label: 'Pine / Tree', emoji: '🌲' },
+  { id: 'flower', label: 'Flora / Flower', emoji: '🌸' },
+  { id: 'leaf', label: 'Botanical Leaf', emoji: '🍃' },
+  { id: 'shield', label: 'Shield / Guard', emoji: '🛡️' },
+  { id: 'sun', label: 'Sunshine', emoji: '☀️' },
+  { id: 'tractor', label: 'Tractor / Field', emoji: '🚜' },
+  { id: 'truck', label: 'Delivery Truck', emoji: '🚚' },
+  { id: 'wrench', label: 'Maintenance / Ops', emoji: '🔧' },
+  { id: 'scissors', label: 'Pruners / Shears', emoji: '✂️' },
+  { id: 'droplets', label: 'Irrigation', emoji: '💧' },
+  { id: 'compass', label: 'Yard Compass', emoji: '🧭' },
+  { id: 'star', label: 'Star / Lead', emoji: '⭐' },
+  { id: 'heart', label: 'Heart / Care', emoji: '❤️' },
+  { id: 'user', label: 'Standard User', emoji: '👤' },
+] as const;
+
+export const AVATAR_COLOR_OPTIONS = [
+  { hex: '#012d1d', label: 'Deep Forest Green' },
+  { hex: '#0e6c4a', label: 'Mid Green' },
+  { hex: '#16a34a', label: 'Vibrant Leaf' },
+  { hex: '#059669', label: 'Emerald' },
+  { hex: '#0284c7', label: 'Sky Blue' },
+  { hex: '#1d4ed8', label: 'Royal Blue' },
+  { hex: '#7c3aed', label: 'Violet' },
+  { hex: '#d97706', label: 'Amber / Sun' },
+  { hex: '#dc2626', label: 'Crimson' },
+  { hex: '#db2777', label: 'Rose Flora' },
+] as const;
 
 export interface StockAlertSettings {
   criticalThreshold: number;

@@ -1,41 +1,21 @@
 import React, { useState } from 'react';
-import { User as UserType } from '../types';
-import { Sprout, User, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle } from 'lucide-react';
+import { User as UserType, UserAccount } from '../types';
+import { Sprout, User, Lock, Eye, EyeOff, ArrowRight, ShieldCheck, CheckCircle2, AlertCircle, Crown } from 'lucide-react';
 import { auth } from '../lib/firebase';
 import { GoogleAuthProvider, signInWithPopup } from 'firebase/auth';
+import { INITIAL_USER_ACCOUNTS } from '../data/mockData';
+import { UserAvatar } from './UserAvatar';
 
 interface LoginScreenProps {
   onLogin: (user: UserType, keepSignedIn: boolean) => void;
+  allUsers?: UserAccount[];
 }
 
-const DEMO_STAFF_ACCOUNTS: UserType[] = [
-  {
-    name: 'Pete',
-    email: 'pete@maplelanenursery.com',
-    role: 'General Manager',
-    isLoggedIn: true
-  },
-  {
-    name: 'Alex',
-    email: 'alex@maplelanenursery.com',
-    role: 'Operations Specialist',
-    isLoggedIn: true
-  },
-  {
-    name: 'Sarah',
-    email: 'sarah@maplelanenursery.com',
-    role: 'Nursery Manager',
-    isLoggedIn: true
-  },
-  {
-    name: 'Michael',
-    email: 'michael@maplelanenursery.com',
-    role: 'Inventory Lead',
-    isLoggedIn: true
-  }
-];
+export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, allUsers = INITIAL_USER_ACCOUNTS }) => {
+  const activeStaffAccounts = (allUsers && allUsers.length > 0 ? allUsers : INITIAL_USER_ACCOUNTS).filter(
+    u => u.status !== 'inactive'
+  );
 
-export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
   const [username, setUsername] = useState<string>('pete@maplelanenursery.com');
   const [password, setPassword] = useState<string>('password123');
   const [showPassword, setShowPassword] = useState<boolean>(false);
@@ -47,7 +27,8 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     e.preventDefault();
     setErrorMsg(null);
 
-    if (!username.trim()) {
+    const cleanUser = username.trim().toLowerCase();
+    if (!cleanUser) {
       setErrorMsg('Please enter your username or email.');
       return;
     }
@@ -55,22 +36,66 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
     setIsLoading(true);
 
     setTimeout(() => {
-      const namePart = username.includes('@') ? username.split('@')[0] : username;
-      const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+      // Find matching user in registered accounts
+      const matchedAccount = activeStaffAccounts.find(
+        u => u.email.toLowerCase() === cleanUser || u.name.toLowerCase() === cleanUser
+      );
 
-      onLogin({
-        name: displayName || 'Nursery Staff',
-        email: username.trim(),
-        role: 'Operations Specialist',
-        isLoggedIn: true
-      }, keepSignedIn);
+      if (matchedAccount) {
+        // Check password if set
+        if (matchedAccount.password && password !== matchedAccount.password) {
+          setErrorMsg('Incorrect password. Please verify your credentials or ask an administrator to reset it.');
+          setIsLoading(false);
+          return;
+        }
+
+        onLogin({
+          id: matchedAccount.id,
+          name: matchedAccount.name,
+          email: matchedAccount.email,
+          role: matchedAccount.role,
+          isAdmin: matchedAccount.isAdmin,
+          avatarIcon: matchedAccount.avatarIcon,
+          avatarColor: matchedAccount.avatarColor,
+          phone: matchedAccount.phone,
+          department: matchedAccount.department,
+          status: matchedAccount.status,
+          isLoggedIn: true
+        }, keepSignedIn);
+      } else {
+        // Fallback for new staff sign in
+        const namePart = cleanUser.includes('@') ? cleanUser.split('@')[0] : cleanUser;
+        const displayName = namePart.charAt(0).toUpperCase() + namePart.slice(1);
+
+        onLogin({
+          name: displayName || 'Nursery Staff',
+          email: cleanUser,
+          role: 'Operations Specialist',
+          isAdmin: false,
+          avatarIcon: 'sprout',
+          avatarColor: '#0e6c4a',
+          isLoggedIn: true
+        }, keepSignedIn);
+      }
 
       setIsLoading(false);
-    }, 400);
+    }, 300);
   };
 
-  const handleQuickLogin = (staffUser: UserType) => {
-    onLogin(staffUser, keepSignedIn);
+  const handleQuickLogin = (account: UserAccount) => {
+    onLogin({
+      id: account.id,
+      name: account.name,
+      email: account.email,
+      role: account.role,
+      isAdmin: account.isAdmin,
+      avatarIcon: account.avatarIcon,
+      avatarColor: account.avatarColor,
+      phone: account.phone,
+      department: account.department,
+      status: account.status,
+      isLoggedIn: true
+    }, keepSignedIn);
   };
 
   const handleGoogleSignIn = async () => {
@@ -124,22 +149,37 @@ export const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
                 <ShieldCheck className="w-4.5 h-4.5 text-[#0e6c4a]" />
                 Quick Staff Switch / Tap Login
               </span>
-              <span className="text-xs text-[#717973] font-semibold">1-Tap Access</span>
+              <span className="text-xs text-[#717973] font-semibold">{activeStaffAccounts.length} Staff Available</span>
             </div>
             <div className="grid grid-cols-2 gap-2.5">
-              {DEMO_STAFF_ACCOUNTS.map((staff) => (
+              {activeStaffAccounts.map((account) => (
                 <button
-                  key={staff.email}
+                  key={account.id || account.email}
                   type="button"
-                  onClick={() => handleQuickLogin(staff)}
-                  className="p-3.5 bg-[#f3f4f0] hover:bg-[#a0f4c8]/40 active:scale-[0.98] border border-[#c1c8c2] hover:border-[#0e6c4a] rounded-xl text-left transition-all flex flex-col cursor-pointer group shadow-2xs"
+                  onClick={() => handleQuickLogin(account)}
+                  className="p-3 bg-[#f3f4f0] hover:bg-[#a0f4c8]/40 active:scale-[0.98] border border-[#c1c8c2] hover:border-[#0e6c4a] rounded-xl text-left transition-all flex items-center gap-2.5 cursor-pointer group shadow-2xs"
                 >
-                  <span className="text-base font-extrabold text-[#012d1d] group-hover:text-[#0e6c4a] truncate">
-                    {staff.name}
-                  </span>
-                  <span className="text-xs font-medium text-[#555d58] truncate">
-                    {staff.role}
-                  </span>
+                  <UserAvatar
+                    icon={account.avatarIcon}
+                    color={account.avatarColor}
+                    name={account.name}
+                    isAdmin={account.isAdmin}
+                    size="sm"
+                    showAdminBadge={true}
+                  />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-1">
+                      <span className="text-sm font-extrabold text-[#012d1d] group-hover:text-[#0e6c4a] truncate block">
+                        {account.name}
+                      </span>
+                      {account.isAdmin && (
+                        <Crown className="w-3 h-3 text-amber-600 shrink-0" />
+                      )}
+                    </div>
+                    <span className="text-[11px] font-medium text-[#555d58] truncate block">
+                      {account.role}
+                    </span>
+                  </div>
                 </button>
               ))}
             </div>

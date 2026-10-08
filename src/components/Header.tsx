@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { ScreenType, User } from '../types';
-import { ArrowLeft, User as UserIcon, MoreVertical, Sprout, Wifi, QrCode, X, Copy, Check, Smartphone, ExternalLink, BookOpen } from 'lucide-react';
+import { ArrowLeft, User as UserIcon, MoreVertical, Sprout, Wifi, QrCode, X, Copy, Check, Smartphone, ExternalLink, BookOpen, Crown } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { UserAvatar } from './UserAvatar';
 
 interface HeaderProps {
   currentScreen: ScreenType;
@@ -153,12 +154,18 @@ export const Header: React.FC<HeaderProps> = ({
           ) : (
             <button 
               onClick={() => onOpenProfile ? onOpenProfile() : onNavigate('settings')}
-              className="p-1 rounded-full text-[#414844] hover:bg-[#e2e3df] transition-colors flex items-center gap-1.5"
-              title={`Account: ${user.name}`}
+              className="p-1 rounded-full hover:bg-[#e2e3df] transition-colors flex items-center gap-1.5 cursor-pointer"
+              title={`Account: ${user.name}${user.isAdmin ? ' (Administrator)' : ''}`}
             >
-              <div className="w-8 h-8 rounded-full bg-[#a0f4c8] text-[#002113] flex items-center justify-center font-bold text-xs border border-[#19724f]/20">
-                {user.name.split(' ').map(n => n[0]).join('') || 'A'}
-              </div>
+              <UserAvatar
+                icon={user.avatarIcon}
+                color={user.avatarColor}
+                name={user.name}
+                isAdmin={user.isAdmin}
+                size="sm"
+                showAdminBadge={true}
+                borderClass="border-[#0e6c4a]/30"
+              />
             </button>
           )}
         </div>

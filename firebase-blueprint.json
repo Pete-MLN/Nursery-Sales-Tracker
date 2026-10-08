@@ -27,6 +27,10 @@
     "inventory_audits": {
       "title": "Physical Inventory Audits",
       "description": "Physical stock count sessions with independent plant details, GPS yard logging, multi-location cycle counting, and variance audit reports."
+    },
+    "users": {
+      "title": "User Accounts & Administrators",
+      "description": "Staff user accounts, personalized avatar icons, password credentials, and administrator privileges."
     }
   }
 }

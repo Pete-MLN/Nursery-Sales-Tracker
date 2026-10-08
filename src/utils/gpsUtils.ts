@@ -1,3 +1,5 @@
+import { PlantItem, GPSLocationEntry } from '../types';
+
 /**
  * High-Precision GPS and Yard Navigation Utilities for Maple Lane Nursery
  * 
@@ -432,4 +434,118 @@ export function formatDistanceFeet(feet: number): string {
     return `${miles} mi`;
   }
   return `${feet} ft`;
+}
+
+/**
+ * Normalizes and extracts all GPS location records for a plant into a sorted array (most recent first).
+ * Combines entries from plant.gpsLocations and legacy plant.gpsLocation so no historical spot is lost.
+ */
+export function getPlantGpsHistory(plant: PlantItem): GPSLocationEntry[] {
+  const map = new Map<string, GPSLocationEntry>();
+
+  if (plant.gpsLocations && Array.isArray(plant.gpsLocations)) {
+    for (const loc of plant.gpsLocations) {
+      if (loc && typeof loc.latitude === 'number' && typeof loc.longitude === 'number') {
+        const key = `${loc.latitude.toFixed(6)}_${loc.longitude.toFixed(6)}_${loc.timestamp || ''}`;
+        map.set(key, loc);
+      }
+    }
+  }
+
+  if (plant.gpsLocation && typeof plant.gpsLocation.latitude === 'number' && typeof plant.gpsLocation.longitude === 'number') {
+    const key = `${plant.gpsLocation.latitude.toFixed(6)}_${plant.gpsLocation.longitude.toFixed(6)}_${plant.gpsLocation.timestamp || ''}`;
+    if (!map.has(key)) {
+      map.set(key, {
+        id: `legacy-${plant.id}`,
+        latitude: plant.gpsLocation.latitude,
+        longitude: plant.gpsLocation.longitude,
+        accuracy: plant.gpsLocation.accuracy,
+        timestamp: plant.gpsLocation.timestamp || new Date().toISOString(),
+        label: plant.holdingLocation ? `Bay ${plant.holdingLocation}` : 'Primary Location'
+      });
+    }
+  }
+
+  const entries = Array.from(map.values());
+  // Sort descending by timestamp
+  return entries.sort((a, b) => {
+    const timeA = a.timestamp ? new Date(a.timestamp).getTime() : 0;
+    const timeB = b.timestamp ? new Date(b.timestamp).getTime() : 0;
+    return timeB - timeA;
+  });
+}
+
+export interface PlantGpsYearStatus {
+  isTaggedThisYear: boolean;
+  thisYearCount: number;
+  totalCount: number;
+  latestTag?: GPSLocationEntry;
+  latestYear?: number;
+  latestDateFormatted?: string;
+  hasAnyGps: boolean;
+  history: GPSLocationEntry[];
+}
+
+/**
+ * Formats a GPS timestamp into a human-readable date and time
+ * e.g. "Oct 8, 2026 at 7:42 AM"
+ */
+export function formatGpsDateString(isoOrDateString?: string): string {
+  if (!isoOrDateString) return 'Date unknown';
+  const d = new Date(isoOrDateString);
+  if (isNaN(d.getTime())) return isoOrDateString;
+
+  return d.toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+}
+
+/**
+ * Checks if a plant has been GPS tagged during the current calendar year (or specified target year).
+ */
+export function getPlantGpsYearStatus(plant: PlantItem, targetYear: number = new Date().getFullYear()): PlantGpsYearStatus {
+  const history = getPlantGpsHistory(plant);
+  if (history.length === 0) {
+    return {
+      isTaggedThisYear: false,
+      thisYearCount: 0,
+      totalCount: 0,
+      hasAnyGps: false,
+      history: []
+    };
+  }
+
+  const thisYearTags = history.filter(loc => {
+    if (!loc.timestamp) return false;
+    const date = new Date(loc.timestamp);
+    return !isNaN(date.getTime()) && date.getFullYear() === targetYear;
+  });
+
+  const latestTag = history[0];
+  let latestYear: number | undefined;
+  let latestDateFormatted: string | undefined;
+
+  if (latestTag?.timestamp) {
+    const d = new Date(latestTag.timestamp);
+    if (!isNaN(d.getTime())) {
+      latestYear = d.getFullYear();
+      latestDateFormatted = formatGpsDateString(latestTag.timestamp);
+    }
+  }
+
+  return {
+    isTaggedThisYear: thisYearTags.length > 0,
+    thisYearCount: thisYearTags.length,
+    totalCount: history.length,
+    latestTag,
+    latestYear,
+    latestDateFormatted,
+    hasAnyGps: true,
+    history
+  };
 }

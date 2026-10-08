@@ -25,9 +25,17 @@ export const DraftRecoveryBanner: React.FC<DraftRecoveryBannerProps> = ({
     const checkDraft = () => {
       const active = getActiveDraft(orders);
       if (active && (active.cartItems.length > 0 || (active.customerName && active.customerName.trim().length > 0))) {
-        setDraft(active);
+        setDraft(prev => {
+          if (prev &&
+              prev.orderId === active.orderId &&
+              prev.lastSavedAt === active.lastSavedAt &&
+              prev.cartItems.length === active.cartItems.length) {
+            return prev;
+          }
+          return active;
+        });
       } else {
-        setDraft(null);
+        setDraft(prev => prev === null ? null : null);
       }
     };
 

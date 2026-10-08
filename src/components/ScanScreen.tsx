@@ -3867,37 +3867,41 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         </div>
       )}
       {/* Plant Verification & Quantity Confirmation Pop-up Modal */}
-      <PlantVerificationModal
-        isOpen={verifyingPlant !== null}
-        plant={verifyingPlant?.plant || null}
-        initialQuantity={verifyingPlant?.initialQty}
-        initialPriceLevel={verifyingPlant?.initialPriceLevel}
-        existingCartItem={verifyingPlant?.existingCartItem}
-        customerType={customerType}
-        onUpdatePlant={handleUpdatePlantFromVerification}
-        onConfirm={(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes, markdown) => {
-          handleConfirmPlantVerification(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes, markdown);
-          setVerifyingPlant(null);
-        }}
-        onClose={handleCloseVerificationModal}
-      />
+      {verifyingPlant && (
+        <PlantVerificationModal
+          isOpen={true}
+          plant={verifyingPlant.plant}
+          initialQuantity={verifyingPlant.initialQty}
+          initialPriceLevel={verifyingPlant.initialPriceLevel}
+          existingCartItem={verifyingPlant.existingCartItem}
+          customerType={customerType}
+          onUpdatePlant={handleUpdatePlantFromVerification}
+          onConfirm={(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes, markdown) => {
+            handleConfirmPlantVerification(plant, qty, priceLevel, unitPrice, fulfillment, gps, gpsLocationsList, notes, markdown);
+            setVerifyingPlant(null);
+          }}
+          onClose={handleCloseVerificationModal}
+        />
+      )}
 
       {/* Plant Yard & GPS Map Modal */}
-      <PlantMapModal
-        isOpen={mapModalItem !== null}
-        onClose={() => setMapModalItem(null)}
-        selectedItem={mapModalItem}
-        allItems={cartItems}
-        gpsLoggedMap={gpsLoggedMap}
-        onLogGPS={handleLogGPS}
-        orderId={activeOrder?.id}
-        customerName={selectedCustomer || customerSearch}
-        onBackToOrder={() => setMapModalItem(null)}
-        onNavigateHome={() => {
-          setMapModalItem(null);
-          onNavigate('home');
-        }}
-      />
+      {mapModalItem && (
+        <PlantMapModal
+          isOpen={true}
+          onClose={() => setMapModalItem(null)}
+          selectedItem={mapModalItem}
+          allItems={cartItems}
+          gpsLoggedMap={gpsLoggedMap}
+          onLogGPS={handleLogGPS}
+          orderId={activeOrder?.id}
+          customerName={selectedCustomer || customerSearch}
+          onBackToOrder={() => setMapModalItem(null)}
+          onNavigateHome={() => {
+            setMapModalItem(null);
+            onNavigate('home');
+          }}
+        />
+      )}
 
       {/* One-Time Order Markdown Modal */}
       {markdownTargetItem && (

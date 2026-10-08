@@ -872,9 +872,9 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
       </div>
 
       {/* Plant GPS Google Map Modal */}
-      {activeOrder && activeOrder.items && (
+      {isPlantMapOpen && activeOrder && activeOrder.items && (
         <PlantMapModal
-          isOpen={isPlantMapOpen}
+          isOpen={true}
           onClose={() => setIsPlantMapOpen(false)}
           selectedItem={activeOrder.items[0] || null}
           allItems={activeOrder.items}

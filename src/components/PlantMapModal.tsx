@@ -163,9 +163,14 @@ const InteractiveTileMap: React.FC<{
   // Center on active location when it changes
   useEffect(() => {
     if (activeLocation) {
-      setCenter({ lat: activeLocation.lat, lng: activeLocation.lng });
+      setCenter(prev => {
+        if (Math.abs(prev.lat - activeLocation.lat) < 0.0000001 && Math.abs(prev.lng - activeLocation.lng) < 0.0000001) {
+          return prev;
+        }
+        return { lat: activeLocation.lat, lng: activeLocation.lng };
+      });
     }
-  }, [activeLocation]);
+  }, [activeLocation?.lat, activeLocation?.lng]);
 
   // Center on user location ONLY when manually triggered by the user
   const lastCenterOnUserTriggerRef = useRef<number>(centerOnUserTrigger);
@@ -725,12 +730,15 @@ const InteractiveTileMap: React.FC<{
   );
 };
 
+const EMPTY_ALL_ITEMS: OrderCartItem[] = [];
+const EMPTY_GPS_LOGGED_MAP: Record<string, string> = {};
+
 export const PlantMapModal: React.FC<PlantMapModalProps> = ({
   isOpen,
   onClose,
   selectedItem = null,
-  allItems = [],
-  gpsLoggedMap = {},
+  allItems = EMPTY_ALL_ITEMS,
+  gpsLoggedMap = EMPTY_GPS_LOGGED_MAP,
   onLogGPS,
   orderId,
   customerName,
@@ -774,13 +782,23 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
 
   // Sync active item when selectedItem prop changes
   useEffect(() => {
+    if (!isOpen) return;
     if (selectedItem) {
-      setActiveItem(selectedItem);
+      setActiveItem(prev => {
+        if (prev?.plant?.id === selectedItem.plant.id &&
+            prev?.quantity === selectedItem.quantity &&
+            prev?.selectedPrice === selectedItem.selectedPrice) {
+          return prev;
+        }
+        return selectedItem;
+      });
     }
-  }, [selectedItem]);
+  }, [isOpen, selectedItem?.plant?.id, selectedItem?.quantity, selectedItem?.selectedPrice]);
 
   // Consolidate all items (including selected item if not in allItems)
+  const selectedPlantId = selectedItem?.plant?.id;
   const effectiveItems = useMemo(() => {
+    if (!isOpen) return [];
     const list = [...allItems];
     if (selectedItem && !list.some(i => i.plant.id === selectedItem.plant.id)) {
       list.unshift(selectedItem);
@@ -801,7 +819,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
             latitude,
             longitude,
             accuracy: 10,
-            timestamp: new Date().toISOString()
+            timestamp: 'pin'
           }
         },
         quantity: 1,
@@ -810,15 +828,16 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
           latitude,
           longitude,
           accuracy: 10,
-          timestamp: new Date().toISOString()
+          timestamp: 'pin'
         }
       });
     }
     return list;
-  }, [allItems, selectedItem, latitude, longitude, plantName, locationNotes]);
+  }, [isOpen, allItems, selectedPlantId, latitude, longitude, plantName, locationNotes]);
 
   // Parse GPS coordinates for each plant (including multiple spots per plant)
   const parsedLocations = useMemo<ParsedPlantLocation[]>(() => {
+    if (!isOpen) return [];
     const list: ParsedPlantLocation[] = [];
 
     effectiveItems.forEach((item, index) => {
@@ -898,7 +917,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
     });
 
     return list;
-  }, [effectiveItems, gpsLoggedMap]);
+  }, [isOpen, effectiveItems, gpsLoggedMap]);
 
   // Filtered list based on view tab
   const displayedLocations = useMemo(() => {
@@ -912,16 +931,26 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
 
   // Selected item location
   const currentActiveLocation = useMemo(() => {
+    if (!isOpen) return null;
     if (!activeItem) return parsedLocations[0] || null;
     return parsedLocations.find(l => l.item.plant.id === activeItem.plant.id) || parsedLocations[0] || null;
-  }, [activeItem, parsedLocations]);
+  }, [isOpen, activeItem?.plant?.id, parsedLocations]);
 
   // Auto-open InfoWindow when active item changes
   useEffect(() => {
+    if (!isOpen) return;
     if (currentActiveLocation) {
-      setInfoWindowItem(currentActiveLocation);
+      setInfoWindowItem(prev => {
+        if (prev?.item?.plant?.id === currentActiveLocation.item.plant.id &&
+            prev?.spotIndex === currentActiveLocation.spotIndex &&
+            prev?.lat === currentActiveLocation.lat &&
+            prev?.lng === currentActiveLocation.lng) {
+          return prev;
+        }
+        return currentActiveLocation;
+      });
     }
-  }, [currentActiveLocation]);
+  }, [isOpen, currentActiveLocation?.item?.plant?.id, currentActiveLocation?.spotIndex, currentActiveLocation?.lat, currentActiveLocation?.lng]);
 
   // AUTO-ACQUIRE AND WATCH USER LOCATION WHEN MAP OPENS
   useEffect(() => {

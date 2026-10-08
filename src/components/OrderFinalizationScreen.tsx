@@ -110,31 +110,6 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     };
   });
 
-  // Sync state if prop changes
-  useEffect(() => {
-    if (order) {
-      setCurrentOrder({
-        ...order,
-        items: order.items ? order.items.map(item => ({ ...item })) : []
-      });
-      setCustomerName(order.customerName || '');
-      setFulfillment(order.type || 'Take Now');
-      setScheduledDate(extractDateForInput(order.scheduledDate || order.scheduledTime));
-      if (order.scheduledTime && !/^\d{4}-\d{2}-\d{2}$/.test(order.scheduledTime)) {
-        setScheduledTime(order.scheduledTime);
-      } else {
-        setScheduledTime(order.type === 'Take Now' ? 'Immediate (Take Now)' : 'Morning (8:00 AM - 12:00 PM)');
-      }
-      setOrderStatus(order.status || 'Pending');
-      setHoldingLocation(order.holdingLocation || 'Left in Place (Current Row)');
-      setOrderNotes(order.notes || '');
-      setItems(order.items ? order.items.map(item => ({ ...item })) : []);
-      setRemainingPickupDate(order.remainingPickupDate || '');
-      setPartialPickupNotes(order.partialPickupNotes || '');
-      setPoNumber(order.poNumber || '');
-    }
-  }, [order]);
-
   // Form Fields
   const [customerName, setCustomerName] = useState<string>(currentOrder.customerName);
   const [poNumber, setPoNumber] = useState<string>(currentOrder.poNumber || '');
@@ -163,6 +138,31 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
   });
   const [remainingPickupDate, setRemainingPickupDate] = useState<string>(currentOrder.remainingPickupDate || '');
   const [partialPickupNotes, setPartialPickupNotes] = useState<string>(currentOrder.partialPickupNotes || '');
+
+  // Sync state if prop changes
+  useEffect(() => {
+    if (order) {
+      setCurrentOrder({
+        ...order,
+        items: order.items ? order.items.map(item => ({ ...item })) : []
+      });
+      setCustomerName(order.customerName || '');
+      setFulfillment(order.type || 'Take Now');
+      setScheduledDate(extractDateForInput(order.scheduledDate || order.scheduledTime));
+      if (order.scheduledTime && !/^\d{4}-\d{2}-\d{2}$/.test(order.scheduledTime)) {
+        setScheduledTime(order.scheduledTime);
+      } else {
+        setScheduledTime(order.type === 'Take Now' ? 'Immediate (Take Now)' : 'Morning (8:00 AM - 12:00 PM)');
+      }
+      setOrderStatus(order.status || 'Pending');
+      setHoldingLocation(order.holdingLocation || 'Left in Place (Current Row)');
+      setOrderNotes(order.notes || '');
+      setItems(order.items ? order.items.map(item => ({ ...item })) : []);
+      setRemainingPickupDate(order.remainingPickupDate || '');
+      setPartialPickupNotes(order.partialPickupNotes || '');
+      setPoNumber(order.poNumber || '');
+    }
+  }, [order?.id, order?.updatedAt, order?.modifiedAt]);
 
   // Modals & UI States
   const [isAddingPlantModalOpen, setIsAddingPlantModalOpen] = useState<boolean>(false);
@@ -278,7 +278,7 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     setRemainingPickupDate(currentOrder.remainingPickupDate || '');
     setPartialPickupNotes(currentOrder.partialPickupNotes || '');
     setHasUnsavedChanges(false);
-  }, [currentOrder.id, customers]);
+  }, [currentOrder.id]);
 
   // LIVE AUTO-SAVE: Every edit made in finalization (status, items, staging bay, date, customer name, notes) is auto-saved to disk and synced
   useEffect(() => {
@@ -3446,26 +3446,28 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
       )}
 
       {/* Plant Yard & GPS Map Modal */}
-      <PlantMapModal
-        isOpen={mapModalItem !== null}
-        onClose={() => setMapModalItem(null)}
-        selectedItem={mapModalItem}
-        allItems={items}
-        gpsLoggedMap={items.reduce((acc, it) => {
-          if (it.gpsLocation) {
-            acc[it.plant.id] = `${it.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(it.gpsLocation.longitude).toFixed(4)}° W`;
-          }
-          return acc;
-        }, {} as Record<string, string>)}
-        onLogGPS={handleLogGPS}
-        orderId={currentOrder.id}
-        customerName={customerName || currentOrder.customerName}
-        onBackToOrder={() => setMapModalItem(null)}
-        onNavigateHome={() => {
-          setMapModalItem(null);
-          onNavigate('home');
-        }}
-      />
+      {mapModalItem && (
+        <PlantMapModal
+          isOpen={true}
+          onClose={() => setMapModalItem(null)}
+          selectedItem={mapModalItem}
+          allItems={items}
+          gpsLoggedMap={items.reduce((acc, it) => {
+            if (it.gpsLocation) {
+              acc[it.plant.id] = `${it.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(it.gpsLocation.longitude).toFixed(4)}° W`;
+            }
+            return acc;
+          }, {} as Record<string, string>)}
+          onLogGPS={handleLogGPS}
+          orderId={currentOrder.id}
+          customerName={customerName || currentOrder.customerName}
+          onBackToOrder={() => setMapModalItem(null)}
+          onNavigateHome={() => {
+            setMapModalItem(null);
+            onNavigate('home');
+          }}
+        />
+      )}
 
       {/* One-Time Order Markdown Modal */}
       {markdownTargetItem && (

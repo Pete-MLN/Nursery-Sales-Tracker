@@ -82,8 +82,15 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
   const [plantRecordStatus, setPlantRecordStatus] = useState<string>('');
 
   useEffect(() => {
-    setActivePlant(plant);
-  }, [plant]);
+    if (plant) {
+      setActivePlant(prev => {
+        if (prev?.id === plant.id && prev?.stock === plant.stock && prev?.price === plant.price) {
+          return prev;
+        }
+        return plant;
+      });
+    }
+  }, [plant?.id, plant?.stock, plant?.price]);
 
   const currentPlant = activePlant || plant;
   const catUpper = (currentPlant?.category || '').toUpperCase();
@@ -266,7 +273,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
         clearTimeout(focusTimer);
       };
     }
-  }, [isOpen, plant, existingCartItem, initialQuantity, customerType]);
+  }, [isOpen, plant?.id, existingCartItem?.plant?.id, existingCartItem?.quantity, initialQuantity, customerType]);
 
   if (!isOpen || !plant) {
     return null;

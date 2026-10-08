@@ -580,28 +580,26 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
       )}
 
       {/* Interactive Satellite Yard Map Modal */}
-      {mapModalPlant && (
-        <PlantMapModal
-          isOpen={Boolean(mapModalPlant)}
-          onClose={() => setMapModalPlant(null)}
-          selectedItem={{
-            plant: mapModalPlant,
-            quantity: mapModalPlant.stock || 1,
-            gpsLocation: mapModalPlant.gpsLocation,
-            gpsLocations: mapModalPlant.gpsLocations
-          }}
-          allItems={[{
-            plant: mapModalPlant,
-            quantity: mapModalPlant.stock || 1,
-            gpsLocation: mapModalPlant.gpsLocation,
-            gpsLocations: mapModalPlant.gpsLocations
-          }]}
-          latitude={mapModalPlant.gpsLocation?.latitude}
-          longitude={mapModalPlant.gpsLocation?.longitude}
-          plantName={mapModalPlant.name}
-          locationNotes={mapModalPlant.holdingLocation ? `Holding Bay: ${mapModalPlant.holdingLocation}` : undefined}
-        />
-      )}
+      {mapModalPlant && (() => {
+        const modalItem: OrderCartItem = {
+          plant: mapModalPlant,
+          quantity: mapModalPlant.stock || 1,
+          gpsLocation: mapModalPlant.gpsLocation,
+          gpsLocations: mapModalPlant.gpsLocations
+        };
+        return (
+          <PlantMapModal
+            isOpen={true}
+            onClose={() => setMapModalPlant(null)}
+            selectedItem={modalItem}
+            allItems={[modalItem]}
+            latitude={mapModalPlant.gpsLocation?.latitude}
+            longitude={mapModalPlant.gpsLocation?.longitude}
+            plantName={mapModalPlant.name}
+            locationNotes={mapModalPlant.holdingLocation ? `Holding Bay: ${mapModalPlant.holdingLocation}` : undefined}
+          />
+        );
+      })()}
     </div>
   );
 };

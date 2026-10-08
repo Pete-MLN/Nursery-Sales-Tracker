@@ -858,7 +858,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {/* Plant GPS Google Map Modal for Order */}
       {mapModalOrder && mapModalOrder.items && (
         <PlantMapModal
-          isOpen={mapModalOrder !== null}
+          isOpen={true}
           onClose={() => setMapModalOrder(null)}
           selectedItem={mapModalOrder.items[0] || null}
           allItems={mapModalOrder.items}

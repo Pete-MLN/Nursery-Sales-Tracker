@@ -68,24 +68,23 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
 
   // Sync if plant changes while open
   useEffect(() => {
-    if (plant) {
-      if (plant.saleDiscount) {
-        setDiscountType(plant.saleDiscount.type);
-        setDiscountValueInput(plant.saleDiscount.value.toString());
-        setSaleLabel(plant.saleDiscount.saleLabel || '');
-        setIsActive(plant.saleDiscount.active !== false);
-      } else {
-        setDiscountType('percentage');
-        setDiscountValueInput('20');
-        setSaleLabel('');
-        setIsActive(true);
-      }
-      setErrorText('');
-      setIsUpdating(false);
-      setIsSuccess(false);
-      setUpdateProgress(0);
+    if (!isOpen || !plant) return;
+    if (plant.saleDiscount) {
+      setDiscountType(plant.saleDiscount.type);
+      setDiscountValueInput(plant.saleDiscount.value.toString());
+      setSaleLabel(plant.saleDiscount.saleLabel || '');
+      setIsActive(plant.saleDiscount.active !== false);
+    } else {
+      setDiscountType('percentage');
+      setDiscountValueInput('20');
+      setSaleLabel('');
+      setIsActive(true);
     }
-  }, [plant]);
+    setErrorText('');
+    setIsUpdating(false);
+    setIsSuccess(false);
+    setUpdateProgress(0);
+  }, [isOpen, plant?.id, plant?.saleDiscount?.type, plant?.saleDiscount?.value, plant?.saleDiscount?.active]);
 
   // Bring modal to clean scroll alignment when opened
   useEffect(() => {

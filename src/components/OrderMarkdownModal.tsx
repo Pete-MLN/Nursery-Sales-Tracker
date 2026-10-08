@@ -75,27 +75,26 @@ export const OrderMarkdownModal: React.FC<OrderMarkdownModalProps> = ({
 
   // Synchronize state when opening with fresh markdown or plant
   useEffect(() => {
-    if (plant) {
-      if (currentMarkdown) {
-        setMethod(currentMarkdown.type);
-        setInputValue(currentMarkdown.value.toString());
-        const match = COMMON_REASONS.find(r => r.label === currentMarkdown.reason);
-        if (match) {
-          setSelectedReason(match.label);
-          setCustomReasonText(currentMarkdown.customReason || '');
-        } else {
-          setSelectedReason('✏️ Custom Reason');
-          setCustomReasonText(currentMarkdown.reason || '');
-        }
+    if (!isOpen || !plant) return;
+    if (currentMarkdown) {
+      setMethod(currentMarkdown.type);
+      setInputValue(currentMarkdown.value.toString());
+      const match = COMMON_REASONS.find(r => r.label === currentMarkdown.reason);
+      if (match) {
+        setSelectedReason(match.label);
+        setCustomReasonText(currentMarkdown.customReason || '');
       } else {
-        setMethod('percentage');
-        setInputValue('20');
-        setSelectedReason(COMMON_REASONS[0].label);
-        setCustomReasonText('');
+        setSelectedReason('✏️ Custom Reason');
+        setCustomReasonText(currentMarkdown.reason || '');
       }
-      setErrorText('');
+    } else {
+      setMethod('percentage');
+      setInputValue('20');
+      setSelectedReason(COMMON_REASONS[0].label);
+      setCustomReasonText('');
     }
-  }, [plant, currentMarkdown]);
+    setErrorText('');
+  }, [isOpen, plant?.id, currentMarkdown?.type, currentMarkdown?.value, currentMarkdown?.reason, currentMarkdown?.markdownPrice]);
 
   // Bring window to top on open
   useEffect(() => {

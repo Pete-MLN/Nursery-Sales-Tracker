@@ -1645,52 +1645,43 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               return (
                 <div 
                   key={`rem-${item.plant.id}-${idx}`}
-                  className="bg-white p-3.5 rounded-xl border border-amber-200 shadow-2xs flex items-center justify-between gap-3"
+                  className="bg-white p-3.5 sm:p-4 rounded-xl border border-amber-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4"
                 >
-                  <div className="flex items-center gap-3 min-w-0 flex-1">
-                    <img
-                      src={item.plant.image || DEFAULT_PLANT_IMAGE}
-                      alt={item.plant.name}
-                      className="w-12 h-12 rounded-lg object-cover border border-amber-200 shrink-0"
-                      referrerPolicy="no-referrer"
-                      onError={(e) => { (e.target as HTMLImageElement).src = DEFAULT_PLANT_IMAGE; }}
-                    />
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-1.5 flex-wrap">
-                        <span className="font-extrabold text-sm text-[#012d1d] truncate">
-                          {item.plant.name}
-                        </span>
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                        <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[11px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">
-                          <Tag className="w-2.5 h-2.5 text-[#a0f4c8]" />
-                          #{item.plant.itemNo || item.plant.barcode || 'N/A'}
-                        </span>
-                        <span className="bg-[#461702] text-amber-100 text-[11px] font-black px-2 py-0.5 rounded-md flex items-center gap-1">
-                          <Package className="w-2.5 h-2.5 text-amber-300" />
-                          SIZE: {item.plant.size || 'Standard'}
-                        </span>
-                      </div>
-                      {item.plant.botanicalName && (
-                        <span className="text-xs italic text-[#414844] block truncate mt-0.5">
-                          {item.plant.botanicalName}
-                        </span>
-                      )}
-                      <span className="text-[11px] text-[#717973] block mt-0.5">
-                        Total Ordered: <strong>{item.quantity}</strong> • Taken: <strong>{takenQty}</strong>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-black text-base sm:text-[17px] text-[#012d1d] break-words leading-snug">
+                        {item.plant.name}
                       </span>
                     </div>
+                    <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                      <span className="bg-[#012d1d] text-[#a0f4c8] font-mono text-[13px] font-black px-2.5 py-0.5 rounded-md flex items-center gap-1.5 shadow-2xs">
+                        <Tag className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                        #{item.plant.itemNo || item.plant.barcode || 'N/A'}
+                      </span>
+                      <span className="bg-[#461702] text-amber-100 text-[13px] font-black px-2.5 py-0.5 rounded-md flex items-center gap-1.5 shadow-2xs">
+                        <Package className="w-3.5 h-3.5 text-amber-300" />
+                        SIZE: {item.plant.size || 'Standard'}
+                      </span>
+                    </div>
+                    {item.plant.botanicalName && (
+                      <span className="text-sm italic text-[#414844] block mt-1 break-words">
+                        {item.plant.botanicalName}
+                      </span>
+                    )}
+                    <span className="text-[13px] text-[#555d57] block mt-1">
+                      Total Ordered: <strong className="text-[#1a1c1a]">{item.quantity}</strong> • Taken: <strong className="text-[#1a1c1a]">{takenQty}</strong>
+                    </span>
                   </div>
 
-                  <div className="text-right shrink-0 flex flex-col items-end gap-1">
-                    <span className="inline-flex items-center gap-1 text-xs font-extrabold bg-amber-100 text-amber-900 border border-amber-300 px-2.5 py-1 rounded-lg">
-                      <Clock className="w-3.5 h-3.5 text-amber-700" />
+                  <div className="text-left sm:text-right shrink-0 flex flex-row sm:flex-col items-center sm:items-end justify-between sm:justify-center gap-2 pt-2 sm:pt-0 border-t sm:border-0 border-amber-100">
+                    <span className="inline-flex items-center gap-1.5 text-[14px] sm:text-[15px] font-black bg-amber-100 text-amber-950 border border-amber-300 px-3 py-1.5 rounded-lg shadow-2xs">
+                      <Clock className="w-4 h-4 text-amber-800" />
                       <span>{remQty} to Pick Up</span>
                     </span>
                     <button
                       type="button"
                       onClick={() => handleSetItemPickedUpQty(item.plant.id, item.quantity)}
-                      className="text-[11px] font-bold text-[#0e6c4a] hover:underline cursor-pointer"
+                      className="text-xs sm:text-[13px] font-bold text-[#0e6c4a] hover:text-[#012d1d] hover:underline cursor-pointer"
                     >
                       Mark this item taken
                     </button>

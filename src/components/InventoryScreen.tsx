@@ -136,20 +136,32 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
           </div>
         </div>
 
-        {/* Search & Status Pills */}
-        <div className="flex flex-col sm:flex-row gap-2.5">
-          <div className="relative flex-1">
-            <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              placeholder="Search by Item #, Botanical, Common Name, Size, or Location..."
-              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-4 py-2 text-xs font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
-            />
-          </div>
+        {/* Search & Status Filters */}
+        <div className="flex flex-col gap-2.5">
+          {/* Search Row - Dedicated full-width line on both mobile & desktop */}
+          <div className="relative w-full">
+          <Search className="w-5 h-5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#717973] pointer-events-none" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by Item #, Botanical, Common Name, Size, or Location..."
+            className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-11 pr-10 py-2.5 sm:py-3 text-[15px] sm:text-base font-medium text-[#1a1c1a] placeholder:text-[#717973] focus:outline-none focus:border-[#012d1d] focus:ring-1 focus:ring-[#012d1d] shadow-2xs transition-all"
+          />
+          {searchTerm && (
+            <button
+              type="button"
+              onClick={() => setSearchTerm('')}
+              className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-[#717973] hover:text-[#1a1c1a] hover:bg-[#e2e3df] rounded-lg transition-colors cursor-pointer"
+              title="Clear search"
+            >
+              <X className="w-4 h-4" />
+            </button>
+          )}
+        </div>
 
-          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 sm:pb-0">
+        {/* Status & Filter Pills Row */}
+        <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
             {/* Qty >= 1 Toggle Chip */}
             <button
               onClick={() => setMinQtyOneOnly(!minQtyOneOnly)}

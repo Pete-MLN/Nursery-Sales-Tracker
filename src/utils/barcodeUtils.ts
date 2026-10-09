@@ -65,7 +65,14 @@ export function isValidBarcodeString(code: string | undefined | null): boolean {
  * - Reverse prefix matching (e.g. item in inventory has 'ITEM41796' and scanned is '41796')
  * - 1-digit check digit variations
  */
-export function findPlantByBarcode(rawCode: string, inventory: PlantItem[]): PlantItem | undefined {
+export function findPlantByBarcode(
+  rawCode: string,
+  inventory: PlantItem[],
+  options: { allowFuzzy?: boolean } = {}
+): PlantItem | undefined {
+  // Steps 5 & 6 below are fuzzy (prefix / substring) matches. Camera reads from the
+  // JS (ZXing) decoder pass allowFuzzy: false.
+  const allowFuzzy = options.allowFuzzy !== false;
   const cleanRaw = String(rawCode).trim();
   if (!cleanRaw || cleanRaw.length < 2) return undefined;
 
@@ -121,6 +128,8 @@ export function findPlantByBarcode(rawCode: string, inventory: PlantItem[]): Pla
       );
     });
     if (matched) return matched;
+
+    if (!allowFuzzy) return undefined;
 
     // 5. Exact 1-digit checksum variation (e.g. scanned '417968' where '8' is check digit and item is '41796')
     // We sort items by LONGEST normalized barcode/itemNo first to avoid matching short keys

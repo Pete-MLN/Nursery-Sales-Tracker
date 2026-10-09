@@ -358,6 +358,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     fullCanvas: HTMLCanvasElement;
   } | null>(null);
   const nativeDetectorRef = useRef<any>(undefined);
+  // Which decoder produced the last result: native (trusted) or ZXing-JS (iPhones).
+  const lastDecodeSourceRef = useRef<'native' | 'zxing'>('zxing');
 
   // Focus and center the camera scanner viewport when returning from verification
   const focusCameraScanner = () => {
@@ -623,7 +625,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
   const unrecognizedCandidateRef = useRef<{ code: string; count: number }>({ code: '', count: 0 });
 
   // Process detected barcode string with strict validation to eliminate false matches on iOS
-  const handleScannedBarcode = (rawCode: string, isManualInput: boolean = false) => {
+  const handleScannedBarcode = (rawCode: string, isManualInput: boolean = false, source: 'native' | 'zxing' | 'typed' = 'typed') => {
     resetCameraTimer();
     const cleanCode = rawCode.trim();
     if (!cleanCode || cleanCode.length < 2) return;
@@ -639,7 +641,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       return;
     }
 
-    const matchedPlant = findPlantByBarcode(cleanCode, inventory);
+    const matchedPlant = findPlantByBarcode(cleanCode, inventory, { allowFuzzy: source !== 'zxing' });
 
     // 1. If an exact barcode / itemNo / SKU match is found in inventory
     if (matchedPlant) {
@@ -775,6 +777,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         if (barcodes && barcodes.length > 0) {
           for (const b of barcodes) {
             if (b.rawValue && isValidBarcodeString(b.rawValue)) {
+              lastDecodeSourceRef.current = 'native';
               return b.rawValue;
             }
           }
@@ -794,6 +797,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     const fullCtx = fullCanvas.getContext('2d', { willReadFrequently: true });
     if (!cropCtx) return null;
 
+    lastDecodeSourceRef.current = 'zxing';
     const reader = getZxingReader();
     const vw = video.videoWidth;
     const vh = video.videoHeight;
@@ -804,8 +808,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     const cropX = Math.floor((vw - cropW) / 2);
     const cropY = Math.floor((vh - cropH) / 2);
 
-    cropCanvas.width = Math.min(cropW, 1280);
-    cropCanvas.height = Math.min(cropH, 960);
+    const cropScale = Math.min(1, 1280 / cropW, 960 / cropH);
+    cropCanvas.width = Math.round(cropW * cropScale);
+    cropCanvas.height = Math.round(cropH * cropScale);
 
     // Pass 1: Standard high-res cropped frame
     cropCtx.drawImage(video, cropX, cropY, cropW, cropH, 0, 0, cropCanvas.width, cropCanvas.height);
@@ -861,12 +866,21 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         const imgData = cropCtx.getImageData(0, 0, cropCanvas.width, cropCanvas.height);
         const data = imgData.data;
         const len = data.length;
+        const hist = new Uint32Array(256);
         for (let i = 0; i < len; i += 4) {
           const lum = (data[i] * 77 + data[i + 1] * 150 + data[i + 2] * 29) >> 8;
-          const enhanced = lum < 115 ? 0 : (lum > 155 ? 255 : (lum < 135 ? 25 : 235));
-          data[i] = enhanced;
-          data[i + 1] = enhanced;
-          data[i + 2] = enhanced;
+          hist[lum]++;
+          data[i] = data[i + 1] = data[i + 2] = lum;
+        }
+        const total = len / 4;
+        let acc = 0, lo = 0, hi = 255;
+        for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc >= total * 0.02) { lo = v; break; } }
+        acc = 0;
+        for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc >= total * 0.02) { hi = v; break; } }
+        const range = Math.max(hi - lo, 1);
+        for (let i = 0; i < len; i += 4) {
+          const st = Math.max(0, Math.min(255, ((data[i] - lo) * 255) / range));
+          data[i] = data[i + 1] = data[i + 2] = st;
         }
         cropCtx.putImageData(imgData, 0, 0);
 
@@ -878,8 +892,9 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         // Pass 4: Full uncropped frame at scaled resolution
         if (fullCtx) {
           try {
-            fullCanvas.width = Math.min(vw, 1024);
-            fullCanvas.height = Math.min(vh, 768);
+            const fullScale = Math.min(1, 1024 / vw, 768 / vh);
+            fullCanvas.width = Math.round(vw * fullScale);
+            fullCanvas.height = Math.round(vh * fullScale);
             fullCtx.drawImage(video, 0, 0, fullCanvas.width, fullCanvas.height);
             const result3 = reader.decodeFromCanvas(fullCanvas);
             if (result3 && result3.getText() && isValidBarcodeString(result3.getText())) {
@@ -913,33 +928,26 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         const detectedRawCode = await decodeBarcodeFromVideoElement(video);
 
         if (detectedRawCode && !isCancelled) {
+          const source = lastDecodeSourceRef.current;
+          const isNative = source === 'native';
           const cleanCode = cleanCounterpointBarcode(detectedRawCode);
           const now = Date.now();
 
-          // Push into temporal frame buffer
+          const windowMs = isNative ? 1200 : 2500;
           recentFramesBufferRef.current.push({ code: cleanCode, timestamp: now });
-          // Retain frames within the last 1200ms sliding window
-          recentFramesBufferRef.current = recentFramesBufferRef.current.filter(item => now - item.timestamp <= 1200);
+          recentFramesBufferRef.current = recentFramesBufferRef.current.filter(item => now - item.timestamp <= windowMs);
 
-          // Count matching frames for this specific barcode string
           const matchingFrames = recentFramesBufferRef.current.filter(item => item.code === cleanCode).length;
+          const conflicting = recentFramesBufferRef.current.some(item => item.code !== cleanCode);
 
-          // Check if candidate matches a known plant in the active catalog
-          const directMatch = findPlantByBarcode(cleanCode, inventory);
+          const directMatch = findPlantByBarcode(cleanCode, inventory, { allowFuzzy: isNative });
 
-          if (directMatch) {
-            // Known inventory plant: require at least 3 matching frames in the sliding window to confirm
-            // (Eliminates single-frame partial reads or motion blur on iPhone)
-            if (matchingFrames >= 3) {
-              recentFramesBufferRef.current = []; // Clear temporal buffer once verified
-              handleScannedBarcode(detectedRawCode, false);
-            }
-          } else {
-            // Uncataloged or ambiguous code: require at least 4 frames in the sliding window to agree
-            if (matchingFrames >= 4) {
-              recentFramesBufferRef.current = []; // Clear temporal buffer once verified
-              handleScannedBarcode(detectedRawCode, false);
-            }
+          const needed = directMatch ? (isNative ? 3 : 4) : (isNative ? 4 : 6);
+          const required = needed + (!isNative && conflicting ? 2 : 0);
+
+          if (matchingFrames >= required) {
+            recentFramesBufferRef.current = [];
+            handleScannedBarcode(detectedRawCode, false, source);
           }
         }
       } catch (err) {
@@ -1305,7 +1313,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     try {
       const detectedRawCode = await decodeBarcodeFromVideoElement(video);
       if (detectedRawCode) {
-        handleScannedBarcode(detectedRawCode, true);
+        handleScannedBarcode(detectedRawCode, true, lastDecodeSourceRef.current);
       } else {
         triggerScannedFeedback('No barcode detected in camera frame. Align plant barcode inside green reticle and hold steady.', 'warning', 3500);
       }

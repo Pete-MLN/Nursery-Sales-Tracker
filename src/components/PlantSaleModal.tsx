@@ -415,7 +415,7 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
             {/* Quick Presets */}
             {discountType === 'percentage' ? (
               <div>
-                <span className="text-[11px] font-bold text-[#717973] block mb-1.5">Quick Percent Presets:</span>
+                <span className="text-[14px] font-bold text-[#717973] block mb-1.5">Quick Percent Presets:</span>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {PERCENTAGE_PRESETS.map((pct) => (
                     <button
@@ -425,7 +425,7 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
                         setDiscountValueInput(pct.toString());
                         setErrorText('');
                       }}
-                      className={`px-2.5 py-1 rounded-xl text-xs font-extrabold transition-all cursor-pointer border ${
+                      className={`px-3 py-1.5 rounded-xl text-[15px] font-extrabold transition-all cursor-pointer border ${
                         discountValueInput === pct.toString() || parseFloat(discountValueInput) === pct
                           ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d]'
                           : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#f3f4f0]'
@@ -438,7 +438,7 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
               </div>
             ) : (
               <div>
-                <span className="text-[11px] font-bold text-[#717973] block mb-1.5">Quick Reduction Shortcuts:</span>
+                <span className="text-[14px] font-bold text-[#717973] block mb-1.5">Quick Reduction Shortcuts:</span>
                 <div className="flex items-center gap-1.5 flex-wrap">
                   {[5, 10, 15, 20, 25].map((dollarOff) => {
                     const target = Math.max(1, basePrice - dollarOff);
@@ -451,7 +451,7 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
                           setDiscountValueInput(target.toFixed(2));
                           setErrorText('');
                         }}
-                        className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-white text-[#414844] border border-[#c1c8c2] hover:bg-[#f3f4f0] cursor-pointer"
+                        className="px-3 py-1.5 rounded-xl text-[15px] font-extrabold bg-white text-[#414844] border border-[#c1c8c2] hover:bg-[#f3f4f0] cursor-pointer"
                       >
                         -${dollarOff}.00 (${target.toFixed(2)})
                       </button>
@@ -467,7 +467,7 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
                         setDiscountValueInput(endingNine);
                         setErrorText('');
                       }}
-                      className="px-2.5 py-1 rounded-xl text-xs font-extrabold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 cursor-pointer"
+                      className="px-3 py-1.5 rounded-xl text-[15px] font-extrabold bg-amber-50 text-amber-900 border border-amber-300 hover:bg-amber-100 cursor-pointer"
                     >
                       .99 Ending (~20% off)
                     </button>
@@ -483,20 +483,13 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
               <span>Sale Label / Campaign Name (Optional)</span>
               <span className="text-[10px] text-[#717973] font-normal">Displays on plant tags & orders</span>
             </label>
-            <input
-              type="text"
-              value={saleLabel}
-              onChange={(e) => setSaleLabel(e.target.value)}
-              placeholder="e.g. End of Season Clearance, 25% Off Special"
-              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2 text-xs font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
-            />
             <div className="flex items-center gap-1.5 flex-wrap">
               {COMMON_LABELS.map((label) => (
                 <button
                   key={label}
                   type="button"
                   onClick={() => setSaleLabel(label)}
-                  className={`text-[10px] font-bold px-2 py-0.5 rounded-lg border transition-colors cursor-pointer ${
+                  className={`text-[13px] font-bold px-2.5 py-1 rounded-lg border transition-colors cursor-pointer ${
                     saleLabel === label
                       ? 'bg-[#0e6c4a] text-white border-[#0e6c4a]'
                       : 'bg-white text-[#717973] border-[#c1c8c2] hover:bg-[#f3f4f0]'
@@ -506,6 +499,13 @@ export const PlantSaleModal: React.FC<PlantSaleModalProps> = ({
                 </button>
               ))}
             </div>
+            <input
+              type="text"
+              value={saleLabel}
+              onChange={(e) => setSaleLabel(e.target.value)}
+              placeholder="e.g. End of Season Clearance, 25% Off Special"
+              className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl px-3.5 py-2.5 text-sm font-medium text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+            />
           </div>
 
           {/* Active Status Switch */}

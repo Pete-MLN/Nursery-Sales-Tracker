@@ -2055,10 +2055,11 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="submit"
-                className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-extrabold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+                className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-extrabold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs whitespace-nowrap"
+                title="Add product number or SKU manually"
               >
                 <Plus className="w-4 h-4 text-[#a0f4c8]" />
-                <span>Add / Scan</span>
+                <span>Add product #</span>
               </button>
 
               <button

@@ -655,16 +655,20 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
     // 2. If barcode is NOT in catalog:
     // When scanning from LIVE CAMERA STREAM:
     if (!isManualInput) {
-      // Require 4 consecutive frame detections of the uncataloged code to prevent video noise and misreads on iOS
-      if (unrecognizedCandidateRef.current.code === cleanCode) {
-        unrecognizedCandidateRef.current.count += 1;
-      } else {
-        unrecognizedCandidateRef.current = { code: cleanCode, count: 1 };
-        return; // Wait for frame verification
-      }
+      // Native decoder (Android): unchanged - require 4 consecutive detections of the uncataloged code.
+      // ZXing decoder (iPhone): the frame loop has already verified agreement across several frames,
+      // so skip the extra counter (it made iPhone misreads invisible).
+      if (source !== 'zxing') {
+        if (unrecognizedCandidateRef.current.code === cleanCode) {
+          unrecognizedCandidateRef.current.count += 1;
+        } else {
+          unrecognizedCandidateRef.current = { code: cleanCode, count: 1 };
+          return; // Wait for frame verification
+        }
 
-      if (unrecognizedCandidateRef.current.count < 4) {
-        return; // Wait for frame verification
+        if (unrecognizedCandidateRef.current.count < 4) {
+          return; // Wait for frame verification
+        }
       }
 
       // Reset candidate ref once accepted
@@ -675,7 +679,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       // NEVER match a random plant via fuzzy substring during a live camera scan!
       setUnrecognizedCode(cleanCode);
       triggerScannedFeedback(
-        `Scanned code "${cleanCode}" - Barcode not found in catalog. Tap to assign to a plant.`,
+        `Scanned code "${cleanCode}"${source === 'zxing' ? ' [zxing]' : ''} - Barcode not found in catalog. Tap to assign to a plant.`,
         'warning',
         10500
       );
@@ -922,17 +926,16 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
           const cleanCode = cleanCounterpointBarcode(detectedRawCode);
           const now = Date.now();
 
-          const windowMs = isNative ? 1200 : 2500;
+          const windowMs = isNative ? 1200 : 2000;
           recentFramesBufferRef.current.push({ code: cleanCode, timestamp: now });
           recentFramesBufferRef.current = recentFramesBufferRef.current.filter(item => now - item.timestamp <= windowMs);
 
           const matchingFrames = recentFramesBufferRef.current.filter(item => item.code === cleanCode).length;
-          const conflicting = recentFramesBufferRef.current.some(item => item.code !== cleanCode);
 
           const directMatch = findPlantByBarcode(cleanCode, inventory, { allowFuzzy: isNative });
 
-          const needed = directMatch ? (isNative ? 3 : 4) : (isNative ? 4 : 6);
-          const required = needed + (!isNative && conflicting ? 2 : 0);
+          // Same frame counts as the original (3 known / 4 unknown). iPhone misreads can no longer fuzzy-match a plant.
+          const required = directMatch ? 3 : 4;
 
           if (matchingFrames >= required) {
             recentFramesBufferRef.current = [];
@@ -2055,11 +2058,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="submit"
-                className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-extrabold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs whitespace-nowrap"
-                title="Add product number or SKU manually"
+                className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-extrabold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
               >
                 <Plus className="w-4 h-4 text-[#a0f4c8]" />
-                <span>Add product #</span>
+                <span>Add / Scan</span>
               </button>
 
               <button

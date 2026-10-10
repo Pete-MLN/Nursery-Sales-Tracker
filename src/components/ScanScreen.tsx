@@ -21,6 +21,8 @@ import {
 import { savePlantToFirestore, saveOrderToFirestore, isDefaultMockItem } from '../services/firebaseService';
 import { acquireHighPrecisionGps, formatGpsCoordinates, getPlantGpsYearStatus, formatGpsDateString } from '../utils/gpsUtils';
 
+ // Check if this can push to AI Studio
+
 interface ScanScreenProps {
   onNavigate: (screen: ScreenType) => void;
   inventory: PlantItem[];

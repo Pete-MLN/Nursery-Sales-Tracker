@@ -290,7 +290,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               </button>
             </div>
           ) : (
-            filteredInventory.map((item) => {
+            filteredInventory.map((item, index) => {
               const currentStatus = getItemStatus(item);
               const statusBadge = 
                 currentStatus === 'critical'
@@ -305,7 +305,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
 
               return (
                 <div
-                  key={item.id}
+                  key={`inv-${item.id}-${index}`}
                   className={`p-3.5 rounded-xl border transition-all flex flex-col gap-3 ${
                     saleSavings
                       ? 'bg-[#fffaf9] border-rose-200 hover:border-rose-400 shadow-2xs'

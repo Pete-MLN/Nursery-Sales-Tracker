@@ -1,5 +1,4 @@
 import React from 'react';
-import { motion, AnimatePresence } from 'motion/react';
 import { Check, Leaf, CheckCircle2, ArrowRight, Cloud, Database, Users, Calendar, MapPin } from 'lucide-react';
 
 export interface LastUploadDatesInfo {
@@ -52,26 +51,18 @@ export const AppStartupProgressRing: React.FC<AppStartupProgressRingProps> = ({
   const tipY = size / 2 + radius * Math.sin(angleRad);
 
   return (
-    <AnimatePresence>
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        exit={{ opacity: 0, scale: 0.98 }}
-        transition={{ duration: 0.3 }}
-        className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f9faf6] px-4 py-8 select-none"
-      >
-        {/* Subtle background ambient plant leaf silhouette decoration */}
-        <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.03] flex items-center justify-center">
-          <Leaf className="w-[600px] h-[600px] text-[#012d1d] -rotate-12" />
-        </div>
+    <div
+      className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-[#f9faf6] px-4 py-8 select-none transition-opacity duration-300"
+    >
+      {/* Subtle background ambient plant leaf silhouette decoration */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none opacity-[0.03] flex items-center justify-center">
+        <Leaf className="w-[600px] h-[600px] text-[#012d1d] -rotate-12" />
+      </div>
 
-        <motion.div
-          initial={{ opacity: 0, y: 15 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.4 }}
-          className="relative z-10 w-full max-w-sm flex flex-col items-center text-center bg-white rounded-3xl border border-[#c1c8c2]/50 shadow-xl p-6 sm:p-8"
-        >
-          {/* Header Brand */}
+      <div
+        className="relative z-10 w-full max-w-sm flex flex-col items-center text-center bg-white rounded-3xl border border-[#c1c8c2]/50 shadow-xl p-6 sm:p-8 transition-transform duration-300"
+      >
+        {/* Header Brand */}
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-[#012d1d]/5 border border-[#012d1d]/10 mb-6">
             <span className="w-2 h-2 rounded-full bg-[#0e6c4a] animate-ping" />
             <span className="text-xs font-black tracking-wider uppercase text-[#012d1d]">
@@ -140,11 +131,8 @@ export const AppStartupProgressRing: React.FC<AppStartupProgressRingProps> = ({
             {/* Inner Content of Ring */}
             <div className="absolute inset-0 flex flex-col items-center justify-center text-center">
               {isReady && clampedProgress >= 100 ? (
-                <motion.div
-                  initial={{ scale: 0.8, opacity: 0 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  transition={{ type: 'spring', stiffness: 300, damping: 20 }}
-                  className="flex flex-col items-center"
+                <div
+                  className="flex flex-col items-center transition-all duration-300 scale-100 animate-in zoom-in-95"
                 >
                   <div className="w-10 h-10 rounded-full bg-[#0e6c4a] text-[#a0f4c8] flex items-center justify-center shadow-md mb-0.5">
                     <Check className="w-6 h-6 stroke-[3]" />
@@ -155,7 +143,7 @@ export const AppStartupProgressRing: React.FC<AppStartupProgressRingProps> = ({
                   <span className="text-[10px] font-black tracking-wide text-[#0e6c4a] uppercase mt-0.5">
                     Ready
                   </span>
-                </motion.div>
+                </div>
               ) : (
                 <div className="flex flex-col items-center">
                   <Leaf className="w-5 h-5 text-[#0e6c4a] mb-0.5 animate-pulse" />
@@ -301,13 +289,12 @@ export const AppStartupProgressRing: React.FC<AppStartupProgressRingProps> = ({
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           )}
-        </motion.div>
+        </div>
 
         {/* Brand Tagline */}
         <p className="mt-6 text-[11px] font-semibold text-[#717973] tracking-wide">
           Point of Sale & Yard Logistics System
         </p>
-      </motion.div>
-    </AnimatePresence>
+      </div>
   );
 };

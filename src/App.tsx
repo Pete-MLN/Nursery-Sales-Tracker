@@ -428,7 +428,22 @@ export default function App() {
           }
         }
 
-        const plantList = Array.from(consolidatedMap.values());
+        const rawPlantList = Array.from(consolidatedMap.values());
+        const seenPlantIds = new Set<string>();
+        const plantList: PlantItem[] = rawPlantList.map((p, idx) => {
+          let uniqueId = p.id || `plant-${idx}`;
+          if (seenPlantIds.has(uniqueId)) {
+            const sizeSuffix = (p.size || '').replace(/[^a-zA-Z0-9]/g, '_');
+            uniqueId = `${uniqueId}_${sizeSuffix || idx}`;
+            let count = 1;
+            while (seenPlantIds.has(uniqueId)) {
+              uniqueId = `${p.id}_${sizeSuffix || idx}_${count++}`;
+            }
+          }
+          seenPlantIds.add(uniqueId);
+          return { ...p, id: uniqueId };
+        });
+
         setInventory(plantList);
         plantsReceived = true;
         setSyncProgress((prev) => Math.max(prev, 72));

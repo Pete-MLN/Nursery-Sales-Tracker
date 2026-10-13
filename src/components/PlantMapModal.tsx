@@ -463,7 +463,7 @@ const InteractiveTileMap: React.FC<{
       })()}
 
       {/* PLANT GPS MARKERS */}
-      {locations.map((loc) => {
+      {locations.map((loc, idx) => {
         const isSelected = activeLocation?.item.plant.id === loc.item.plant.id;
         const isExplicit = loc.hasExplicitGps;
         const locProj = projectMercator(loc.lat, loc.lng, zoom);
@@ -477,7 +477,7 @@ const InteractiveTileMap: React.FC<{
 
         return (
           <div
-            key={loc.item.plant.id}
+            key={`marker-${loc.item.plant.id}-${loc.spotIndex ?? idx}`}
             onClick={(e) => {
               e.stopPropagation();
               onSelectLocation(loc);
@@ -1406,7 +1406,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
                     )}
                   </div>
                 ) : (
-                  displayedLocations.map((loc) => {
+                  displayedLocations.map((loc, idx) => {
                     const isSelected = activeItem?.plant.id === loc.item.plant.id;
                     const isExplicit = loc.hasExplicitGps;
                     const justLogged = gpsLogSuccess === loc.item.plant.id;
@@ -1418,7 +1418,7 @@ export const PlantMapModal: React.FC<PlantMapModalProps> = ({
 
                     return (
                       <div
-                        key={loc.item.plant.id}
+                        key={`loc-card-${loc.item.plant.id}-${loc.spotIndex ?? idx}`}
                         onClick={() => {
                           setActiveItem(loc.item);
                           setInfoWindowItem(loc);

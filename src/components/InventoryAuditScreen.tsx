@@ -1518,9 +1518,9 @@ export const InventoryAuditScreen: React.FC<InventoryAuditScreenProps> = ({
                               </span>
                             </div>
 
-                            {filteredPlants.map((plant) => (
+                            {filteredPlants.map((plant, pIdx) => (
                               <div
-                                key={plant.id}
+                                key={`audit-plant-${plant.id}-${pIdx}`}
                                 onClick={() => handleSelectPlant(plant)}
                                 className="p-3 hover:bg-[#f3f4f0] cursor-pointer flex items-center justify-between gap-3 transition-colors"
                               >

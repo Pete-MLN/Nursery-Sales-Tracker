@@ -2408,9 +2408,9 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                   <p className="text-sm font-semibold">No nursery plants match your search.</p>
                 </div>
               ) : (
-                filteredInventory.map(plant => (
+                filteredInventory.map((plant, idx) => (
                   <div 
-                    key={plant.id}
+                    key={`cat-add-${plant.id}-${idx}`}
                     className="py-3 flex items-center justify-between gap-3 hover:bg-[#f9faf6] px-2 rounded-xl transition-colors"
                   >
                     <div className="flex items-center gap-3 min-w-0 flex-1">

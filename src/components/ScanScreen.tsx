@@ -1994,7 +1994,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
       </section>
 
       {/* Manual Barcode Search & Preset Chips */}
-      <section className="bg-white p-3.5 rounded-2xl border border-[#c1c8c2] shadow-2xs flex flex-col gap-2.5">
+      <section className="bg-[#012d1d] p-3.5 rounded-2xl border border-[#c1c8c2] shadow-2xs flex flex-col gap-2.5">
         {/* Plant Search Header & Input */}
         <div className="flex flex-col gap-2 pt-1">
           <div className="flex items-center justify-between gap-2">
@@ -2002,7 +2002,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               <div className="w-7 h-7 rounded-lg bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold shadow-2xs">
                 <Leaf className="w-4 h-4" />
               </div>
-              <span className="text-xs font-black uppercase tracking-wider text-[#012d1d]">
+              <span className="text-[14px] font-black uppercase tracking-wider text-white">
                 Plant & Barcode Search
               </span>
             </div>
@@ -2036,7 +2036,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 }}
                 onFocus={() => setShowPlantSuggestions(true)}
                 placeholder="Type plant name, variety, SKU #, or barcode..."
-                className="w-full bg-[#f9faf6] border-2 border-[#0e6c4a]/35 hover:border-[#0e6c4a]/60 focus:border-[#012d1d] focus:bg-white focus:ring-2 focus:ring-[#a0f4c8]/60 rounded-xl pl-10 pr-10 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] outline-none transition-all shadow-2xs placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
+                className="w-full bg-white border-2 border-[#0e6c4a]/35 hover:border-[#0e6c4a]/60 focus:border-[#012d1d] focus:bg-white focus:ring-2 focus:ring-[#a0f4c8]/60 rounded-xl pl-10 pr-10 py-3 text-base sm:text-lg font-bold text-[#1a1c1a] outline-none transition-all shadow-2xs placeholder:text-sm sm:placeholder:text-base placeholder:font-normal placeholder:text-[#717973]"
               />
 
               {manualBarcodeInput && (
@@ -2059,8 +2059,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                 type="submit"
                 className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-extrabold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
               >
-                <Plus className="w-4 h-4 text-[#a0f4c8]" />
-                <span>Add / Scan</span>
+                <Search className="w-4 h-4 text-[#a0f4c8]" />
+                <span>Search</span>
               </button>
 
               <button
@@ -2353,7 +2353,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
         {/* Quick Test Barcode Presets - dynamically derived from loaded inventory */}
         {inventory.some(p => p.barcode && p.barcode.trim().length > 0) && (
           <div className="flex items-center gap-1.5 overflow-x-auto text-[11px]">
-            <span className="text-[#717973] font-bold uppercase tracking-wider shrink-0 text-[10px]">
+            <span className="text-[#e4f2e5] font-bold uppercase tracking-wider shrink-0 text-[10px]">
               Test Barcodes:
             </span>
             {inventory

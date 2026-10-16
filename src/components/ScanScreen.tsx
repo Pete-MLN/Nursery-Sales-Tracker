@@ -2002,7 +2002,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
               <div className="w-7 h-7 rounded-lg bg-[#012d1d] text-[#a0f4c8] flex items-center justify-center font-bold shadow-2xs">
                 <Leaf className="w-4 h-4" />
               </div>
-              <span className="text-[14px] font-black uppercase tracking-wider text-white">
+              <span className="text-[14px] font-black uppercase tracking-wider text-[#a0f4c8]">
                 Plant & Barcode Search
               </span>
             </div>

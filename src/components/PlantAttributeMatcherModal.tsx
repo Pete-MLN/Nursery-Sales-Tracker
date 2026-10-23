@@ -249,7 +249,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
         {toastMessage && (
           <div className="absolute top-4 left-1/2 -translate-x-1/2 z-50 bg-[#012d1d] text-white px-4 py-3 rounded-2xl shadow-2xl border border-[#a0f4c8]/40 flex items-center gap-3 animate-fade-in max-w-md w-[90%]">
             <CheckCircle2 className="w-5 h-5 text-[#a0f4c8] shrink-0" />
-            <span className="flex-1 text-xs font-bold text-[#f3f4f0]">{toastMessage}</span>
+            <span className="flex-1 text-sm font-bold text-[#f3f4f0]">{toastMessage}</span>
             <button
               type="button"
               onClick={() => setToastMessage(null)}
@@ -268,14 +268,14 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg sm:text-xl font-bold tracking-tight text-white">
+                <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
                   Customer Plant Matcher
                 </h2>
-                <span className="bg-[#a0f4c8]/20 text-[#a0f4c8] text-[10px] font-extrabold uppercase px-2 py-0.5 rounded-full border border-[#a0f4c8]/30">
+                <span className="bg-[#a0f4c8]/20 text-[#a0f4c8] text-xs font-extrabold uppercase px-2 py-0.5 rounded-full border border-[#a0f4c8]/30">
                   Counterpoint Cultural Engine
                 </span>
               </div>
-              <p className="text-xs text-white/70">
+              <p className="text-sm text-white/70">
                 Match plant height, foliage, bloom color, fall color, sun, soil & deer resistance in the yard.
               </p>
             </div>
@@ -286,11 +286,11 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="bg-white/10 hover:bg-white/20 text-[#a0f4c8] text-xs font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-[#a0f4c8]/30"
+                className="bg-white/10 hover:bg-white/20 text-[#a0f4c8] text-sm font-bold px-3 py-1.5 rounded-xl flex items-center gap-1.5 transition-colors cursor-pointer border border-[#a0f4c8]/30"
               >
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span className="hidden sm:inline">Reset All</span>
-                <span className="bg-[#a0f4c8] text-[#012d1d] px-1.5 py-0.2 rounded-full text-[10px]">
+                <span className="bg-[#a0f4c8] text-[#012d1d] px-1.5 py-0.2 rounded-full text-xs font-extrabold">
                   {activeCriteriaCount}
                 </span>
               </button>
@@ -316,7 +316,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
               value={keywordSearch}
               onChange={(e) => setKeywordSearch(e.target.value)}
               placeholder="Refine search by plant name, botanical, or cultivar..."
-              className="w-full bg-white border border-[#c1c8c2] rounded-xl pl-9 pr-8 py-1.5 text-xs font-medium text-[#1a1c1a] placeholder:text-[#717973] focus:outline-none focus:border-[#012d1d]"
+              className="w-full bg-white border border-[#c1c8c2] rounded-xl pl-9 pr-8 py-1.5 text-sm font-medium text-[#1a1c1a] placeholder:text-[#717973] focus:outline-none focus:border-[#012d1d]"
             />
             {keywordSearch && (
               <button
@@ -334,7 +334,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <button
               type="button"
               onClick={handleToggleInStock}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
                 inStockOnly
                   ? 'bg-[#0e6c4a] text-white border-[#0e6c4a] shadow-2xs'
                   : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-[#e7e9e5]'
@@ -348,7 +348,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <button
               type="button"
               onClick={() => handleToggleOnSale()}
-              className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
+              className={`px-3 py-1.5 rounded-xl text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 border ${
                 onSaleOnly
                   ? 'bg-rose-700 text-white border-rose-700 shadow-2xs'
                   : 'bg-white text-[#414844] border-[#c1c8c2] hover:bg-rose-50 hover:border-rose-300'
@@ -358,7 +358,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
               <Flame className={`w-3.5 h-3.5 ${onSaleOnly ? 'text-amber-300 fill-amber-300' : 'text-rose-600'}`} />
               <span>On Sale</span>
               {totalOnSaleCount > 0 && (
-                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                <span className={`text-xs px-1.5 py-0.2 rounded-full font-black ${
                   onSaleOnly ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-800'
                 }`}>
                   {totalOnSaleCount}
@@ -370,7 +370,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <button
               type="button"
               onClick={() => setIsFilterPanelExpanded(!isFilterPanelExpanded)}
-              className="text-xs font-bold text-[#012d1d] hover:bg-[#e2e3df] px-2.5 py-1.5 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
+              className="text-sm font-bold text-[#012d1d] hover:bg-[#e2e3df] px-2.5 py-1.5 rounded-xl transition-colors flex items-center gap-1 cursor-pointer"
             >
               <span>{isFilterPanelExpanded ? 'Hide Filters' : 'Show Filters'}</span>
               {isFilterPanelExpanded ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />}
@@ -383,9 +383,9 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
           <div className="bg-white px-4 py-3 border-b border-[#c1c8c2]/50 overflow-y-auto max-h-[38vh] flex flex-col gap-3 shrink-0 shadow-2xs">
             {/* 1. Mature Height */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d] flex items-center gap-1">
+              <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d] flex items-center gap-1">
                 <span>1. Mature Height</span>
-                {heightFilter && <span className="text-[#0e6c4a] font-bold">· Selected</span>}
+                {heightFilter && <span className="text-[#0e6c4a] text-xs font-bold">· Selected</span>}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 {[
@@ -401,7 +401,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                     key={opt.label}
                     type="button"
                     onClick={() => setHeightFilter(opt.val)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                    className={`px-2.5 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                       heightFilter === opt.val
                         ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                         : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -417,7 +417,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 border-t border-[#e2e3df]">
               {/* Foliage Type */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d]">
+                <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d]">
                   2. Foliage Type
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -430,7 +430,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                       key={opt.label}
                       type="button"
                       onClick={() => setFoliageFilter(opt.val)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      className={`px-2.5 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                         foliageFilter === opt.val
                           ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                           : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -444,7 +444,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
               {/* Plant Type */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d]">
+                <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d]">
                   3. Plant Category
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -463,7 +463,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                       key={opt.label}
                       type="button"
                       onClick={() => setCategoryFilter(opt.val)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      className={`px-2.5 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                         categoryFilter === opt.val
                           ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                           : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -480,7 +480,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-1 border-t border-[#e2e3df]">
               {/* Flower Color */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d]">
+                <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d]">
                   4. Flower / Bloom Color
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -499,7 +499,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                       key={opt.label}
                       type="button"
                       onClick={() => setFlowerColorFilter(opt.val)}
-                      className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      className={`px-2 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                         flowerColorFilter === opt.val
                           ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                           : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -513,7 +513,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
               {/* Fall Color */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d]">
+                <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d]">
                   5. Fall Foliage Color
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -529,7 +529,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                       key={opt.label}
                       type="button"
                       onClick={() => setFallColorFilter(opt.val)}
-                      className={`px-2 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      className={`px-2 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                         fallColorFilter === opt.val
                           ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                           : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -546,7 +546,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-1 border-t border-[#e2e3df]">
               {/* Sun Exposure */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d]">
+                <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d]">
                   6. Sun Exposure
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -560,7 +560,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                       key={opt.label}
                       type="button"
                       onClick={() => setSunFilter(opt.val)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      className={`px-2.5 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                         sunFilter === opt.val
                           ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                           : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -574,7 +574,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
               {/* Soil Moisture */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d]">
+                <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d]">
                   7. Soil Moisture
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -588,7 +588,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                       key={opt.label}
                       type="button"
                       onClick={() => setSoilFilter(opt.val)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      className={`px-2.5 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                         soilFilter === opt.val
                           ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                           : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -602,7 +602,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
               {/* Deer Resistance */}
               <div className="flex flex-col gap-1.5">
-                <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d]">
+                <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d]">
                   8. Deer Resistance
                 </span>
                 <div className="flex flex-wrap gap-1.5">
@@ -616,7 +616,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                       key={opt.label}
                       type="button"
                       onClick={() => setDeerFilter(opt.val)}
-                      className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                      className={`px-2.5 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                         deerFilter === opt.val
                           ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                           : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -631,15 +631,15 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
             {/* 9. Special Pricing / Promotions */}
             <div className="flex flex-col gap-1.5 pt-2 border-t border-[#e2e3df]">
-              <span className="text-[11px] font-extrabold uppercase tracking-wider text-[#012d1d] flex items-center gap-1.5">
+              <span className="text-[13px] font-extrabold uppercase tracking-wider text-[#012d1d] flex items-center gap-1.5">
                 <span>9. Pricing / Promotions</span>
-                {onSaleOnly && <span className="text-rose-700 font-bold">· On Sale Active</span>}
+                {onSaleOnly && <span className="text-rose-700 text-xs font-bold">· On Sale Active</span>}
               </span>
               <div className="flex flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() => handleToggleOnSale(false)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border ${
+                  className={`px-2.5 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border ${
                     !onSaleOnly
                       ? 'bg-[#012d1d] text-white border-[#012d1d] shadow-2xs'
                       : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2]/70 hover:bg-[#e7e9e5]'
@@ -650,7 +650,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                 <button
                   type="button"
                   onClick={() => handleToggleOnSale(true)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                  className={`px-2.5 py-1 rounded-lg text-sm font-semibold transition-all cursor-pointer border flex items-center gap-1.5 ${
                     onSaleOnly
                       ? 'bg-rose-700 text-white border-rose-700 shadow-2xs'
                       : 'bg-[#f3f4f0] text-rose-800 border-[#c1c8c2]/70 hover:bg-rose-50'
@@ -659,7 +659,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                   <Flame className={`w-3.5 h-3.5 ${onSaleOnly ? 'text-amber-300 fill-amber-300' : 'text-rose-600'}`} />
                   <span>🔥 On Sale Plants Only</span>
                   {totalOnSaleCount > 0 && (
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-black ${
+                    <span className={`text-xs px-1.5 py-0.2 rounded-full font-black ${
                       onSaleOnly ? 'bg-white/20 text-white' : 'bg-rose-100 text-rose-800'
                     }`}>
                       {totalOnSaleCount}
@@ -677,7 +677,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <button
               type="button"
               onClick={handleStartSearch}
-              className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white px-4 py-2 rounded-xl text-xs sm:text-sm font-extrabold flex items-center gap-2 shadow-md transition-all cursor-pointer active:scale-95"
+              className="bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white px-4 py-2 rounded-xl text-sm sm:text-base font-extrabold flex items-center gap-2 shadow-md transition-all cursor-pointer active:scale-95"
             >
               <Search className="w-4 h-4" />
               <span>
@@ -690,14 +690,14 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="text-xs font-bold text-[#525a55] hover:text-[#012d1d] hover:bg-[#d9ded8] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                className="text-sm font-bold text-[#525a55] hover:text-[#012d1d] hover:bg-[#d9ded8] px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
               >
                 Clear Selections
               </button>
             )}
           </div>
 
-          <div className="flex items-center gap-3 text-xs text-[#525a55]">
+          <div className="flex items-center gap-3 text-sm text-[#525a55]">
             {hasExecutedSearch ? (
               <span className="font-bold text-[#012d1d]">
                 Showing matches for {activeCriteriaCount > 0 ? `${activeCriteriaCount} active attribute(s)` : 'inventory'}
@@ -715,7 +715,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
         {/* Results Counter Bar (Visible after search is run) */}
         {hasExecutedSearch && (
-          <div className="bg-[#f3f4f0] px-5 py-2.5 border-b border-[#c1c8c2]/60 flex items-center justify-between text-xs font-bold text-[#012d1d] shrink-0">
+          <div className="bg-[#f3f4f0] px-5 py-2.5 border-b border-[#c1c8c2]/60 flex items-center justify-between text-sm font-bold text-[#012d1d] shrink-0">
             <div className="flex items-center gap-3 flex-wrap">
               <span className="flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
@@ -728,14 +728,14 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                 </span>
               )}
               {activeSearchedCriteria?.onSaleOnly && (
-                <span className="bg-rose-100 text-rose-800 text-[11px] font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1 border border-rose-300">
+                <span className="bg-rose-100 text-rose-800 text-xs font-extrabold px-2 py-0.5 rounded-md flex items-center gap-1 border border-rose-300">
                   <Flame className="w-3 h-3 fill-rose-600 text-rose-600" />
                   <span>On Sale Only</span>
                 </span>
               )}
             </div>
 
-            <span className="text-[11px] text-[#717973] font-normal">
+            <span className="text-xs text-[#717973] font-normal">
               {culturalProfiles.length > 0 ? `${culturalProfiles.length} Counterpoint profiles indexed` : 'Loading profiles...'}
             </span>
           </div>
@@ -746,7 +746,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
           {isLoadingProfiles && (
             <div className="flex flex-col items-center justify-center p-12 text-[#717973] gap-3">
               <Sparkles className="w-8 h-8 text-[#0e6c4a] animate-spin" />
-              <p className="text-sm font-semibold">Indexing Counterpoint plant cultural database...</p>
+              <p className="text-base font-semibold">Indexing Counterpoint plant cultural database...</p>
             </div>
           )}
 
@@ -757,15 +757,15 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                 <Sparkles className="w-8 h-8" />
               </div>
               <div>
-                <h3 className="font-extrabold text-lg text-[#012d1d]">Find Plants by Customer Preferences</h3>
-                <p className="text-xs sm:text-sm text-[#525a55] mt-1.5 leading-relaxed">
+                <h3 className="font-extrabold text-xl text-[#012d1d]">Find Plants by Customer Preferences</h3>
+                <p className="text-sm sm:text-base text-[#525a55] mt-1.5 leading-relaxed">
                   Select what the customer is asking for above: <strong>Groundcover (&lt; 1 ft)</strong>, shrubs or trees, evergreen or deciduous foliage, bloom or fall color, sun exposure, or <strong>On Sale</strong> promotions. Matches best fitting the requested attributes will be shown first, followed by alphabetical order.
                 </p>
               </div>
               <button
                 type="button"
                 onClick={handleStartSearch}
-                className="mt-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white px-6 py-3 rounded-2xl text-sm font-extrabold flex items-center gap-2.5 shadow-md transition-all cursor-pointer active:scale-95"
+                className="mt-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white px-6 py-3 rounded-2xl text-base font-extrabold flex items-center gap-2.5 shadow-md transition-all cursor-pointer active:scale-95"
               >
                 <Search className="w-4 h-4" />
                 <span>Find Matching Plants {activeCriteriaCount > 0 ? `(${activeCriteriaCount} Selected)` : ''}</span>
@@ -778,14 +778,14 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
               <div className="w-12 h-12 rounded-full bg-[#f3f4f0] flex items-center justify-center text-[#717973]">
                 <Search className="w-6 h-6" />
               </div>
-              <h3 className="font-bold text-base text-[#012d1d]">No Matching Plants Found</h3>
-              <p className="text-xs text-[#525a55]">
+              <h3 className="font-bold text-lg text-[#012d1d]">No Matching Plants Found</h3>
+              <p className="text-sm text-[#525a55]">
                 No inventory plants match all selected criteria and in-stock conditions. Try broadening your criteria or toggling off "In-Stock Only".
               </p>
               <button
                 type="button"
                 onClick={handleResetFilters}
-                className="mt-2 bg-[#012d1d] text-white px-4 py-2 rounded-xl text-xs font-bold hover:bg-[#0e6c4a] transition-colors cursor-pointer"
+                className="mt-2 bg-[#012d1d] text-white px-4 py-2 rounded-xl text-sm font-bold hover:bg-[#0e6c4a] transition-colors cursor-pointer"
               >
                 Reset All Filters
               </button>
@@ -797,11 +797,11 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between pb-1 border-b border-[#0e6c4a]/30">
                 <div className="flex items-center gap-2">
-                  <span className="bg-[#0e6c4a] text-white text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                  <span className="bg-[#0e6c4a] text-white text-xs font-extrabold uppercase px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
                     <CheckCircle2 className="w-3.5 h-3.5 text-[#a0f4c8]" />
                     <span>Best Matches ({bestMatches.length})</span>
                   </span>
-                  <span className="text-xs text-[#525a55]">
+                  <span className="text-sm text-[#525a55]">
                     Satisfies 100% of customer criteria
                   </span>
                 </div>
@@ -835,11 +835,11 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             <section className="flex flex-col gap-3">
               <div className="flex items-center justify-between pb-1 border-b border-amber-300">
                 <div className="flex items-center gap-2">
-                  <span className="bg-amber-100 text-amber-900 border border-amber-300 text-[11px] font-extrabold uppercase px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                  <span className="bg-amber-100 text-amber-900 border border-amber-300 text-xs font-extrabold uppercase px-2.5 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
                     <Info className="w-3.5 h-3.5 text-amber-700" />
                     <span>Close Matches ({closeMatches.length})</span>
                   </span>
-                  <span className="text-xs text-[#525a55]">
+                  <span className="text-sm text-[#525a55]">
                     Ranked by similarity (green indicates matching traits)
                   </span>
                 </div>
@@ -871,13 +871,13 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
         {/* Modal Footer */}
         <footer className="bg-white px-5 py-3 border-t border-[#c1c8c2] flex items-center justify-between shrink-0">
-          <div className="text-xs text-[#525a55]">
+          <div className="text-sm text-[#525a55]">
             Found <strong>{bestMatches.length + closeMatches.length}</strong> varieties matching your nursery criteria
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="bg-[#012d1d] hover:bg-[#0e6c4a] text-white px-5 py-2 rounded-xl text-xs font-bold transition-colors cursor-pointer"
+            className="bg-[#012d1d] hover:bg-[#0e6c4a] text-white px-5 py-2 rounded-xl text-sm font-bold transition-colors cursor-pointer"
           >
             Done
           </button>
@@ -977,7 +977,7 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-1.5">
               {/* Match Score Badge */}
-              <span className={`text-[10px] font-black px-2 py-0.5 rounded-md border flex items-center gap-1 shadow-2xs ${
+              <span className={`text-xs font-black px-2 py-0.5 rounded-md border flex items-center gap-1 shadow-2xs ${
                 isBestMatch 
                   ? 'bg-emerald-100 text-emerald-900 border-emerald-300' 
                   : 'bg-amber-100 text-amber-900 border-amber-300'
@@ -987,25 +987,25 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
               </span>
 
               {plant.itemNo && (
-                <span className="bg-[#012d1d] text-white font-mono text-[10px] font-bold px-1.5 py-0.5 rounded">
+                <span className="bg-[#012d1d] text-white font-mono text-xs font-bold px-1.5 py-0.5 rounded">
                   #{plant.itemNo}
                 </span>
               )}
 
-              <h3 className="font-bold text-sm sm:text-base text-[#1a1c1a] truncate">{plant.name}</h3>
+              <h3 className="font-bold text-base sm:text-lg text-[#1a1c1a] truncate">{plant.name}</h3>
 
               {plant.size && (
-                <span className="bg-[#461702] text-white text-[10px] font-bold px-2 py-0.5 rounded-md">
+                <span className="bg-[#461702] text-white text-xs font-bold px-2 py-0.5 rounded-md">
                   {plant.size}
                 </span>
               )}
 
-              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${statusBadge.bg}`}>
+              <span className={`text-xs font-bold px-2 py-0.5 rounded-md border ${statusBadge.bg}`}>
                 {statusBadge.label} ({plant.stock} on hand)
               </span>
 
               {saleSavings && (
-                <span className="bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
+                <span className="bg-rose-600 text-white text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 shadow-2xs">
                   <Flame className="w-3 h-3 text-amber-300" />
                   <span>SALE {saleSavings.savingsPercent}% OFF</span>
                 </span>
@@ -1013,13 +1013,13 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
             </div>
 
             {plant.botanicalName && plant.botanicalName !== plant.name && (
-              <p className="text-xs italic text-[#414844] mt-0.5">
+              <p className="text-sm italic text-[#414844] mt-0.5">
                 {plant.botanicalName}
               </p>
             )}
 
             {/* Price & Location Row */}
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-xs text-[#414844]">
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1 text-sm text-[#414844]">
               {plant.holdingLocation && (
                 <span className="flex items-center gap-1 font-semibold text-[#0e6c4a] bg-[#a0f4c8]/30 px-1.5 py-0.5 rounded">
                   <MapPin className="w-3 h-3 text-[#0e6c4a]" />
@@ -1030,16 +1030,16 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
               {/* Price display */}
               {saleSavings ? (
                 <div className="flex items-center gap-1.5 bg-rose-50 border border-rose-200 px-2 py-0.5 rounded-md">
-                  <span className="line-through text-[#717973] text-xs font-semibold">
+                  <span className="line-through text-[#717973] text-sm font-semibold">
                     ${saleSavings.regularPrice.toFixed(2)}
                   </span>
-                  <span className="font-black text-rose-700 text-sm">
+                  <span className="font-black text-rose-700 text-base">
                     ${saleSavings.salePrice.toFixed(2)}
                   </span>
                 </div>
               ) : (
-                <span className="font-bold text-[#012d1d] text-sm">
-                  ${plant.price.toFixed(2)} <span className="text-[10px] font-normal text-[#717973]">(Retail)</span>
+                <span className="font-bold text-[#012d1d] text-base">
+                  ${plant.price.toFixed(2)} <span className="text-xs font-normal text-[#717973]">(Retail)</span>
                 </span>
               )}
             </div>
@@ -1052,7 +1052,7 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
           <button
             type="button"
             onClick={onOpenGpsModal}
-            className={`text-xs font-bold px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
+            className={`text-sm font-bold px-2.5 py-1.5 rounded-lg border transition-all flex items-center gap-1 cursor-pointer ${
               gpsYearStatus.isTaggedThisYear
                 ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100 shadow-2xs'
                 : gpsYearStatus.hasAnyGps
@@ -1066,7 +1066,7 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
             {gpsYearStatus.isTaggedThisYear ? (
               <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
             ) : (
-              <span className="text-[10px] text-[#717973]">({gpsYearStatus.totalCount})</span>
+              <span className="text-xs text-[#717973]">({gpsYearStatus.totalCount})</span>
             )}
           </button>
 
@@ -1074,7 +1074,7 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
           <button
             type="button"
             onClick={onAddToCart}
-            className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.98] text-white px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            className="bg-[#461702] hover:bg-[#622c13] active:scale-[0.98] text-white px-3 py-1.5 rounded-lg text-sm font-bold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
             <span>Add to Order</span>
@@ -1083,7 +1083,7 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
       </div>
 
       {/* Cultural Attributes Badges Strip */}
-      <div className="bg-[#f3f4f0] p-2.5 rounded-xl border border-[#c1c8c2]/50 flex flex-wrap items-center gap-1.5 text-[11px]">
+      <div className="bg-[#f3f4f0] p-2.5 rounded-xl border border-[#c1c8c2]/50 flex flex-wrap items-center gap-1.5 text-xs">
         {/* Height */}
         <span className={`px-2 py-0.5 rounded-md font-medium border flex items-center gap-1 ${
           matchDetails.height.selected 
@@ -1158,18 +1158,18 @@ const PlantResultCard: React.FC<PlantResultCardProps> = ({
 
       {/* Cultural Notes & Positives Accordion */}
       {(profile.positives || profile.negatives) && (
-        <div className="text-xs">
+        <div className="text-sm">
           <button
             type="button"
             onClick={() => setExpandedNotesId(isNotesExpanded ? null : plant.id)}
-            className="text-[11px] font-bold text-[#0e6c4a] hover:underline flex items-center gap-1 cursor-pointer"
+            className="text-xs font-bold text-[#0e6c4a] hover:underline flex items-center gap-1 cursor-pointer"
           >
             <span>{isNotesExpanded ? 'Hide Cultural Advice' : 'View Cultural Advice & Highlights'}</span>
             {isNotesExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
           </button>
 
           {isNotesExpanded && (
-            <div className="mt-2 p-2.5 bg-white rounded-xl border border-[#c1c8c2]/60 flex flex-col gap-1.5 text-[11px] animate-fade-in">
+            <div className="mt-2 p-2.5 bg-white rounded-xl border border-[#c1c8c2]/60 flex flex-col gap-1.5 text-xs animate-fade-in">
               {profile.positives && (
                 <div className="flex items-start gap-1.5 text-emerald-900">
                   <CheckCircle className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />

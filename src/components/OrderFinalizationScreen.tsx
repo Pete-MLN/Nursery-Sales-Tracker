@@ -1244,17 +1244,8 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             )}
           </div>
 
-          <div className="flex flex-col sm:flex-row sm:items-center sm:text-right gap-3 sm:gap-4">
-            <div>
-              <span className="text-xs font-bold text-[#717973] uppercase tracking-wider block">
-                Order Total ({calculatedItemsCount} items)
-              </span>
-              <div className="text-2xl sm:text-3xl font-extrabold text-[#012d1d]">
-                ${calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-              </div>
-            </div>
-
-            {/* 'Scan & Add Plants' Button (Text 2 points smaller: 13.5px / 14.5px) */}
+          <div className="flex flex-col items-start sm:items-end gap-2 text-left sm:text-right">
+            {/* 'Scan & Add Plants' Button (on the line ABOVE 'Order Total') */}
             <button
               type="button"
               id="btn-top-scan-and-add-plants"
@@ -1265,6 +1256,15 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
               <Barcode className="w-4 h-4 text-[#a0f4c8] shrink-0" />
               <span>Scan & Add Plants</span>
             </button>
+
+            <div>
+              <span className="text-xs font-bold text-[#717973] uppercase tracking-wider block">
+                Order Total ({calculatedItemsCount} items)
+              </span>
+              <div className="text-2xl sm:text-3xl font-extrabold text-[#012d1d]">
+                ${calculatedTotal.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              </div>
+            </div>
           </div>
         </div>
 

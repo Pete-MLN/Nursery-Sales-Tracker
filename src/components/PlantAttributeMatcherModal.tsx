@@ -238,11 +238,11 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-2 sm:p-4 py-3 sm:py-6 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto overscroll-y-contain"
+      className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 pt-3 sm:pt-6 pb-28 sm:pb-40 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto overscroll-y-contain"
       onClick={onClose}
     >
       <div 
-        className="bg-[#f9faf6] w-full max-w-5xl max-h-[92vh] sm:max-h-[94vh] my-auto rounded-3xl shadow-2xl border border-[#c1c8c2] flex flex-col overflow-hidden text-[#1a1c1a]"
+        className="bg-[#f9faf6] w-full max-w-5xl max-h-[85vh] sm:max-h-[90vh] my-auto rounded-3xl shadow-2xl border border-[#c1c8c2] flex flex-col overflow-hidden text-[#1a1c1a] shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Toast Alert */}
@@ -742,7 +742,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
         )}
 
         {/* Scrollable Results Feed */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 flex flex-col gap-6 bg-[#f9faf6]">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 sm:pb-36 flex flex-col gap-6 bg-[#f9faf6]">
           {isLoadingProfiles && (
             <div className="flex flex-col items-center justify-center p-12 text-[#717973] gap-3">
               <Sparkles className="w-8 h-8 text-[#0e6c4a] animate-spin" />

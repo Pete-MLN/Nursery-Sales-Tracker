@@ -1,10 +1,11 @@
 import React, { useState } from 'react';
-import { ScreenType, Order, PlantItem } from '../types';
+import { ScreenType, Order, PlantItem, StockAlertSettings } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { formatOrderScheduledTime } from '../utils/dateUtils';
-import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode, Package, CheckCircle2, X } from 'lucide-react';
+import { PlusCircle, ChevronRight, Smartphone, BookOpen, UserPlus, Mail, Barcode, Package, CheckCircle2, X, Sparkles } from 'lucide-react';
 import { DraftRecoveryBanner } from './DraftRecoveryBanner';
 import { OrderDraft } from '../services/orderAutoSaveService';
+import { PlantAttributeMatcherModal } from './PlantAttributeMatcherModal';
 
 interface HomeScreenProps {
   userName: string;
@@ -14,6 +15,8 @@ interface HomeScreenProps {
   onSelectOrder?: (order: Order) => void;
   onResumeDraft?: (draft: OrderDraft) => void;
   onSaveDraft?: (draft: OrderDraft) => void;
+  onAddToCart?: (plant: PlantItem) => void;
+  stockAlertSettings?: StockAlertSettings;
 }
 
 export const HomeScreen: React.FC<HomeScreenProps> = ({
@@ -23,9 +26,12 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
   inventory,
   onSelectOrder,
   onResumeDraft,
-  onSaveDraft
+  onSaveDraft,
+  onAddToCart,
+  stockAlertSettings
 }) => {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isMatcherModalOpen, setIsMatcherModalOpen] = useState<boolean>(false);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -53,6 +59,20 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         </div>
       )}
 
+      {/* Customer Plant Matcher Popup */}
+      {isMatcherModalOpen && (
+        <PlantAttributeMatcherModal
+          isOpen={isMatcherModalOpen}
+          onClose={() => setIsMatcherModalOpen(false)}
+          inventory={inventory}
+          orders={orders}
+          onSelectOrder={onSelectOrder}
+          onNavigate={onNavigate}
+          onAddToCart={onAddToCart}
+          stockAlertSettings={stockAlertSettings}
+        />
+      )}
+
       {/* Draft Recovery Banner if uncommitted draft exists */}
       <DraftRecoveryBanner 
         orders={orders}
@@ -71,7 +91,7 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
         }}
       />
 
-      {/* Welcome & Primary CTA */}
+      {/* Welcome & Primary CTAs */}
       <section className="flex flex-col gap-4">
         <div>
           <h1 className="text-2xl md:text-3xl font-bold text-[#012d1d] tracking-tight">
@@ -80,23 +100,37 @@ export const HomeScreen: React.FC<HomeScreenProps> = ({
           <p className="text-sm text-[#414844] mt-1">Here is your daily nursery operations overview.</p>
         </div>
 
-        {/* Quick Operations Action (New Order) */}
-        <div>
+        {/* Quick Operations Actions Grid (New Order + Customer Plant Matcher) */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           {/* Big Terracotta New Order Button */}
           <button
             onClick={() => {
               if (onSelectOrder) onSelectOrder(null as any);
               onNavigate('scan');
             }}
-            className="w-full bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] text-white flex flex-col items-center justify-center p-5 rounded-xl shadow-md transition-all h-28 cursor-pointer group"
+            className="w-full bg-[#461702] hover:bg-[#622c13] active:scale-[0.99] text-white flex flex-col items-center justify-center p-4.5 rounded-2xl shadow-md transition-all h-28 cursor-pointer group border border-[#622c13]/50"
           >
-            <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center mb-1.5 group-hover:scale-110 transition-transform">
-              <PlusCircle className="w-7 h-7 text-white fill-white/20" />
+            <div className="w-9 h-9 rounded-full bg-white/10 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform">
+              <PlusCircle className="w-6 h-6 text-white fill-white/20" />
             </div>
-            <span className="font-semibold text-lg tracking-tight">New Order</span>
+            <span className="font-bold text-base tracking-tight">New Order</span>
+            <span className="text-[11px] text-white/70">Scan barcode or enter items</span>
+          </button>
+
+          {/* Customer Plant Matcher Button */}
+          <button
+            onClick={() => setIsMatcherModalOpen(true)}
+            className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.99] text-white flex flex-col items-center justify-center p-4.5 rounded-2xl shadow-md transition-all h-28 cursor-pointer group border border-[#19724f]/60"
+          >
+            <div className="w-9 h-9 rounded-full bg-[#a0f4c8]/20 text-[#a0f4c8] flex items-center justify-center mb-1 group-hover:scale-110 transition-transform border border-[#a0f4c8]/30">
+              <Sparkles className="w-5 h-5 text-[#a0f4c8]" />
+            </div>
+            <span className="font-bold text-base tracking-tight text-white">Customer Plant Matcher</span>
+            <span className="text-[11px] text-[#a0f4c8]">Match height, foliage, flower & fall color</span>
           </button>
         </div>
       </section>
+
 
       {/* Operations Summary */}
       <section className="flex flex-col gap-5">

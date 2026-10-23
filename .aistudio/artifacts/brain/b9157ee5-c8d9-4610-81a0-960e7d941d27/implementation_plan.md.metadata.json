@@ -1,6 +1,6 @@
 {
-  "summary":  "Implementation plan for renaming the search action button in the Nursery Manager Plant & Barcode Search card to 'Add product #' and streamlining the manual entry workflow for damaged or unreadable barcodes.",
-  "updatedAt":  "2026-10-10T13:40:42.428665407Z",
+  "summary":  "Comprehensive implementation plan for integrating the uploaded Counterpoint cultural CSV (/public/assets/aistudio/Nursery_Plants_-_Cultural_information_-_Main_2932d36a.csv) into the nursery plant matching engine, providing attribute resolution (Height, Evergreen/Deciduous Foliage, Flower Color, Fall Color, Sun Exposure, Soil Moisture, Deer Resistance, Plant Type, Positives/Negatives, and Dog Safety), and delivering the Customer Plant Matcher popup on the Home page with Inventory-styled cards, yard GPS satellite maps, and direct order integration.",
+  "updatedAt":  "2026-10-22T12:17:35.594930260Z",
   "requestFeedback":  true,
   "userFacing":  true
 }

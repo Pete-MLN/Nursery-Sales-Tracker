@@ -690,7 +690,7 @@ export const PlantVerificationModal: React.FC<PlantVerificationModalProps> = ({
                     )}
                   </div>
                   <div className="text-[11px] text-rose-800 font-semibold mt-0.5">
-                    Regular: <span className="line-through">${saleSavings.regularPrice.toFixed(2)}</span> · <span className="font-extrabold text-rose-950">Save ${saleSavings.savingsAmount.toFixed(2)} ({saleSavings.savingsPercent}% OFF)</span>
+                    Sale Price: <span className="font-black text-rose-950 text-xs">${saleSavings.salePrice.toFixed(2)} ea</span> · Reg: <span className="line-through">${saleSavings.regularPrice.toFixed(2)}</span> · <span className="font-extrabold text-rose-950">Save ${saleSavings.savingsAmount.toFixed(2)} ({saleSavings.savingsPercent}% OFF)</span>
                   </div>
                 </div>
               </div>

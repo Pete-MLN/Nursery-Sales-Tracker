@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { ScreenType, PlantItem, StockAlertSettings, OrderCartItem } from '../types';
+import { ScreenType, PlantItem, StockAlertSettings, OrderCartItem, Order } from '../types';
 import { DEFAULT_PLANT_IMAGE } from '../data/mockData';
 import { isPlantOnSale, getPlantSaleSavings } from '../utils/pricingUtils';
 import { getPlantGpsYearStatus } from '../utils/gpsUtils';
@@ -26,12 +26,16 @@ import {
   ChevronUp,
   ClipboardList,
   Flame,
-  Percent
+  Percent,
+  Truck,
+  ArrowRight
 } from 'lucide-react';
 
 interface InventoryScreenProps {
   onNavigate: (screen: ScreenType) => void;
   inventory: PlantItem[];
+  orders?: Order[];
+  onSelectOrder?: (order: Order) => void;
   onUpdateStock: (id: string, newStock: number) => void;
   onUpdatePlant?: (updatedPlant: PlantItem) => void;
   stockAlertSettings?: StockAlertSettings;
@@ -40,12 +44,14 @@ interface InventoryScreenProps {
 export const InventoryScreen: React.FC<InventoryScreenProps> = ({
   onNavigate,
   inventory,
+  orders = [],
+  onSelectOrder,
   onUpdateStock,
   onUpdatePlant,
   stockAlertSettings
 }) => {
   const [searchTerm, setSearchTerm] = useState<string>('');
-  const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy' | 'sale' | 'gps_tagged_year' | 'gps_not_tagged_year'>('all');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'critical' | 'warning' | 'healthy' | 'sale' | 'gps_tagged_year' | 'gps_not_tagged_year' | 'on_orders'>('all');
   const [minQtyOneOnly, setMinQtyOneOnly] = useState<boolean>(false);
   const [expandedPricesItemId, setExpandedPricesItemId] = useState<string | null>(null);
   const [saleModalPlant, setSaleModalPlant] = useState<PlantItem | null>(null);
@@ -63,12 +69,74 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     return 'healthy';
   };
 
+  // Active customer orders (excluding cancelled, completed, and archived orders)
+  const activeOrders = React.useMemo(() => {
+    return (orders || []).filter(o => 
+      o && o.status !== 'Cancelled' && o.status !== 'Completed' && !o.archived
+    );
+  }, [orders]);
+
+  // Map of plant identifiers to order summaries
+  const plantOrdersMap = React.useMemo(() => {
+    const map = new Map<string, {
+      totalQty: number;
+      orders: {
+        orderId: string;
+        customerName: string;
+        quantity: number;
+        status: string;
+        date: string;
+        holdingLocation?: string;
+      }[];
+    }>();
+
+    activeOrders.forEach(order => {
+      (order.items || []).forEach(item => {
+        if (!item.plant) return;
+        const remainingQty = (item.quantity || 0) - (item.pickedUpQuantity || 0);
+        const effectiveQty = remainingQty > 0 ? remainingQty : (item.quantity || 1);
+
+        const summary = {
+          orderId: order.id,
+          customerName: order.customerName || 'Walk In Customer',
+          quantity: effectiveQty,
+          status: order.status,
+          date: order.date || order.scheduledDate || '',
+          holdingLocation: order.holdingLocation,
+          order: order
+        };
+
+        const keysToSet = new Set<string>();
+        if (item.plant.id) keysToSet.add(item.plant.id);
+        if (item.plant.itemNo) keysToSet.add(`itemNo-${item.plant.itemNo}`);
+        if (item.plant.barcode) keysToSet.add(`barcode-${item.plant.barcode}`);
+
+        keysToSet.forEach(k => {
+          const existing = map.get(k) || { totalQty: 0, orders: [] };
+          existing.totalQty += effectiveQty;
+          existing.orders.push(summary);
+          map.set(k, existing);
+        });
+      });
+    });
+
+    return map;
+  }, [activeOrders]);
+
+  const getPlantOrderInfo = React.useCallback((plant: PlantItem) => {
+    if (plantOrdersMap.has(plant.id)) return plantOrdersMap.get(plant.id);
+    if (plant.itemNo && plantOrdersMap.has(`itemNo-${plant.itemNo}`)) return plantOrdersMap.get(`itemNo-${plant.itemNo}`);
+    if (plant.barcode && plantOrdersMap.has(`barcode-${plant.barcode}`)) return plantOrdersMap.get(`barcode-${plant.barcode}`);
+    return null;
+  }, [plantOrdersMap]);
+
   const criticalCount = inventory.filter(i => getItemStatus(i) === 'critical').length;
   const warningCount = inventory.filter(i => getItemStatus(i) === 'warning').length;
   const healthyCount = inventory.filter(i => getItemStatus(i) === 'healthy').length;
   const saleCount = inventory.filter(i => isPlantOnSale(i)).length;
   const gpsTaggedThisYearCount = inventory.filter(i => getPlantGpsYearStatus(i, currentYear).isTaggedThisYear).length;
   const gpsNotTaggedThisYearCount = inventory.filter(i => !getPlantGpsYearStatus(i, currentYear).isTaggedThisYear).length;
+  const plantsOnOrdersCount = inventory.filter(i => getPlantOrderInfo(i) !== null).length;
 
   const filteredInventory = inventory.filter(item => {
     if (minQtyOneOnly && item.stock < 1) {
@@ -85,6 +153,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
     if (statusFilter === 'sale') return matchesSearch && isPlantOnSale(item);
     if (statusFilter === 'gps_tagged_year') return matchesSearch && getPlantGpsYearStatus(item, currentYear).isTaggedThisYear;
     if (statusFilter === 'gps_not_tagged_year') return matchesSearch && !getPlantGpsYearStatus(item, currentYear).isTaggedThisYear;
+    if (statusFilter === 'on_orders') return matchesSearch && getPlantOrderInfo(item) !== null;
     return matchesSearch && getItemStatus(item) === statusFilter;
   });
 
@@ -203,7 +272,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               <span>On Sale ({saleCount})</span>
             </button>
 
-            {/* GPS Tagged This Year Filter Chip */}
+            {/* GPS Pinned This Year Filter Chip */}
             <button
               onClick={() => setStatusFilter(statusFilter === 'gps_tagged_year' ? 'all' : 'gps_tagged_year')}
               className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
@@ -213,13 +282,13 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   ? 'bg-emerald-50 text-emerald-900 border-emerald-300 hover:bg-emerald-100'
                   : 'bg-[#f3f4f0] text-[#717973] border-[#c1c8c2] hover:bg-[#e7e9e5]'
               }`}
-              title={`Filter inventory to plants tagged with GPS during ${currentYear}`}
+              title={`Filter inventory to plants pinned with GPS during ${currentYear}`}
             >
               <CheckCircle2 className={`w-3.5 h-3.5 ${statusFilter === 'gps_tagged_year' ? 'text-[#a0f4c8]' : 'text-emerald-700'}`} />
-              <span>📍 Tagged {currentYear} ({gpsTaggedThisYearCount})</span>
+              <span>📍 Pinned {currentYear} ({gpsTaggedThisYearCount})</span>
             </button>
 
-            {/* GPS Needs Tagging Filter Chip */}
+            {/* GPS Needs Pinning Filter Chip */}
             <button
               onClick={() => setStatusFilter(statusFilter === 'gps_not_tagged_year' ? 'all' : 'gps_not_tagged_year')}
               className={`px-3 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
@@ -227,10 +296,26 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                   ? 'bg-amber-700 text-white border-amber-700 shadow-xs ring-2 ring-amber-300'
                   : 'bg-[#f3f4f0] text-[#414844] border-[#c1c8c2] hover:bg-[#e7e9e5]'
               }`}
-              title={`Filter inventory to plants not yet tagged with GPS in ${currentYear}`}
+              title={`Filter inventory to plants not yet pinned with GPS in ${currentYear}`}
             >
               <Clock className={`w-3.5 h-3.5 ${statusFilter === 'gps_not_tagged_year' ? 'text-amber-300' : 'text-amber-700'}`} />
-              <span>Needs {currentYear} Tag ({gpsNotTaggedThisYearCount})</span>
+              <span>Needs {currentYear} Pin ({gpsNotTaggedThisYearCount})</span>
+            </button>
+
+            {/* Plants On Orders Filter Chip */}
+            <button
+              onClick={() => setStatusFilter(statusFilter === 'on_orders' ? 'all' : 'on_orders')}
+              className={`px-3 py-2 rounded-xl text-xs font-extrabold transition-all cursor-pointer whitespace-nowrap flex items-center gap-1.5 border ${
+                statusFilter === 'on_orders'
+                  ? 'bg-[#012d1d] text-[#a0f4c8] border-[#012d1d] shadow-xs ring-2 ring-[#a0f4c8]/50'
+                  : plantsOnOrdersCount > 0
+                  ? 'bg-blue-50 text-blue-900 border-blue-300 hover:bg-blue-100'
+                  : 'bg-[#f3f4f0] text-[#717973] border-[#c1c8c2] hover:bg-[#e7e9e5]'
+              }`}
+              title="Filter inventory to show all plants currently reserved on active customer orders"
+            >
+              <ClipboardList className={`w-3.5 h-3.5 ${statusFilter === 'on_orders' ? 'text-[#a0f4c8]' : 'text-blue-700'}`} />
+              <span>On Orders ({plantsOnOrdersCount})</span>
             </button>
 
             <button
@@ -302,6 +387,7 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
               const isPricesExpanded = expandedPricesItemId === item.id;
               const saleSavings = getPlantSaleSavings(item);
               const gpsYearStatus = getPlantGpsYearStatus(item, currentYear);
+              const orderInfo = getPlantOrderInfo(item);
 
               return (
                 <div
@@ -357,16 +443,16 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                             </span>
                           )}
 
-                          {/* GPS Tagged This Year Status Badge */}
+                          {/* GPS Pinned This Year Status Badge */}
                           {gpsYearStatus.isTaggedThisYear ? (
                             <button
                               type="button"
                               onClick={() => setGpsModalPlant(item)}
                               className="bg-emerald-50 hover:bg-emerald-100 text-emerald-900 border border-emerald-300 px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                              title={`GPS Tagged in ${currentYear} (${gpsYearStatus.thisYearCount} spot${gpsYearStatus.thisYearCount === 1 ? '' : 's'} this year). Click to view history and map`}
+                              title={`GPS Pinned in ${currentYear} (${gpsYearStatus.thisYearCount} spot${gpsYearStatus.thisYearCount === 1 ? '' : 's'} this year). Click to view history and map`}
                             >
                               <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
-                              <span>GPS Tagged ({currentYear})</span>
+                              <span>GPS Pinned ({currentYear})</span>
                               {gpsYearStatus.totalCount > 1 && (
                                 <span className="bg-emerald-200 text-emerald-900 px-1 rounded-full text-[9px] font-mono">
                                   {gpsYearStatus.totalCount} spots
@@ -378,20 +464,39 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                               type="button"
                               onClick={() => setGpsModalPlant(item)}
                               className="bg-amber-50 hover:bg-amber-100 text-amber-900 border border-amber-300 px-2 py-0.5 rounded-md text-[10px] font-bold flex items-center gap-1 shadow-2xs transition-colors cursor-pointer"
-                              title={`Tagged in ${gpsYearStatus.latestYear || 'prior season'}. Needs ${currentYear} re-tag. Click to view history & map`}
+                              title={`Pinned in ${gpsYearStatus.latestYear || 'prior season'}. Needs ${currentYear} re-pin. Click to view history & map`}
                             >
                               <Clock className="w-3 h-3 text-amber-600 shrink-0" />
-                              <span>GPS: Tagged {gpsYearStatus.latestYear || 'Prior'}</span>
+                              <span>GPS: Pinned {gpsYearStatus.latestYear || 'Prior'}</span>
                             </button>
                           ) : (
                             <button
                               type="button"
                               onClick={() => setGpsModalPlant(item)}
                               className="bg-[#f3f4f0] hover:bg-[#e7e9e5] text-[#717973] hover:text-[#012d1d] border border-[#c1c8c2] px-2 py-0.5 rounded-md text-[10px] font-semibold flex items-center gap-1 transition-colors cursor-pointer"
-                              title="No GPS coordinates logged yet. Click to tag GPS and show on map"
+                              title="No GPS coordinates logged yet. Click to pin GPS and show on map"
                             >
                               <MapPin className="w-3 h-3 text-[#717973] shrink-0" />
-                              <span>No GPS (Tag)</span>
+                              <span>No GPS (Pin)</span>
+                            </button>
+                          )}
+
+                          {/* Customer Order Badge */}
+                          {orderInfo && (
+                            <button 
+                              type="button"
+                              onClick={() => {
+                                if (orderInfo.orders.length > 0 && onSelectOrder) {
+                                  onSelectOrder(orderInfo.orders[0].order);
+                                  onNavigate('finalization');
+                                }
+                              }}
+                              className="bg-blue-50 hover:bg-blue-100 text-blue-900 border border-blue-200 hover:border-blue-300 px-2 py-0.5 rounded-md text-[10px] font-black flex items-center gap-1 shadow-2xs transition-all cursor-pointer group"
+                              title={`Click to open order (${orderInfo.orders.map(o => `${o.customerName} #${o.orderId}`).join(', ')})`}
+                            >
+                              <ClipboardList className="w-3 h-3 text-blue-700 shrink-0" />
+                              <span>On Order: {orderInfo.totalQty} qty ({orderInfo.orders.length} order{orderInfo.orders.length === 1 ? '' : 's'})</span>
+                              <ArrowRight className="w-2.5 h-2.5 text-blue-700 group-hover:translate-x-0.5 transition-transform shrink-0" />
                             </button>
                           )}
                         </div>
@@ -513,6 +618,66 @@ export const InventoryScreen: React.FC<InventoryScreenProps> = ({
                       </div>
                     </div>
                   </div>
+
+                  {/* Customer Orders Breakdown Detail */}
+                  {orderInfo && (
+                    <div className="bg-[#f0f7ff] border border-blue-200/90 rounded-xl p-2.5 sm:p-3 text-xs text-[#0f3b60] flex flex-col gap-2 animate-fade-in shadow-2xs">
+                      <div className="flex items-center justify-between font-bold text-blue-900 text-[11px] sm:text-xs">
+                        <span className="flex items-center gap-1.5">
+                          <ClipboardList className="w-3.5 h-3.5 text-blue-700 shrink-0" />
+                          <span>Active Customer Orders ({orderInfo.totalQty} unit{orderInfo.totalQty === 1 ? '' : 's'} reserved)</span>
+                        </span>
+                        <span className="text-[10px] sm:text-[11px] text-blue-800 font-semibold bg-blue-100/70 border border-blue-200 px-2 py-0.5 rounded-full">
+                          {orderInfo.orders.length} Active Order{orderInfo.orders.length === 1 ? '' : 's'} · Click to open
+                        </span>
+                      </div>
+                      <div className="flex flex-col gap-1.5 divide-y divide-blue-100">
+                        {orderInfo.orders.map((ord, oIdx) => (
+                          <div
+                            key={`${ord.orderId}-${oIdx}`}
+                            onClick={() => {
+                              if (onSelectOrder) {
+                                onSelectOrder(ord.order);
+                              }
+                              onNavigate('finalization');
+                            }}
+                            className="pt-1.5 first:pt-0 flex items-center justify-between gap-2 flex-wrap p-2 -mx-1 hover:bg-white/80 rounded-xl cursor-pointer transition-all border border-transparent hover:border-blue-200 group active:scale-[0.99]"
+                            title={`Open Order #${ord.orderId} for ${ord.customerName}`}
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <span className="font-extrabold text-[#012d1d] group-hover:text-blue-900 transition-colors">{ord.customerName}</span>
+                              <span className="font-mono text-[10px] bg-white border border-blue-200 px-1.5 py-0.2 rounded text-blue-800 font-bold">
+                                #{ord.orderId}
+                              </span>
+                              {ord.holdingLocation && (
+                                <span className="text-[10px] text-[#525a55] flex items-center gap-0.5">
+                                  <MapPin className="w-3 h-3 text-[#0e6c4a]" />
+                                  {ord.holdingLocation}
+                                </span>
+                              )}
+                              {ord.date && (
+                                <span className="text-[10px] text-[#717973] hidden sm:inline">
+                                  · {ord.date}
+                                </span>
+                              )}
+                            </div>
+                            <div className="flex items-center gap-2 shrink-0">
+                              <span className="font-extrabold text-[#012d1d] bg-white border border-blue-200 px-2 py-0.5 rounded text-[11px]">
+                                {ord.quantity} reserved
+                              </span>
+                              <span className="text-[10px] font-extrabold px-2 py-0.5 rounded bg-blue-100 text-blue-900 border border-blue-200">
+                                {ord.status}
+                              </span>
+                              <div className="flex items-center gap-1 text-[11px] font-extrabold text-blue-700 bg-blue-50 group-hover:bg-blue-600 group-hover:text-white px-2 py-1 rounded-lg border border-blue-200 group-hover:border-blue-600 transition-colors">
+                                <span>Go to Order</span>
+                                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                              </div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Collapsible Pricing Tiers Display */}
                   {isPricesExpanded && (

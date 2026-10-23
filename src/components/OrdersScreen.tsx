@@ -4,7 +4,8 @@ import { formatOrderCreatedDate, formatOrderScheduledTime, formatOrderModifiedDa
 import { PlantMapModal } from './PlantMapModal';
 import { saveOrderToFirestore, savePlantToFirestore } from '../services/firebaseService';
 import { acquireHighPrecisionGps, formatGpsCoordinates } from '../utils/gpsUtils';
-import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Trash2, X, AlertTriangle, CheckCircle, RotateCcw, Archive, Undo2 } from 'lucide-react';
+import { getPlantSaleSavings } from '../utils/pricingUtils';
+import { Search, MapPin, ChevronRight, Package, Calendar, Truck, ShoppingBag, Plus, AlertCircle, Clock, Trash2, X, AlertTriangle, CheckCircle, RotateCcw, Archive, Undo2, Flame, Tag } from 'lucide-react';
 
 interface OrdersScreenProps {
   onNavigate: (screen: ScreenType) => void;
@@ -46,42 +47,63 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
     }, 4500);
   };
 
-  const validOrders = orders.filter(o => o && o.id && !o.id.startsWith('ORD-DRAFT-'));
-
-  const activeOrdersCount = validOrders.filter(o => o.status !== 'Completed' && o.status !== 'Cancelled' && !o.archived).length;
-  const readyOrdersCount = validOrders.filter(o => o.status === 'Ready for Pickup' && !o.archived).length;
-  const pendingOrdersCount = validOrders.filter(o => o.status === 'Pending' && !o.archived).length;
-  const partialOrdersCount = validOrders.filter(o => (o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0)) && o.status !== 'Completed' && !o.archived).length;
-  const completedOrdersCount = validOrders.filter(o => o.status === 'Completed' || !!o.archived).length;
-  const cancelledOrdersCount = validOrders.filter(o => o.status === 'Cancelled').length;
-
-  const filteredOrders = validOrders.filter(o => {
-    const isPartial = o.status === 'Partial Pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0);
-    const isCompleted = o.status === 'Completed' || !!o.archived;
-    const isCancelled = o.status === 'Cancelled';
+  // Helper to categorize order status robustly without dropping pending or ready orders
+  const getOrderState = (o: Order) => {
+    const normStatus = (o.status || '').trim().toLowerCase();
+    const isPending = normStatus === 'pending';
+    const isReady = normStatus === 'ready for pickup' || normStatus === 'ready';
+    const isCancelled = normStatus === 'cancelled' || normStatus === 'canceled';
+    const isPartial = normStatus === 'partial pickup' || !!o.hasPartialPickup || ((o.remainingItemsCount || 0) > 0 && (o.pickedUpItemsCount || 0) > 0);
+    // An order is completed ONLY if status is explicitly completed, or if marked archived and NOT pending/ready/partial
+    const isCompleted = normStatus === 'completed' || (!!o.archived && !isPending && !isReady && !isPartial);
+    // Active orders include ALL orders that are Pending, Ready, Partial, or not completed/cancelled
     const isActive = !isCompleted && !isCancelled;
 
+    return {
+      isPending,
+      isReady,
+      isPartial,
+      isCompleted,
+      isCancelled,
+      isActive
+    };
+  };
+
+  const validOrders = orders.filter(o => o && (o.id || (o as any).docId) && !(o.id || '').startsWith('ORD-DRAFT-'));
+
+  const activeOrdersCount = validOrders.filter(o => getOrderState(o).isActive).length;
+  const readyOrdersCount = validOrders.filter(o => getOrderState(o).isReady).length;
+  const pendingOrdersCount = validOrders.filter(o => getOrderState(o).isPending).length;
+  const partialOrdersCount = validOrders.filter(o => getOrderState(o).isPartial && !getOrderState(o).isCompleted).length;
+  const completedOrdersCount = validOrders.filter(o => getOrderState(o).isCompleted).length;
+  const cancelledOrdersCount = validOrders.filter(o => getOrderState(o).isCancelled).length;
+
+  const filteredOrders = validOrders.filter(o => {
+    const state = getOrderState(o);
+
     const matchesTab = 
-      activeTab === 'Active' ? isActive :
-      activeTab === 'Ready' ? (o.status === 'Ready for Pickup' && !isCompleted) :
-      activeTab === 'Pending' ? (o.status === 'Pending' && !isCompleted) :
-      activeTab === 'Partial Pickup' ? (isPartial && !isCompleted) :
-      activeTab === 'Completed' ? isCompleted :
-      activeTab === 'Cancelled' ? isCancelled :
+      activeTab === 'Active' ? state.isActive :
+      activeTab === 'Ready' ? state.isReady :
+      activeTab === 'Pending' ? state.isPending :
+      activeTab === 'Partial Pickup' ? (state.isPartial && !state.isCompleted) :
+      activeTab === 'Completed' ? state.isCompleted :
+      activeTab === 'Cancelled' ? state.isCancelled :
       true; // 'All'
 
     const q = searchQuery.toLowerCase().trim();
     const matchesSearch = 
       !q ||
-      o.id.toLowerCase().includes(q) ||
-      o.customerName.toLowerCase().includes(q) ||
+      (o.id && o.id.toLowerCase().includes(q)) ||
+      (o.customerName && o.customerName.toLowerCase().includes(q)) ||
       (o.poNumber && o.poNumber.toLowerCase().includes(q)) ||
+      (o.holdingLocation && o.holdingLocation.toLowerCase().includes(q)) ||
+      (o.notes && o.notes.toLowerCase().includes(q)) ||
       (o.items && o.items.some(item => 
-        (item.plant.name && item.plant.name.toLowerCase().includes(q)) ||
-        (item.plant.botanicalName && item.plant.botanicalName.toLowerCase().includes(q)) ||
-        (item.plant.commonName && item.plant.commonName.toLowerCase().includes(q)) ||
-        (item.plant.itemNo && item.plant.itemNo.toLowerCase().includes(q)) ||
-        (item.plant.barcode && item.plant.barcode.toLowerCase().includes(q))
+        (item?.plant?.name && item.plant.name.toLowerCase().includes(q)) ||
+        (item?.plant?.botanicalName && item.plant.botanicalName.toLowerCase().includes(q)) ||
+        (item?.plant?.commonName && item.plant.commonName.toLowerCase().includes(q)) ||
+        (item?.plant?.itemNo && item.plant.itemNo.toLowerCase().includes(q)) ||
+        (item?.plant?.barcode && item.plant.barcode.toLowerCase().includes(q))
       ));
 
     return matchesTab && matchesSearch;
@@ -444,9 +466,12 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           </div>
         ) : (
           filteredOrders.map((order) => {
-            const isPartial = order.status === 'Partial Pickup' || !!order.hasPartialPickup || ((order.remainingItemsCount || 0) > 0 && (order.pickedUpItemsCount || 0) > 0);
-            const remainingCount = order.remainingItemsCount ?? (isPartial ? (order.itemsCount - (order.pickedUpItemsCount || 0)) : 0);
-            const isCompleted = order.status === 'Completed' || !!order.archived;
+            const orderState = getOrderState(order);
+            const isPartial = orderState.isPartial;
+            const isCompleted = orderState.isCompleted;
+            const remainingCount = order.remainingItemsCount ?? (isPartial ? ((order.itemsCount || order.items?.length || 0) - (order.pickedUpItemsCount || 0)) : 0);
+            const displayTotal = typeof order.total === 'number' ? order.total.toFixed(2) : (parseFloat(order.total || '0') || 0).toFixed(2);
+            const displayItemsCount = order.itemsCount ?? (order.items?.length || 0);
 
             return (
               <div
@@ -496,7 +521,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                             ? 'bg-red-100 text-red-800 border border-red-300'
                             : 'bg-[#f3f4f0] text-[#717973]'
                         }`}>
-                          {order.status}
+                          {order.status || 'Pending'}
                         </span>
                       )}
                     </div>
@@ -533,10 +558,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
                   <div className="text-right shrink-0">
                     <span className="font-extrabold text-lg sm:text-xl text-[#012d1d] block">
-                      ${order.total.toFixed(2)}
+                      ${displayTotal}
                     </span>
                     <span className="text-[11px] font-semibold text-[#717973]">
-                      {order.itemsCount} items
+                      {displayItemsCount} items
                     </span>
                   </div>
                 </div>
@@ -576,31 +601,105 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
                 {/* Items Preview with Product Number & Size for Yard Loaders */}
                 {order.items && order.items.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5 pt-0.5">
-                    {order.items.slice(0, 4).map((item, idx) => (
-                      <span 
-                        key={`${item.plant.id}-${idx}`}
-                        className="inline-flex items-center gap-1.5 text-[11px] bg-[#f9faf6] border border-[#c1c8c2] px-2 py-1 rounded-lg text-[#1a1c1a]"
-                      >
-                        <span className="font-bold text-[#012d1d]">{item.quantity}x</span>
-                        <span className="truncate max-w-[130px] font-semibold">{item.plant.name}</span>
-                        <span className="font-mono font-bold text-[#a0f4c8] bg-[#012d1d] px-1.5 py-0.2 rounded text-[10px]">
-                          #{item.plant.itemNo || item.plant.barcode || 'N/A'}
-                        </span>
-                        <span className="font-bold text-amber-100 bg-[#461702] px-1.5 py-0.2 rounded text-[10px]">
-                          {item.plant.size || 'Std'}
-                        </span>
-                        {item.orderMarkdown && (
-                          <span className="font-bold text-amber-900 bg-amber-200 px-1.5 py-0.2 rounded text-[10px]">
-                            M/D
+                  <div className="flex flex-col gap-2 pt-0.5">
+                    <div className="flex flex-wrap gap-1.5">
+                      {order.items.slice(0, 4).map((item, idx) => {
+                        const activeSale = item?.saleDiscount || item?.plant?.saleDiscount;
+                        const saleSavings = activeSale ? getPlantSaleSavings({ ...item.plant, saleDiscount: activeSale }) : null;
+                        const mdPrice = item?.orderMarkdown?.markdownPrice;
+
+                        return (
+                          <span 
+                            key={`${item?.plant?.id || item?.plant?.itemNo || idx}-${idx}`}
+                            className="inline-flex items-center gap-1.5 text-[11px] bg-[#f9faf6] border border-[#c1c8c2] px-2 py-1 rounded-lg text-[#1a1c1a] flex-wrap"
+                          >
+                            <span className="font-bold text-[#012d1d]">{item?.quantity || 1}x</span>
+                            <span className="truncate max-w-[130px] font-semibold">{item?.plant?.name || 'Plant Item'}</span>
+                            <span className="font-mono font-bold text-[#a0f4c8] bg-[#012d1d] px-1.5 py-0.2 rounded text-[10px]">
+                              #{item?.plant?.itemNo || item?.plant?.barcode || 'N/A'}
+                            </span>
+                            <span className="font-bold text-amber-100 bg-[#461702] px-1.5 py-0.2 rounded text-[10px]">
+                              {item?.plant?.size || 'Std'}
+                            </span>
+                            {item?.orderMarkdown && (
+                              <span className="font-black text-amber-950 bg-amber-200 border border-amber-400 px-1.5 py-0.2 rounded text-[10px] flex items-center gap-0.5 shadow-2xs">
+                                <Tag className="w-2.5 h-2.5 text-amber-800" />
+                                <span>ORDER M/D · ${mdPrice !== undefined ? mdPrice.toFixed(2) : ''}</span>
+                              </span>
+                            )}
+                            {!item?.orderMarkdown && saleSavings && (
+                              <span className="font-black text-white bg-rose-600 border border-rose-700 px-1.5 py-0.2 rounded text-[10px] flex items-center gap-0.5 shadow-2xs">
+                                <Flame className="w-2.5 h-2.5 text-amber-300" />
+                                <span>ON SALE · ${saleSavings.salePrice.toFixed(2)}</span>
+                              </span>
+                            )}
                           </span>
-                        )}
-                      </span>
-                    ))}
-                    {order.items.length > 4 && (
-                      <span className="text-[11px] text-[#717973] font-bold self-center px-1">
-                        +{order.items.length - 4} more items
-                      </span>
+                        );
+                      })}
+                      {order.items.length > 4 && (
+                        <span className="text-[11px] text-[#717973] font-bold self-center px-1">
+                          +{order.items.length - 4} more items
+                        </span>
+                      )}
+                    </div>
+
+                    {/* Informational Breakdown of Markdowns & Sales (Matches Scan Screen Design) */}
+                    {order.items.some(i => i?.orderMarkdown || i?.saleDiscount || i?.plant?.saleDiscount) && (
+                      <div className="bg-amber-50/90 border border-amber-300/80 rounded-xl p-2.5 flex flex-col gap-1.5 text-xs shadow-2xs">
+                        <div className="flex items-center gap-1.5 text-amber-950 font-black">
+                          <Tag className="w-3.5 h-3.5 text-amber-800" />
+                          <span>Active Discounts & Markdowns on this Order:</span>
+                        </div>
+                        <div className="flex flex-col gap-1">
+                          {order.items.map((item, idx) => {
+                            if (item?.orderMarkdown) {
+                              const orig = item.orderMarkdown.originalPrice || item.originalPrice || item.plant?.price || 0;
+                              return (
+                                <div key={`order-md-${idx}`} className="flex items-center justify-between gap-2 bg-white/90 p-2 rounded-lg border border-amber-200 text-xs shadow-2xs flex-wrap">
+                                  <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                    <span className="font-bold text-[#012d1d]">{item.quantity}x</span>
+                                    <span className="font-bold text-[#1a1c1a] truncate">{item.plant?.name}</span>
+                                    <span className="bg-amber-700 text-white font-black text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1">
+                                      <Tag className="w-3 h-3 text-amber-200" />
+                                      ORDER MARKDOWN · {item.orderMarkdown.type === 'percentage' ? `${item.orderMarkdown.value}% OFF` : 'CUSTOM PRICE'}
+                                    </span>
+                                    {item.orderMarkdown.reason && (
+                                      <span className="text-[#525a55] italic text-[11px]">({item.orderMarkdown.reason})</span>
+                                    )}
+                                  </div>
+                                  <div className="font-bold text-amber-950 shrink-0 text-right">
+                                    <span className="line-through text-[#717973] mr-2 text-[11px]">${orig.toFixed(2)}</span>
+                                    <span className="text-amber-900 font-black text-sm">${item.orderMarkdown.markdownPrice.toFixed(2)} ea</span>
+                                  </div>
+                                </div>
+                              );
+                            }
+                            const activeSale = item?.saleDiscount || item?.plant?.saleDiscount;
+                            if (activeSale) {
+                              const sSavings = getPlantSaleSavings({ ...item.plant, saleDiscount: activeSale });
+                              if (sSavings) {
+                                return (
+                                  <div key={`order-sale-${idx}`} className="flex items-center justify-between gap-2 bg-white/90 p-2 rounded-lg border border-rose-200 text-xs shadow-2xs flex-wrap">
+                                    <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
+                                      <span className="font-bold text-[#012d1d]">{item.quantity}x</span>
+                                      <span className="font-bold text-[#1a1c1a] truncate">{item.plant?.name}</span>
+                                      <span className="bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1">
+                                        <Flame className="w-3 h-3 text-amber-300" />
+                                        ON SALE · {sSavings.savingsPercent}% OFF
+                                      </span>
+                                    </div>
+                                    <div className="font-bold text-rose-950 shrink-0 text-right">
+                                      <span className="line-through text-[#717973] mr-2 text-[11px]">${sSavings.regularPrice.toFixed(2)}</span>
+                                      <span className="text-rose-700 font-black text-sm">${sSavings.salePrice.toFixed(2)} ea</span>
+                                    </div>
+                                  </div>
+                                );
+                              }
+                            }
+                            return null;
+                          })}
+                        </div>
+                      </div>
                     )}
                   </div>
                 )}
@@ -736,7 +835,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
               <div className="min-w-0 flex-1">
                 <h3 className="font-extrabold text-base text-[#1a1c1a]">Customer Picked Up Order?</h3>
                 <p className="text-xs text-[#717973] mt-0.5">
-                  Order <span className="font-bold text-[#012d1d]">#{orderToComplete.id}</span> • {orderToComplete.customerName} (${orderToComplete.total.toFixed(2)})
+                  Order <span className="font-bold text-[#012d1d]">#{orderToComplete.id}</span> • {orderToComplete.customerName || 'Walk In Customer'} (${(typeof orderToComplete.total === 'number' ? orderToComplete.total : parseFloat(orderToComplete.total || '0') || 0).toFixed(2)})
                 </p>
               </div>
               <button
@@ -750,7 +849,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
             <div className="bg-[#f3f4f0] p-3.5 rounded-xl border border-[#e2e3df] text-xs text-[#414844] flex flex-col gap-2">
               <div className="flex items-center justify-between font-bold text-[#012d1d] border-b border-[#e2e3df] pb-2">
-                <span>Items: {orderToComplete.itemsCount} plants</span>
+                <span>Items: {orderToComplete.itemsCount ?? (orderToComplete.items?.length || 0)} plants</span>
                 <span>Zone: {orderToComplete.holdingLocation || 'Staging Bay'}</span>
               </div>
               <p className="text-[11px] text-[#525a55] leading-relaxed">
@@ -804,7 +903,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
               <div className="min-w-0 flex-1">
                 <h3 className="font-extrabold text-base text-[#1a1c1a]">Cancel or Delete Order?</h3>
                 <p className="text-xs text-[#717973] mt-0.5">
-                  Order <span className="font-bold text-[#012d1d]">#{orderToDelete.id}</span> • {orderToDelete.customerName} (${orderToDelete.total.toFixed(2)})
+                  Order <span className="font-bold text-[#012d1d]">#{orderToDelete.id}</span> • {orderToDelete.customerName || 'Walk In Customer'} (${(typeof orderToDelete.total === 'number' ? orderToDelete.total : parseFloat(orderToDelete.total || '0') || 0).toFixed(2)})
                 </p>
               </div>
               <button
@@ -862,9 +961,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           onClose={() => setMapModalOrder(null)}
           selectedItem={mapModalOrder.items[0] || null}
           allItems={mapModalOrder.items}
-          gpsLoggedMap={mapModalOrder.items.reduce((acc, it) => {
-            if (it.gpsLocation) {
-              acc[it.plant.id] = `${it.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(it.gpsLocation.longitude).toFixed(4)}° W`;
+          gpsLoggedMap={mapModalOrder.items.reduce((acc, it, idx) => {
+            if (it?.gpsLocation) {
+              const key = it.plant?.id || it.plant?.itemNo || `item-${idx}`;
+              acc[key] = `${it.gpsLocation.latitude.toFixed(4)}° N, ${Math.abs(it.gpsLocation.longitude).toFixed(4)}° W`;
             }
             return acc;
           }, {} as Record<string, string>)}

@@ -50,7 +50,7 @@ import {
   Flame, 
 } from 'lucide-react';
 import { PricingDropdown } from './PricingDropdown';
-import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers, getItemMarkdownSavings } from '../utils/pricingUtils';
+import { getItemEffectiveUnitPrice, PriceLevelKey, getPlantPriceTiers, getItemMarkdownSavings, getPlantSaleSavings } from '../utils/pricingUtils';
 import { formatOrderCreatedDate, formatOrderScheduledTime, extractDateForInput, getTodayDateInputValue, formatRawDateString } from '../utils/dateUtils';
 import { PlantMapModal } from './PlantMapModal';
 import { OrderMarkdownModal } from './OrderMarkdownModal';
@@ -622,35 +622,47 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     showToast(`Added "${plant.name}" [Item #${itemNum}] [Size: ${size}] to order.`);
   };
 
-  // Save changes to database and parent state
-  const handleSaveChanges = () => {
-    const calculatedRemaining = items.reduce((sum, item) => sum + getItemRemainingQty(item), 0);
-    const calculatedPickedUp = items.reduce((sum, item) => sum + getItemPickedUpQty(item), 0);
-    const hasRemaining = calculatedRemaining > 0 && (calculatedPickedUp > 0 || hasPartialPickupToggle);
+  // Helper to compile the updated order payload from current screen state
+  const buildCurrentOrderPayload = (statusOverride?: Order['status']): Order => {
+    const isExplicitCompleted = statusOverride === 'Completed';
+
+    const calculatedRemaining = isExplicitCompleted 
+      ? 0 
+      : items.reduce((sum, item) => sum + getItemRemainingQty(item), 0);
+    const calculatedPickedUp = isExplicitCompleted 
+      ? calculatedItemsCount 
+      : items.reduce((sum, item) => sum + getItemPickedUpQty(item), 0);
+    const hasRemaining = isExplicitCompleted 
+      ? false 
+      : (calculatedRemaining > 0 && (calculatedPickedUp > 0 || hasPartialPickupToggle));
 
     const itemsWithPickup = items.map(item => ({
       ...item,
-      pickedUpQuantity: getItemPickedUpQty(item)
+      pickedUpQuantity: isExplicitCompleted ? item.quantity : getItemPickedUpQty(item)
     }));
 
     const finalStatus: Order['status'] = 
+      statusOverride ? statusOverride :
       orderStatus === 'Cancelled' ? 'Cancelled' :
       (calculatedRemaining === 0 && calculatedItemsCount > 0) ? 'Completed' :
       hasRemaining ? 'Partial Pickup' :
       orderStatus;
 
-    const updated: Order = {
+    const nowIso = new Date().toISOString();
+
+    return {
       ...currentOrder,
       customerName: customerName.trim() || 'Walk In Customer',
       poNumber: poNumber.trim() || undefined,
-      type: fulfillment,
+      type: isExplicitCompleted && (currentOrder.type === 'Take Now' || fulfillment === 'Take Now') ? 'Take Now' : fulfillment,
       scheduledTime: scheduledTime.trim() || 'Scheduled',
       scheduledDate: scheduledDate.trim(),
       date: currentOrder.date ? formatOrderCreatedDate(currentOrder) : new Date().toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }),
-      createdAt: currentOrder.createdAt || new Date().toISOString(),
-      updatedAt: new Date().toISOString(),
-      modifiedAt: new Date().toISOString(),
+      createdAt: currentOrder.createdAt || nowIso,
+      updatedAt: nowIso,
+      modifiedAt: nowIso,
       status: finalStatus,
+      completedAt: finalStatus === 'Completed' ? (currentOrder.completedAt || nowIso) : currentOrder.completedAt,
       holdingLocation: holdingLocation,
       notes: orderNotes.trim(),
       items: itemsWithPickup,
@@ -662,7 +674,11 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
       remainingPickupDate: remainingPickupDate,
       partialPickupNotes: partialPickupNotes.trim()
     };
+  };
 
+  // Save changes to database and parent state
+  const handleSaveChanges = () => {
+    const updated = buildCurrentOrderPayload();
     setCurrentOrder(updated);
     if (onUpdateOrder) {
       onUpdateOrder(updated);
@@ -671,6 +687,41 @@ export const OrderFinalizationScreen: React.FC<OrderFinalizationScreenProps> = (
     setHasUnsavedChanges(false);
     showToast(`Order ${updated.id} saved & synced to cloud!`);
     onNavigate('home');
+  };
+
+  // Save current order and immediately start a fresh order for next customer on Scan page
+  const handleSaveAndNewCustomer = () => {
+    const updated = buildCurrentOrderPayload();
+    setCurrentOrder(updated);
+    if (onUpdateOrder) {
+      onUpdateOrder(updated);
+    }
+    clearActiveDraft(updated.id);
+    setHasUnsavedChanges(false);
+    showToast(`Order #${updated.id} saved! Ready for next customer.`);
+    if (onStartNewOrder) {
+      onStartNewOrder();
+    } else {
+      onNavigate('scan');
+    }
+  };
+
+  // Mark current order Complete, save it, and start a fresh order for next customer on Scan page
+  const handleCompleteAndNewCustomer = () => {
+    const updated = buildCurrentOrderPayload('Completed');
+    setCurrentOrder(updated);
+    setOrderStatus('Completed');
+    if (onUpdateOrder) {
+      onUpdateOrder(updated);
+    }
+    clearActiveDraft(updated.id);
+    setHasUnsavedChanges(false);
+    showToast(`Order #${updated.id} marked Complete! Ready for next customer.`);
+    if (onStartNewOrder) {
+      onStartNewOrder();
+    } else {
+      onNavigate('scan');
+    }
   };
 
   // Navigate to scan page while preserving current order state
@@ -1043,13 +1094,13 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             {onStartNewOrder && (
               <button
                 type="button"
-                id="btn-top-next-customer"
-                onClick={onStartNewOrder}
+                id="btn-top-save-new-customer"
+                onClick={handleSaveAndNewCustomer}
                 className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-[#0e6c4a] hover:bg-[#0b5338] text-white text-[13.5px] sm:text-[15.5px] font-extrabold shadow-sm transition-all cursor-pointer border border-[#a0f4c8]/30 active:scale-95"
-                title="Start a fresh order for the next customer"
+                title="Save current order changes and start a fresh order for the next customer"
               >
                 <Plus className="w-4 h-4 text-[#a0f4c8]" />
-                <span className="text-[13.5px] sm:text-[15.5px]">Next Customer</span>
+                <span className="text-[13.5px] sm:text-[15.5px]">Save &amp; New Customer</span>
               </button>
             )}
           </div>
@@ -1102,13 +1153,13 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
             {onStartNewOrder && (
               <button
                 type="button"
-                id="btn-take-now-next-customer"
-                onClick={onStartNewOrder}
+                id="btn-take-now-complete-new-customer"
+                onClick={handleCompleteAndNewCustomer}
                 className="w-full sm:w-auto px-4 py-2.5 bg-[#a0f4c8] hover:bg-white text-[#012d1d] font-black text-[13.5px] sm:text-[15.5px] rounded-xl transition-all shadow-sm flex items-center justify-center gap-1.5 cursor-pointer active:scale-95"
-                title="Finish and start a fresh order for the next customer"
+                title="Mark this order Completed and start a fresh order for the next customer"
               >
-                <Plus className="w-4 h-4 text-[#012d1d]" />
-                <span className="text-[13.5px] sm:text-[15.5px]">Next Customer</span>
+                <CheckCircle2 className="w-4.5 h-4.5 text-[#012d1d]" />
+                <span className="text-[13.5px] sm:text-[15.5px]">Complete &amp; New Customer</span>
               </button>
             )}
           </div>
@@ -1863,9 +1914,22 @@ ${isPartialPickupActive ? `Partial: ${totalPickedUpQty} loaded, ${totalRemaining
                           {item.orderMarkdown && (
                             <span className="bg-amber-700 text-white text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-amber-800 shadow-2xs">
                               <Tag className="w-3 h-3 text-amber-200" />
-                              <span>ORDER M/D · {item.orderMarkdown.type === 'percentage' ? `${item.orderMarkdown.value}% OFF` : `$${item.orderMarkdown.markdownPrice.toFixed(2)}`}</span>
+                              <span>ORDER M/D · {item.orderMarkdown.type === 'percentage' ? `${item.orderMarkdown.value}% OFF · $${item.orderMarkdown.markdownPrice.toFixed(2)} ea` : `$${item.orderMarkdown.markdownPrice.toFixed(2)} ea`}</span>
                             </span>
                           )}
+
+                          {/* Catalog On-Sale Badge */}
+                          {!item.orderMarkdown && (item.saleDiscount || item.plant.saleDiscount) && (() => {
+                            const activeSale = item.saleDiscount || item.plant.saleDiscount;
+                            const sSavings = activeSale ? getPlantSaleSavings({ ...item.plant, saleDiscount: activeSale }) : null;
+                            if (!sSavings) return null;
+                            return (
+                              <span className="bg-rose-600 text-white text-xs font-black px-2 py-0.5 rounded-md flex items-center gap-1 border border-rose-700 shadow-2xs">
+                                <Flame className="w-3 h-3 text-amber-300" />
+                                <span>ON SALE · {sSavings.savingsPercent}% OFF · ${sSavings.salePrice.toFixed(2)}</span>
+                              </span>
+                            );
+                          })()}
                         </div>
 
                         {/* Plant GPS Location Controls & Badges */}

@@ -541,14 +541,14 @@ export const StockNotificationsScreen: React.FC<StockNotificationsScreenProps> =
               )}
             </div>
           ) : (
-            filteredItems.map(item => {
+            filteredItems.map((item, index) => {
               const status = getItemStatus(item);
               const isCrit = status === 'critical';
               const isWarn = status === 'warning';
 
               return (
                 <div 
-                  key={item.id}
+                  key={`notif-${item.id || 'item'}-${index}`}
                   className={`p-3.5 sm:p-4 rounded-xl border transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                     isCrit 
                       ? 'bg-[#fff8f7] border-[#ffdad6] hover:border-[#ba1a1a]/60' 

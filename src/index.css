@@ -57,3 +57,59 @@ div[class*="fixed inset-0"] {
   touch-action: pan-y;
 }
 
+/* High Visibility Outdoor Mode (Optimized contrast for direct sunlight) */
+html.outdoor-mode {
+  --color-surface: #ffffff;
+  --color-background: #ffffff;
+  --color-surface-container-low: #ffffff;
+  --color-surface-container: #f0f2ed;
+  --color-surface-container-high: #e5e8e1;
+  --color-on-surface: #000000;
+  --color-on-surface-variant: #000000;
+  --color-outline: #012d1d;
+  --color-outline-variant: #012d1d;
+}
+
+html.outdoor-mode body {
+  background-color: #ffffff;
+  color: #000000;
+}
+
+html.outdoor-mode .text-\[\#414844\],
+html.outdoor-mode .text-\[\#525a55\],
+html.outdoor-mode .text-\[\#717973\],
+html.outdoor-mode .text-\[\#1a1c1a\] {
+  color: #000000 !important;
+  font-weight: 600;
+}
+
+html.outdoor-mode .border-\[\#c1c8c2\],
+html.outdoor-mode .border-\[\#c1c8c2\]\/40,
+html.outdoor-mode .border-\[\#c1c8c2\]\/50,
+html.outdoor-mode .border-\[\#c1c8c2\]\/60 {
+  border-color: #012d1d !important;
+  border-width: 1.5px;
+}
+
+html.outdoor-mode .bg-\[\#f3f4f0\],
+html.outdoor-mode .bg-\[\#f9faf6\],
+html.outdoor-mode .bg-\[\#edeeea\],
+html.outdoor-mode .bg-\[\#e7e9e5\],
+html.outdoor-mode .bg-\[\#e2e3df\] {
+  background-color: #ffffff !important;
+}
+
+html.outdoor-mode input,
+html.outdoor-mode select,
+html.outdoor-mode textarea {
+  border-color: #012d1d !important;
+  border-width: 2px !important;
+  color: #000000 !important;
+  font-weight: 700 !important;
+  background-color: #ffffff !important;
+}
+
+html.outdoor-mode button {
+  font-weight: 800 !important;
+}
+

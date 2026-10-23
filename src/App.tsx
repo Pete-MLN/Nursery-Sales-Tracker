@@ -52,8 +52,8 @@ import {
   deleteHoldingLocationFromFirestore,
   saveAuditSessionToFirestore
 } from './services/firebaseService';
-import { sanitizeCustomerName } from './utils/customerNameCleaner';
-import { flushOfflineSyncQueue, clearActiveDraft, OrderDraft } from './services/orderAutoSaveService';
+import { flushOfflineSyncQueue, clearActiveDraft, getActiveDraft, autoSaveDraft, OrderDraft } from './services/orderAutoSaveService';
+import { isPlantOnSale, getPlantSaleSavings } from './utils/pricingUtils';
 
 export function extractLastUploadDates(uploadsList: RecentUpload[]): LastUploadDatesInfo {
   const getTimestamp = (u: RecentUpload): number => {
@@ -166,7 +166,16 @@ export default function App() {
   const [isAdminModalOpen, setIsAdminModalOpen] = useState<boolean>(false);
 
   const [inventory, setInventory] = useState<PlantItem[]>([]);
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
+  const [orders, setOrders] = useState<Order[]>(() => {
+    const cached = localStorage.getItem('nursery_orders_cache');
+    if (cached) {
+      try {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      } catch (e) {}
+    }
+    return INITIAL_ORDERS;
+  });
   const [uploads, setUploads] = useState<RecentUpload[]>(INITIAL_UPLOADS);
   const [customers, setCustomers] = useState<Customer[]>(INITIAL_CUSTOMERS);
   const [employees, setEmployees] = useState<Employee[]>(INITIAL_EMPLOYEES);
@@ -262,6 +271,22 @@ export default function App() {
     setCameraTimeout(seconds);
     localStorage.setItem('nursery_camera_timeout', seconds.toString());
   };
+
+  // High Visibility Outdoor Mode (direct sunlight contrast optimization)
+  const [outdoorMode, setOutdoorMode] = useState<boolean>(() => {
+    return localStorage.getItem('nursery_outdoor_mode') === 'true';
+  });
+
+  useEffect(() => {
+    if (outdoorMode) {
+      document.documentElement.classList.add('outdoor-mode');
+    } else {
+      document.documentElement.classList.remove('outdoor-mode');
+    }
+    try {
+      localStorage.setItem('nursery_outdoor_mode', outdoorMode ? 'true' : 'false');
+    } catch (e) {}
+  }, [outdoorMode]);
 
   // Sync Firebase Auth state if available
   useEffect(() => {
@@ -501,6 +526,11 @@ export default function App() {
       if (data && data.length > 0) {
         const validOrders = data.filter(o => o && o.id && !o.id.startsWith('ORD-DRAFT-'));
         setOrders(validOrders.length > 0 ? validOrders : INITIAL_ORDERS);
+        if (validOrders.length > 0) {
+          try {
+            localStorage.setItem('nursery_orders_cache', JSON.stringify(validOrders));
+          } catch (e) {}
+        }
 
         // Clean up any stale draft orders saved previously in Firestore
         data.filter(o => o && o.id && o.id.startsWith('ORD-DRAFT-')).forEach(draftOrder => {
@@ -513,6 +543,17 @@ export default function App() {
           if (fresh) setActiveOrder(fresh);
         }
       } else {
+        // If Firestore returned empty, keep local cache if it exists, otherwise INITIAL_ORDERS
+        const cached = localStorage.getItem('nursery_orders_cache');
+        if (cached) {
+          try {
+            const parsed = JSON.parse(cached);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setOrders(parsed);
+              return;
+            }
+          } catch (e) {}
+        }
         setOrders(INITIAL_ORDERS);
       }
     });
@@ -776,7 +817,11 @@ export default function App() {
       ...overrides
     };
 
-    setOrders(prev => [newOrder, ...prev.filter(o => o.id !== newOrderId && !o.id.startsWith('ORD-DRAFT-'))]);
+    setOrders(prev => {
+      const next = [newOrder, ...prev.filter(o => o.id !== newOrderId && !o.id.startsWith('ORD-DRAFT-'))];
+      try { localStorage.setItem('nursery_orders_cache', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
     setActiveOrder(newOrder);
     clearActiveDraft();
     saveOrderToFirestore(newOrder);
@@ -794,7 +839,11 @@ export default function App() {
         modifiedAt: nowIso
       };
       setActiveOrder(updatedOrder);
-      setOrders(prev => prev.map(o => o.id === activeOrder.id ? updatedOrder : o));
+      setOrders(prev => {
+        const next = prev.map(o => o.id === activeOrder.id ? updatedOrder : o);
+        try { localStorage.setItem('nursery_orders_cache', JSON.stringify(next)); } catch (e) {}
+        return next;
+      });
       clearActiveDraft(updatedOrder.id);
       saveOrderToFirestore(updatedOrder);
     }
@@ -808,7 +857,11 @@ export default function App() {
       updatedAt: updatedOrder.updatedAt || nowIso,
       modifiedAt: updatedOrder.modifiedAt || nowIso
     };
-    setOrders(prev => prev.map(o => o.id === stampedOrder.id ? stampedOrder : o));
+    setOrders(prev => {
+      const next = prev.map(o => o.id === stampedOrder.id ? stampedOrder : o);
+      try { localStorage.setItem('nursery_orders_cache', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
     if (activeOrder && activeOrder.id === stampedOrder.id) {
       setActiveOrder(stampedOrder);
     }
@@ -818,7 +871,11 @@ export default function App() {
 
   // Cancel / delete order from list and Firestore
   const handleDeleteOrder = (orderId: string) => {
-    setOrders(prev => prev.filter(o => o.id !== orderId));
+    setOrders(prev => {
+      const next = prev.filter(o => o.id !== orderId);
+      try { localStorage.setItem('nursery_orders_cache', JSON.stringify(next)); } catch (e) {}
+      return next;
+    });
     if (activeOrder && activeOrder.id === orderId) {
       setActiveOrder(null);
     }
@@ -927,6 +984,75 @@ export default function App() {
       saveOrderToFirestore(newOrder);
       clearActiveDraft(draft.orderId);
     }
+  };
+
+  // Add plant to order or active draft from Customer Plant Matcher
+  const handleAddPlantToOrder = (plant: PlantItem) => {
+    const unitPrice = isPlantOnSale(plant) ? getPlantSaleSavings(plant)?.salePrice ?? plant.price : plant.price;
+
+    if (activeOrder) {
+      const items = [...(activeOrder.items || [])];
+      const existingIdx = items.findIndex(i => i.plant.id === plant.id);
+
+      if (existingIdx >= 0) {
+        items[existingIdx] = {
+          ...items[existingIdx],
+          quantity: items[existingIdx].quantity + 1
+        };
+      } else {
+        items.push({
+          plant,
+          quantity: 1,
+          selectedPrice: unitPrice,
+          originalPrice: plant.price
+        });
+      }
+      const updatedOrder: Order = {
+        ...activeOrder,
+        items,
+        itemsCount: items.reduce((s, i) => s + i.quantity, 0),
+        total: items.reduce((s, i) => s + (i.selectedPrice ?? i.plant.price) * i.quantity, 0)
+      };
+      setActiveOrder(updatedOrder);
+      handleUpdateOrder(updatedOrder);
+      return;
+    }
+
+    const draft = getActiveDraft();
+    if (draft) {
+      const existingIdx = (draft.cartItems || []).findIndex(ci => ci.plant.id === plant.id);
+      let updatedItems = [...(draft.cartItems || [])];
+      if (existingIdx >= 0) {
+        updatedItems[existingIdx] = {
+          ...updatedItems[existingIdx],
+          quantity: updatedItems[existingIdx].quantity + 1
+        };
+      } else {
+        updatedItems.push({
+          plant,
+          quantity: 1,
+          selectedPrice: unitPrice,
+          originalPrice: plant.price
+        });
+      }
+      draft.cartItems = updatedItems;
+      draft.lastSavedAt = new Date().toISOString();
+      autoSaveDraft(draft, true);
+    } else {
+      const newDraft: OrderDraft = {
+        orderId: '',
+        customerName: 'Walk In Customer',
+        cartItems: [{
+          plant,
+          quantity: 1,
+          selectedPrice: unitPrice,
+          originalPrice: plant.price
+        }],
+        lastSavedAt: new Date().toISOString()
+      };
+      autoSaveDraft(newDraft, true);
+    }
+
   };
 
   // Handle uploading dataset in Data Management
@@ -1194,6 +1320,8 @@ export default function App() {
             onSelectOrder={(ord) => setActiveOrder(ord)}
             onResumeDraft={handleResumeDraft}
             onSaveDraft={handleSaveDraftAsOrder}
+            onAddToCart={handleAddPlantToOrder}
+            stockAlertSettings={stockAlertSettings}
           />
         )}
 
@@ -1217,6 +1345,8 @@ export default function App() {
           <InventoryScreen
             onNavigate={navigateTo}
             inventory={inventory}
+            orders={orders}
+            onSelectOrder={(ord) => setActiveOrder(ord)}
             onUpdateStock={handleUpdateStock}
             stockAlertSettings={stockAlertSettings}
             onUpdatePlant={handleUpdatePlant}
@@ -1270,6 +1400,7 @@ export default function App() {
             onUpdateOrder={handleUpdateOrder}
             onDeleteOrder={handleDeleteOrder}
             onStartNewOrder={() => {
+              clearActiveDraft();
               setActiveOrder(null);
               navigateTo('scan');
             }}
@@ -1324,6 +1455,8 @@ export default function App() {
             onOpenAdminManagement={() => setIsAdminModalOpen(true)}
             totalUsersCount={allUsers.length}
             totalAdminsCount={allUsers.filter(u => u.isAdmin).length}
+            outdoorMode={outdoorMode}
+            onToggleOutdoorMode={() => setOutdoorMode(prev => !prev)}
           />
         )}
 

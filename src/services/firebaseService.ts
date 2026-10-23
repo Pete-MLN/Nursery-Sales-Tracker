@@ -32,10 +32,17 @@ const INVENTORY_AUDITS_COL = 'inventory_audits';
 const USERS_COL = 'users';
 
 const handleSnapshotError = (colName: string, err: any) => {
-  if (err?.code === 'unavailable' || err?.message?.includes('offline') || err?.message?.includes('unavailable') || err?.message?.includes('Could not reach Cloud Firestore')) {
+  if (
+    err?.code === 'unavailable' || 
+    err?.code === 'deadline-exceeded' ||
+    err?.message?.includes('offline') || 
+    err?.message?.includes('unavailable') || 
+    err?.message?.includes('Could not reach Cloud Firestore') ||
+    err?.message?.includes('10 seconds')
+  ) {
     console.warn(`Firestore [${colName}] operating with offline/local cache:`, err?.message || err);
   } else {
-    console.error(`Firestore [${colName}] snapshot error:`, err);
+    console.warn(`Firestore [${colName}] snapshot event:`, err?.message || err);
   }
 };
 
@@ -247,10 +254,11 @@ export function subscribeToEmployees(callback: (employees: Employee[]) => void) 
 export function subscribeToOrders(callback: (orders: Order[]) => void) {
   return onSnapshot(collection(db, ORDERS_COL), (snapshot) => {
     const items: Order[] = [];
-    snapshot.forEach((doc) => {
-      const order = doc.data() as Order;
-      if (order && order.id && !order.id.startsWith('ORD-DRAFT-')) {
-        items.push(order);
+    snapshot.forEach((docSnap) => {
+      const order = docSnap.data() as Order;
+      const orderId = order?.id || docSnap.id;
+      if (order && orderId && !orderId.startsWith('ORD-DRAFT-')) {
+        items.push({ ...order, id: orderId });
       }
     });
     callback(items);

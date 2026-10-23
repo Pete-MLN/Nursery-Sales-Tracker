@@ -80,6 +80,46 @@ export interface PlantItem {
     timestamp: string;
   };
   gpsLocations?: GPSLocationEntry[];
+  culturalProfile?: PlantCulturalProfile;
+}
+
+export interface PlantCulturalProfile {
+  name: string;
+  sunRequirements: string;
+  sunCategories: ('Full Sun' | 'Partial Sun' | 'Full Shade')[];
+  heightRange: string;
+  minHeightFeet: number;
+  maxHeightFeet: number;
+  heightCategory: 'groundcover' | 'under_3ft' | '3_to_6ft' | '6_to_12ft' | '12_to_25ft' | 'over_25ft';
+  spread: string;
+  growthHabit: string;
+  foliageColor: string;
+  flowerColor: string;
+  flowerColorList: string[]; // ['White', 'Pink', 'Red', 'Purple', 'Yellow', 'Blue', 'Orange', 'None']
+  fallColorChange: string;
+  fallColors: string[]; // ['Red', 'Orange', 'Yellow', 'Purple', 'Bronze', 'None']
+  foliageType: 'evergreen' | 'deciduous' | 'semi-evergreen';
+  soilConditions: string;
+  soilMoistureCategory: 'Dry / Drought Tolerant' | 'Moist, Well-Drained' | 'Wet / Poor Drainage' | 'Adaptable';
+  categoryType: 'Shrub' | 'Shade Tree' | 'Ornamental Tree' | 'Conifer' | 'Perennial' | 'Grass' | 'Groundcover' | 'Vine';
+  deerResistance: 'High' | 'Moderate' | 'Low';
+  positives?: string;
+  negatives?: string;
+  fruitingInfo?: string;
+  petSafety?: string;
+}
+
+export interface PlantCulturalFilterCriteria {
+  heightCategory?: 'groundcover' | 'under_3ft' | '3_to_6ft' | '6_to_12ft' | '12_to_25ft' | 'over_25ft';
+  foliageType?: 'evergreen' | 'deciduous';
+  flowerColor?: string;
+  fallColor?: string;
+  categoryType?: 'Shrub' | 'Shade Tree' | 'Ornamental Tree' | 'Conifer' | 'Perennial' | 'Grass' | 'Groundcover' | 'Vine';
+  sunExposure?: 'Full Sun' | 'Partial Sun' | 'Full Shade';
+  soilMoisture?: 'Dry / Drought Tolerant' | 'Moist, Well-Drained' | 'Wet / Poor Drainage' | 'Adaptable';
+  deerResistance?: 'High' | 'Moderate' | 'Low';
+  inStockOnly?: boolean;
+  onSaleOnly?: boolean;
 }
 
 export interface OrderCartItem {

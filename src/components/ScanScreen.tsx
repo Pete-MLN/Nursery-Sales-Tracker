@@ -1868,7 +1868,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                       )}
                     </div>
                   ) : (
-                    matchingCustomers.map((cust) => {
+                    matchingCustomers.map((cust, idx) => {
                       const isSelected = selectedCustomer === cust.name;
                       const isCash = cust.accountNo === 'CASH' || cust.name === 'Walk In Customer';
                       const formattedType = cust.type
@@ -1877,7 +1877,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
 
                       return (
                         <button
-                          key={cust.id}
+                          key={`cust-${cust.id || 'c'}-${idx}`}
                           type="button"
                           onClick={() => {
                             setSelectedCustomer(cust.name);
@@ -2356,15 +2356,23 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <span className="text-[#e4f2e5] font-bold uppercase tracking-wider shrink-0 text-[10px]">
               Test Barcodes:
             </span>
-            {inventory
-              .filter(p => p.barcode && p.barcode.trim().length > 0)
-              .slice(0, 5)
-              .map((p) => {
+            {(() => {
+              const seenBarcodes = new Set<string>();
+              const uniqueBarcoded = inventory
+                .filter(p => {
+                  const b = p.barcode?.trim();
+                  if (!b || seenBarcodes.has(b)) return false;
+                  seenBarcodes.add(b);
+                  return true;
+                })
+                .slice(0, 5);
+
+              return uniqueBarcoded.map((p, idx) => {
                 const code = p.barcode!.trim();
                 const label = (p.commonName || p.name).slice(0, 16);
                 return (
                   <button
-                    key={code}
+                    key={`test-barcode-${code}-${idx}`}
                     type="button"
                     onClick={() => handleScannedBarcode(code, true)}
                     className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] font-mono font-semibold px-2.5 py-1 rounded-lg border border-[#c1c8c2] shrink-0 cursor-pointer transition-all active:scale-95 flex items-center gap-1"
@@ -2374,7 +2382,8 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                     <span className="text-[#717973] font-sans font-normal">({label})</span>
                   </button>
                 );
-              })}
+              });
+            })()}
           </div>
         )}
       </section>
@@ -2829,7 +2838,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                           {!itemOrderMarkdownSavings && itemSaleSavings && (
                             <span className="bg-rose-600 text-white text-[18px] sm:text-[20px] font-black px-3 py-1 rounded-xl flex items-center gap-1.5 border border-rose-700 shadow-2xs">
                               <Flame className="w-5 h-5 text-amber-300" />
-                              <span>ON SALE · {itemSaleSavings.savingsPercent}% OFF</span>
+                              <span>ON SALE · {itemSaleSavings.savingsPercent}% OFF · ${itemSaleSavings.salePrice.toFixed(2)}</span>
                             </span>
                           )}
 
@@ -2939,10 +2948,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                                   {itemSaleSavings.label || 'Active Sale / Markdown'}
                                 </span>
                                 <span className="bg-rose-600 text-white text-[10px] font-black px-1.5 py-0.5 rounded">
-                                  {itemSaleSavings.savingsPercent}% OFF
+                                  ${itemSaleSavings.salePrice.toFixed(2)} ea ({itemSaleSavings.savingsPercent}% OFF)
                                 </span>
                                 <span className="text-xs text-rose-800 font-bold">
-                                  Save ${itemSaleSavings.savingsAmount.toFixed(2)}/unit · Reg: <span className="line-through">${itemSaleSavings.regularPrice.toFixed(2)}</span>
+                                  Sale Price: <strong className="text-rose-950 font-black">${itemSaleSavings.salePrice.toFixed(2)}</strong> · Save ${itemSaleSavings.savingsAmount.toFixed(2)}/unit · Reg: <span className="line-through">${itemSaleSavings.regularPrice.toFixed(2)}</span>
                                 </span>
                               </div>
                             </div>
@@ -3764,7 +3773,7 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
                             {catalogSaleSavings && (
                               <span className="bg-rose-600 text-white text-[16px] sm:text-[18px] font-black px-2.5 py-0.5 rounded-lg flex items-center gap-1 shrink-0 shadow-2xs">
                                 <Flame className="w-4 h-4 text-amber-300" />
-                                <span>ON SALE · {catalogSaleSavings.savingsPercent}% OFF</span>
+                                <span>ON SALE · {catalogSaleSavings.savingsPercent}% OFF · ${catalogSaleSavings.salePrice.toFixed(2)}</span>
                               </span>
                             )}
                           </div>

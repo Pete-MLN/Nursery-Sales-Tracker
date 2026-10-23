@@ -16,6 +16,8 @@ interface SettingsScreenProps {
   onOpenAdminManagement?: () => void;
   totalUsersCount?: number;
   totalAdminsCount?: number;
+  outdoorMode?: boolean;
+  onToggleOutdoorMode?: () => void;
 }
 
 export const SettingsScreen: React.FC<SettingsScreenProps> = ({
@@ -29,11 +31,15 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
   onOpenProfileModal,
   onOpenAdminManagement,
   totalUsersCount,
-  totalAdminsCount
+  totalAdminsCount,
+  outdoorMode,
+  onToggleOutdoorMode
 }) => {
   const [gpsEnabled, setGpsEnabled] = useState<boolean>(true);
   const [notificationsEnabled, setNotificationsEnabled] = useState<boolean>(true);
-  const [darkMode, setDarkMode] = useState<boolean>(false);
+  const [localOutdoorMode, setLocalOutdoorMode] = useState<boolean>(() => {
+    return localStorage.getItem('nursery_outdoor_mode') === 'true';
+  });
   const [copied, setCopied] = useState<boolean>(false);
   const [savedFeedback, setSavedFeedback] = useState<boolean>(false);
 
@@ -666,21 +672,46 @@ export const SettingsScreen: React.FC<SettingsScreenProps> = ({
 
         <div className="flex items-center justify-between pt-3 border-t border-[#f3f4f0]">
           <div className="flex items-center gap-2.5">
-            {darkMode ? <Moon className="w-4 h-4 text-[#414844]" /> : <Sun className="w-4 h-4 text-[#414844]" />}
+            <Sun className={`w-5 h-5 ${(outdoorMode ?? localOutdoorMode) ? 'text-amber-500 fill-amber-400' : 'text-[#414844]'}`} />
             <div>
-              <span className="block text-sm font-semibold text-[#1a1c1a]">High Visibility Outdoor Mode</span>
-              <span className="block text-xs text-[#717973]">Optimized contrast for direct sunlight</span>
+              <div className="flex items-center gap-2">
+                <span className="block text-sm font-semibold text-[#1a1c1a]">High Visibility Outdoor Mode</span>
+                {(outdoorMode ?? localOutdoorMode) && (
+                  <span className="text-[10px] font-black uppercase tracking-wider bg-amber-400 text-amber-950 px-2 py-0.5 rounded-full">
+                    Active
+                  </span>
+                )}
+              </div>
+              <span className="block text-xs text-[#717973]">High-contrast borders, bold text & glare reduction for yard sunlight</span>
             </div>
           </div>
           <button
-            onClick={() => setDarkMode(!darkMode)}
-            className={`w-11 h-6 rounded-full transition-colors relative ${
-              darkMode ? 'bg-[#0e6c4a]' : 'bg-[#c1c8c2]'
+            type="button"
+            onClick={() => {
+              if (onToggleOutdoorMode) {
+                onToggleOutdoorMode();
+              } else {
+                const next = !localOutdoorMode;
+                setLocalOutdoorMode(next);
+                if (next) {
+                  document.documentElement.classList.add('outdoor-mode');
+                } else {
+                  document.documentElement.classList.remove('outdoor-mode');
+                }
+                try {
+                  localStorage.setItem('nursery_outdoor_mode', next ? 'true' : 'false');
+                } catch (e) {}
+              }
+              triggerSavedFeedback();
+            }}
+            className={`w-11 h-6 rounded-full transition-colors relative cursor-pointer ${
+              (outdoorMode ?? localOutdoorMode) ? 'bg-[#0e6c4a]' : 'bg-[#c1c8c2]'
             }`}
+            title="Toggle High Visibility Outdoor Mode"
           >
             <span
               className={`absolute top-1 left-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                darkMode ? 'translate-x-5' : 'translate-x-0'
+                (outdoorMode ?? localOutdoorMode) ? 'translate-x-5' : 'translate-x-0'
               }`}
             />
           </button>

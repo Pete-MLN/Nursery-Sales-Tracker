@@ -160,6 +160,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
   const handleStartSearch = () => {
     setActiveSearchedCriteria({ ...currentCriteria });
     setHasExecutedSearch(true);
+    setIsFilterPanelExpanded(false);
   };
 
   const handleToggleOnSale = (targetValue?: boolean) => {
@@ -192,6 +193,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
     setOnSaleOnly(false);
     setHasExecutedSearch(false);
     setActiveSearchedCriteria(null);
+    setIsFilterPanelExpanded(true);
   };
 
   const showToast = (msg: string) => {
@@ -238,11 +240,11 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
 
   return (
     <div 
-      className="fixed inset-0 z-50 flex items-start justify-center p-2 sm:p-4 pt-3 sm:pt-6 pb-28 sm:pb-40 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto overscroll-y-contain"
+      className="fixed inset-0 z-50 flex items-center justify-center p-2 sm:p-4 bg-black/60 backdrop-blur-sm animate-fade-in overflow-y-auto overscroll-y-contain"
       onClick={onClose}
     >
       <div 
-        className="bg-[#f9faf6] w-full max-w-5xl max-h-[85vh] sm:max-h-[90vh] my-auto rounded-3xl shadow-2xl border border-[#c1c8c2] flex flex-col overflow-hidden text-[#1a1c1a] shrink-0"
+        className="bg-[#f9faf6] w-full max-w-5xl h-[95vh] max-h-[96vh] my-auto rounded-3xl shadow-2xl border border-[#c1c8c2] flex flex-col overflow-hidden text-[#1a1c1a] shrink-0"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Toast Alert */}
@@ -272,7 +274,7 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
                   Customer Plant Matcher
                 </h2>
                 <span className="bg-[#a0f4c8]/20 text-[#a0f4c8] text-xs font-extrabold uppercase px-2 py-0.5 rounded-full border border-[#a0f4c8]/30">
-                  Counterpoint Cultural Engine
+                  Maple Lane Cultural Engine
                 </span>
               </div>
               <p className="text-sm text-white/70">
@@ -736,17 +738,17 @@ export const PlantAttributeMatcherModal: React.FC<PlantAttributeMatcherModalProp
             </div>
 
             <span className="text-xs text-[#717973] font-normal">
-              {culturalProfiles.length > 0 ? `${culturalProfiles.length} Counterpoint profiles indexed` : 'Loading profiles...'}
+              {culturalProfiles.length > 0 ? `${culturalProfiles.length} Maple Lane profiles indexed` : 'Loading profiles...'}
             </span>
           </div>
         )}
 
         {/* Scrollable Results Feed */}
-        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-28 sm:pb-36 flex flex-col gap-6 bg-[#f9faf6]">
+        <div className="flex-1 overflow-y-auto p-4 sm:p-5 pb-6 sm:pb-8 flex flex-col gap-6 bg-[#f9faf6] min-h-[350px] sm:min-h-[500px]">
           {isLoadingProfiles && (
             <div className="flex flex-col items-center justify-center p-12 text-[#717973] gap-3">
               <Sparkles className="w-8 h-8 text-[#0e6c4a] animate-spin" />
-              <p className="text-base font-semibold">Indexing Counterpoint plant cultural database...</p>
+              <p className="text-base font-semibold">Indexing Maple Lane plant cultural database...</p>
             </div>
           )}
 

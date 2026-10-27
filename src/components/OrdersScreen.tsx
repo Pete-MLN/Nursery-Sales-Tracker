@@ -258,7 +258,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {toastNotification && (
         <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 bg-[#012d1d] text-white px-4 py-3 rounded-2xl shadow-2xl border border-[#a0f4c8]/30 flex items-center gap-3 animate-fade-in max-w-md w-[92%]">
           <CheckCircle className="w-5 h-5 text-[#a0f4c8] shrink-0" />
-          <div className="flex-1 text-xs font-bold text-[#f3f4f0]">
+          <div className="flex-1 text-sm font-bold text-[#f3f4f0]">
             {toastNotification.text}
           </div>
           {toastNotification.orderToUndo && (
@@ -270,7 +270,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                   setToastNotification(null);
                 }
               }}
-              className="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-xs font-extrabold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
+              className="px-2.5 py-1 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-extrabold flex items-center gap-1 cursor-pointer transition-colors shrink-0"
             >
               <Undo2 className="w-3.5 h-3.5" />
               <span>Undo</span>
@@ -289,32 +289,32 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
       {/* Header */}
       <div className="flex justify-between items-center">
         <div>
-          <h2 className="text-2xl font-bold text-[#012d1d]">Order Management</h2>
-          <p className="text-xs text-[#414844] mt-0.5">Track active staging orders, customer pickups, and archived records.</p>
+          <h2 className="text-3xl font-bold text-[#012d1d]">Order Management</h2>
+          <p className="text-sm text-[#414844] mt-0.5">Track active staging orders, customer pickups, and archived records.</p>
         </div>
         <button
           onClick={onCreateNewOrderClick}
-          className="bg-[#461702] text-white px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-[#622c13] transition-colors shadow-xs cursor-pointer"
+          className="bg-[#461702] text-white px-4 py-2.5 rounded-xl text-sm font-bold flex items-center gap-1.5 hover:bg-[#622c13] transition-colors shadow-xs cursor-pointer"
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="w-4.5 h-4.5" />
           <span>New Order</span>
         </button>
       </div>
 
       {/* Search Input */}
       <div className="relative">
-        <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-[#717973]" />
+        <Search className="w-4.5 h-4.5 absolute left-3.5 top-1/2 -translate-y-1/2 text-[#717973]" />
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Search by order #, customer, or plant name / SKU..."
-          className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-9 pr-4 py-2.5 text-sm text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
+          className="w-full bg-[#f3f4f0] border border-[#c1c8c2] rounded-xl pl-10 pr-4 py-3 text-base text-[#1a1c1a] focus:outline-none focus:border-[#012d1d]"
         />
       </div>
 
       {/* Tab Navigation */}
-      <div className="flex border-b border-[#c1c8c2] gap-1.5 overflow-x-auto text-xs font-bold pb-0.5 scrollbar-none">
+      <div className="flex border-b border-[#c1c8c2] gap-1.5 overflow-x-auto text-sm font-bold pb-0.5 scrollbar-none">
         <button
           type="button"
           onClick={() => setActiveTab('Active')}
@@ -325,7 +325,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           }`}
         >
           <span>Active Orders</span>
-          <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Active' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'bg-[#e2e3df] text-[#414844]'}`}>
+          <span className={`px-2 py-0.2 rounded-full text-xs ${activeTab === 'Active' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'bg-[#e2e3df] text-[#414844]'}`}>
             {activeOrdersCount}
           </span>
         </button>
@@ -341,7 +341,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         >
           <span>Ready</span>
           {readyOrdersCount > 0 && (
-            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Ready' ? 'bg-[#19724f] text-white' : 'bg-[#a0f4c8] text-[#19724f]'}`}>
+            <span className={`px-2 py-0.2 rounded-full text-xs ${activeTab === 'Ready' ? 'bg-[#19724f] text-white' : 'bg-[#a0f4c8] text-[#19724f]'}`}>
               {readyOrdersCount}
             </span>
           )}
@@ -358,7 +358,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         >
           <span>Pending</span>
           {pendingOrdersCount > 0 && (
-            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Pending' ? 'bg-[#461702] text-white' : 'bg-[#facc15]/30 text-[#461702]'}`}>
+            <span className={`px-2 py-0.2 rounded-full text-xs ${activeTab === 'Pending' ? 'bg-[#461702] text-white' : 'bg-[#facc15]/30 text-[#461702]'}`}>
               {pendingOrdersCount}
             </span>
           )}
@@ -375,7 +375,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         >
           <span>Partial Pickup</span>
           {partialOrdersCount > 0 && (
-            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Partial Pickup' ? 'bg-amber-800 text-white' : 'bg-amber-100 text-amber-900 border border-amber-300'}`}>
+            <span className={`px-2 py-0.2 rounded-full text-xs ${activeTab === 'Partial Pickup' ? 'bg-amber-800 text-white' : 'bg-amber-100 text-amber-900 border border-amber-300'}`}>
               {partialOrdersCount}
             </span>
           )}
@@ -391,10 +391,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           }`}
           title="Orders where customer picked up plants - safely archived and stored for records"
         >
-          <Archive className="w-3.5 h-3.5 text-[#0e6c4a]" />
+          <Archive className="w-4 h-4 text-[#0e6c4a]" />
           <span>Completed (Archived)</span>
           {completedOrdersCount > 0 && (
-            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Completed' ? 'bg-[#0e6c4a] text-white' : 'bg-emerald-100 text-emerald-800'}`}>
+            <span className={`px-2 py-0.2 rounded-full text-xs ${activeTab === 'Completed' ? 'bg-[#0e6c4a] text-white' : 'bg-emerald-100 text-emerald-800'}`}>
               {completedOrdersCount}
             </span>
           )}
@@ -411,7 +411,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         >
           <span>Cancelled</span>
           {cancelledOrdersCount > 0 && (
-            <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'Cancelled' ? 'bg-red-700 text-white' : 'bg-red-100 text-red-800'}`}>
+            <span className={`px-2 py-0.2 rounded-full text-xs ${activeTab === 'Cancelled' ? 'bg-red-700 text-white' : 'bg-red-100 text-red-800'}`}>
               {cancelledOrdersCount}
             </span>
           )}
@@ -427,7 +427,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
           }`}
         >
           <span>All Orders</span>
-          <span className={`px-2 py-0.2 rounded-full text-[10px] ${activeTab === 'All' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'bg-[#e2e3df] text-[#414844]'}`}>
+          <span className={`px-2 py-0.2 rounded-full text-xs ${activeTab === 'All' ? 'bg-[#012d1d] text-[#a0f4c8]' : 'bg-[#e2e3df] text-[#414844]'}`}>
             {validOrders.length}
           </span>
         </button>
@@ -435,11 +435,11 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
       {/* Helper Banner for Completed / Archived View */}
       {activeTab === 'Completed' && (
-        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-3 text-xs text-emerald-950">
+        <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3.5 flex items-center gap-3 text-sm text-emerald-950">
           <Archive className="w-5 h-5 text-emerald-700 shrink-0" />
           <div className="flex-1">
-            <span className="font-extrabold block text-emerald-900">Archived Order History</span>
-            <span className="text-[11px] text-emerald-800">
+            <span className="font-extrabold block text-emerald-900 text-base">Archived Order History</span>
+            <span className="text-xs text-emerald-800">
               Orders marked as Completed (Customer Picked Up) are kept safely here for sales records and history. You can reopen any order back to the active queue at any time.
             </span>
           </div>
@@ -451,7 +451,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
         {filteredOrders.length === 0 ? (
           <div className="p-10 text-center bg-[#f3f4f0] rounded-xl text-[#717973] flex flex-col items-center justify-center gap-2">
             <Package className="w-8 h-8 text-[#c1c8c2]" />
-            <p className="text-sm font-bold text-[#1a1c1a]">
+            <p className="text-base font-bold text-[#1a1c1a]">
               {activeTab === 'Completed' 
                 ? 'No completed orders in the archive yet.' 
                 : activeTab === 'Active' 
@@ -459,7 +459,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                 : 'No orders found matching criteria.'}
             </p>
             {activeTab === 'Active' && (
-              <p className="text-xs text-[#717973] max-w-sm">
+              <p className="text-sm text-[#717973] max-w-sm">
                 Tap <strong>New Order</strong> above to create an order, or check the <strong>Completed (Archived)</strong> tab for previous customer pickups.
               </p>
             )}
@@ -493,26 +493,26 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                 <div className="flex justify-between items-start gap-3">
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-extrabold text-base sm:text-lg text-[#012d1d] group-hover:underline">
+                      <span className="font-extrabold text-lg sm:text-xl text-[#012d1d] group-hover:underline">
                         {order.customerName ? `${order.customerName} - ${order.id}` : order.id}
                       </span>
                       {order.poNumber && (
-                        <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-[#f3f4f0] text-[#012d1d] border border-[#c1c8c2]">
+                        <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-[#f3f4f0] text-[#012d1d] border border-[#c1c8c2]">
                           PO: {order.poNumber}
                         </span>
                       )}
                       {isCompleted ? (
-                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
-                          <CheckCircle className="w-3 h-3 text-emerald-700" />
+                        <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-900 border border-emerald-300 flex items-center gap-1">
+                          <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
                           <span>Completed / Customer Picked Up</span>
                         </span>
                       ) : isPartial ? (
-                        <span className="text-[10px] font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
-                          <AlertCircle className="w-3 h-3 text-amber-700" />
+                        <span className="text-xs font-extrabold px-2.5 py-0.5 rounded-full bg-amber-100 text-amber-900 border border-amber-300 flex items-center gap-1">
+                          <AlertCircle className="w-3.5 h-3.5 text-amber-700" />
                           <span>Partial Pickup ({remainingCount > 0 ? `${remainingCount} remaining` : 'Split Load'})</span>
                         </span>
                       ) : (
-                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${
+                        <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full ${
                           order.status === 'Ready for Pickup' 
                             ? 'bg-[#a0f4c8] text-[#19724f]'
                             : order.status === 'Pending'
@@ -525,30 +525,30 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         </span>
                       )}
                     </div>
-                    <div className="flex items-center gap-2 text-xs text-[#525a55] mt-1 flex-wrap font-medium">
+                    <div className="flex items-center gap-2 text-sm text-[#525a55] mt-1 flex-wrap font-medium">
                       <span className="inline-flex items-center gap-1 bg-[#f3f4f0] px-2 py-0.5 rounded-md text-[#313733]">
-                        <Calendar className="w-3 h-3 text-[#0e6c4a]" />
+                        <Calendar className="w-3.5 h-3.5 text-[#0e6c4a]" />
                         <span>Created: <strong>{formatOrderCreatedDate(order)}</strong></span>
                       </span>
                       {(order.updatedAt || order.modifiedAt) && formatOrderModifiedDate(order) && (
                         <>
                           <span className="text-[#c1c8c2]">•</span>
                           <span className="inline-flex items-center gap-1 bg-[#f3f4f0] px-2 py-0.5 rounded-md text-[#313733]" title={`Last modified: ${order.updatedAt || order.modifiedAt}`}>
-                            <RotateCcw className="w-3 h-3 text-[#0e6c4a]" />
+                            <RotateCcw className="w-3.5 h-3.5 text-[#0e6c4a]" />
                             <span>Modified: <strong>{formatOrderModifiedDate(order)}</strong></span>
                           </span>
                         </>
                       )}
                       <span className="text-[#c1c8c2]">•</span>
                       <span className="inline-flex items-center gap-1 bg-[#f3f4f0] px-2 py-0.5 rounded-md text-[#313733]">
-                        <Clock className="w-3 h-3 text-[#461702]" />
+                        <Clock className="w-3.5 h-3.5 text-[#461702]" />
                         <span>Scheduled: <strong>{formatOrderScheduledTime(order)}</strong></span>
                       </span>
                       {order.completedAt && (
                         <>
                           <span className="text-[#c1c8c2]">•</span>
                           <span className="inline-flex items-center gap-1 bg-emerald-100 px-2 py-0.5 rounded-md text-emerald-900 font-bold">
-                            <CheckCircle className="w-3 h-3 text-emerald-700" />
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
                             <span>Picked Up: {formatCompletionDate(order.completedAt)}</span>
                           </span>
                         </>
@@ -557,35 +557,35 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                   </div>
 
                   <div className="text-right shrink-0">
-                    <span className="font-extrabold text-lg sm:text-xl text-[#012d1d] block">
+                    <span className="font-extrabold text-xl sm:text-2xl text-[#012d1d] block">
                       ${displayTotal}
                     </span>
-                    <span className="text-[11px] font-semibold text-[#717973]">
+                    <span className="text-xs font-semibold text-[#717973]">
                       {displayItemsCount} items
                     </span>
                   </div>
                 </div>
 
                 {/* Holding Location & Pickup Status Notice */}
-                <div className="bg-[#f3f4f0] px-3 py-2 rounded-xl flex items-center justify-between gap-2 text-xs">
+                <div className="bg-[#f3f4f0] px-3 py-2 rounded-xl flex items-center justify-between gap-2 text-sm">
                   <div className="flex items-center gap-1.5 min-w-0 text-[#012d1d]">
-                    <MapPin className="w-3.5 h-3.5 text-[#012d1d] shrink-0" />
+                    <MapPin className="w-4 h-4 text-[#012d1d] shrink-0" />
                     <span className="font-bold truncate">
                       {order.holdingLocation || 'Holding Location Not Assigned'}
                     </span>
                   </div>
                   {isCompleted ? (
-                    <span className="text-[10px] font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
-                      <CheckCircle className="w-3 h-3 text-emerald-700" />
+                    <span className="text-xs font-extrabold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                      <CheckCircle className="w-3.5 h-3.5 text-emerald-700" />
                       <span>Archived in History</span>
                     </span>
                   ) : isPartial && remainingCount > 0 ? (
-                    <span className="text-[10px] font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
-                      <Clock className="w-3 h-3 text-amber-700" />
+                    <span className="text-xs font-extrabold text-amber-900 bg-amber-100 px-2 py-0.5 rounded-md flex items-center gap-1 shrink-0">
+                      <Clock className="w-3.5 h-3.5 text-amber-700" />
                       <span>{remainingCount} plants held for pickup</span>
                     </span>
                   ) : (
-                    <span className="text-[10px] font-extrabold text-[#717973] uppercase tracking-wider shrink-0">
+                    <span className="text-xs font-extrabold text-[#717973] uppercase tracking-wider shrink-0">
                       Zone
                     </span>
                   )}
@@ -593,7 +593,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
                 {/* Order Notes Preview */}
                 {order.notes && (
-                  <div className="bg-[#fffbeb] border border-[#fde68a] text-[#92400e] px-3 py-1.5 rounded-xl text-xs flex items-start gap-1.5">
+                  <div className="bg-[#fffbeb] border border-[#fde68a] text-[#92400e] px-3 py-1.5 rounded-xl text-sm flex items-start gap-1.5">
                     <span className="font-extrabold shrink-0">📝 Notes:</span>
                     <span className="truncate italic">{order.notes}</span>
                   </div>
@@ -611,25 +611,25 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         return (
                           <span 
                             key={`${item?.plant?.id || item?.plant?.itemNo || idx}-${idx}`}
-                            className="inline-flex items-center gap-1.5 text-[11px] bg-[#f9faf6] border border-[#c1c8c2] px-2 py-1 rounded-lg text-[#1a1c1a] flex-wrap"
+                            className="inline-flex items-center gap-1.5 text-xs bg-[#f9faf6] border border-[#c1c8c2] px-2 py-1 rounded-lg text-[#1a1c1a] flex-wrap"
                           >
                             <span className="font-bold text-[#012d1d]">{item?.quantity || 1}x</span>
                             <span className="truncate max-w-[130px] font-semibold">{item?.plant?.name || 'Plant Item'}</span>
-                            <span className="font-mono font-bold text-[#a0f4c8] bg-[#012d1d] px-1.5 py-0.2 rounded text-[10px]">
+                            <span className="font-mono font-bold text-[#a0f4c8] bg-[#012d1d] px-1.5 py-0.2 rounded text-xs">
                               #{item?.plant?.itemNo || item?.plant?.barcode || 'N/A'}
                             </span>
-                            <span className="font-bold text-amber-100 bg-[#461702] px-1.5 py-0.2 rounded text-[10px]">
+                            <span className="font-bold text-amber-100 bg-[#461702] px-1.5 py-0.2 rounded text-xs">
                               {item?.plant?.size || 'Std'}
                             </span>
                             {item?.orderMarkdown && (
-                              <span className="font-black text-amber-950 bg-amber-200 border border-amber-400 px-1.5 py-0.2 rounded text-[10px] flex items-center gap-0.5 shadow-2xs">
-                                <Tag className="w-2.5 h-2.5 text-amber-800" />
+                              <span className="font-black text-amber-950 bg-amber-200 border border-amber-400 px-1.5 py-0.2 rounded text-xs flex items-center gap-0.5 shadow-2xs">
+                                <Tag className="w-3 h-3 text-amber-800" />
                                 <span>ORDER M/D · ${mdPrice !== undefined ? mdPrice.toFixed(2) : ''}</span>
                               </span>
                             )}
                             {!item?.orderMarkdown && saleSavings && (
-                              <span className="font-black text-white bg-rose-600 border border-rose-700 px-1.5 py-0.2 rounded text-[10px] flex items-center gap-0.5 shadow-2xs">
-                                <Flame className="w-2.5 h-2.5 text-amber-300" />
+                              <span className="font-black text-white bg-rose-600 border border-rose-700 px-1.5 py-0.2 rounded text-xs flex items-center gap-0.5 shadow-2xs">
+                                <Flame className="w-3 h-3 text-amber-300" />
                                 <span>ON SALE · ${saleSavings.salePrice.toFixed(2)}</span>
                               </span>
                             )}
@@ -637,7 +637,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         );
                       })}
                       {order.items.length > 4 && (
-                        <span className="text-[11px] text-[#717973] font-bold self-center px-1">
+                        <span className="text-xs text-[#717973] font-bold self-center px-1">
                           +{order.items.length - 4} more items
                         </span>
                       )}
@@ -645,9 +645,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
 
                     {/* Informational Breakdown of Markdowns & Sales (Matches Scan Screen Design) */}
                     {order.items.some(i => i?.orderMarkdown || i?.saleDiscount || i?.plant?.saleDiscount) && (
-                      <div className="bg-amber-50/90 border border-amber-300/80 rounded-xl p-2.5 flex flex-col gap-1.5 text-xs shadow-2xs">
+                      <div className="bg-amber-50/90 border border-amber-300/80 rounded-xl p-2.5 flex flex-col gap-1.5 text-sm shadow-2xs">
                         <div className="flex items-center gap-1.5 text-amber-950 font-black">
-                          <Tag className="w-3.5 h-3.5 text-amber-800" />
+                          <Tag className="w-4 h-4 text-amber-800" />
                           <span>Active Discounts & Markdowns on this Order:</span>
                         </div>
                         <div className="flex flex-col gap-1">
@@ -655,21 +655,21 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                             if (item?.orderMarkdown) {
                               const orig = item.orderMarkdown.originalPrice || item.originalPrice || item.plant?.price || 0;
                               return (
-                                <div key={`order-md-${idx}`} className="flex items-center justify-between gap-2 bg-white/90 p-2 rounded-lg border border-amber-200 text-xs shadow-2xs flex-wrap">
+                                <div key={`order-md-${idx}`} className="flex items-center justify-between gap-2 bg-white/90 p-2 rounded-lg border border-amber-200 text-sm shadow-2xs flex-wrap">
                                   <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                                     <span className="font-bold text-[#012d1d]">{item.quantity}x</span>
                                     <span className="font-bold text-[#1a1c1a] truncate">{item.plant?.name}</span>
-                                    <span className="bg-amber-700 text-white font-black text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1">
-                                      <Tag className="w-3 h-3 text-amber-200" />
+                                    <span className="bg-amber-700 text-white font-black text-xs px-2 py-0.5 rounded-md flex items-center gap-1">
+                                      <Tag className="w-3.5 h-3.5 text-amber-200" />
                                       ORDER MARKDOWN · {item.orderMarkdown.type === 'percentage' ? `${item.orderMarkdown.value}% OFF` : 'CUSTOM PRICE'}
                                     </span>
                                     {item.orderMarkdown.reason && (
-                                      <span className="text-[#525a55] italic text-[11px]">({item.orderMarkdown.reason})</span>
+                                      <span className="text-[#525a55] italic text-xs">({item.orderMarkdown.reason})</span>
                                     )}
                                   </div>
                                   <div className="font-bold text-amber-950 shrink-0 text-right">
-                                    <span className="line-through text-[#717973] mr-2 text-[11px]">${orig.toFixed(2)}</span>
-                                    <span className="text-amber-900 font-black text-sm">${item.orderMarkdown.markdownPrice.toFixed(2)} ea</span>
+                                    <span className="line-through text-[#717973] mr-2 text-xs">${orig.toFixed(2)}</span>
+                                    <span className="text-amber-900 font-black text-base">${item.orderMarkdown.markdownPrice.toFixed(2)} ea</span>
                                   </div>
                                 </div>
                               );
@@ -679,18 +679,18 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                               const sSavings = getPlantSaleSavings({ ...item.plant, saleDiscount: activeSale });
                               if (sSavings) {
                                 return (
-                                  <div key={`order-sale-${idx}`} className="flex items-center justify-between gap-2 bg-white/90 p-2 rounded-lg border border-rose-200 text-xs shadow-2xs flex-wrap">
+                                  <div key={`order-sale-${idx}`} className="flex items-center justify-between gap-2 bg-white/90 p-2 rounded-lg border border-rose-200 text-sm shadow-2xs flex-wrap">
                                     <div className="flex items-center gap-1.5 min-w-0 flex-wrap">
                                       <span className="font-bold text-[#012d1d]">{item.quantity}x</span>
                                       <span className="font-bold text-[#1a1c1a] truncate">{item.plant?.name}</span>
-                                      <span className="bg-rose-600 text-white font-black text-[10px] px-2 py-0.5 rounded-md flex items-center gap-1">
-                                        <Flame className="w-3 h-3 text-amber-300" />
+                                      <span className="bg-rose-600 text-white font-black text-xs px-2 py-0.5 rounded-md flex items-center gap-1">
+                                        <Flame className="w-3.5 h-3.5 text-amber-300" />
                                         ON SALE · {sSavings.savingsPercent}% OFF
                                       </span>
                                     </div>
                                     <div className="font-bold text-rose-950 shrink-0 text-right">
-                                      <span className="line-through text-[#717973] mr-2 text-[11px]">${sSavings.regularPrice.toFixed(2)}</span>
-                                      <span className="text-rose-700 font-black text-sm">${sSavings.salePrice.toFixed(2)} ea</span>
+                                      <span className="line-through text-[#717973] mr-2 text-xs">${sSavings.regularPrice.toFixed(2)}</span>
+                                      <span className="text-rose-700 font-black text-base">${sSavings.salePrice.toFixed(2)} ea</span>
                                     </div>
                                   </div>
                                 );
@@ -705,7 +705,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                 )}
 
                 {/* Card Footer Actions */}
-                <div className="flex flex-wrap justify-between items-center text-xs text-[#414844] pt-2 border-t border-[#f3f4f0] gap-2">
+                <div className="flex flex-wrap justify-between items-center text-sm text-[#414844] pt-2 border-t border-[#f3f4f0] gap-2">
                   <div className="flex items-center gap-1.5">
                     {getFulfillmentIcon(order.type)}
                     <span className="font-semibold">{order.type}</span>
@@ -720,10 +720,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                           e.stopPropagation();
                           setOrderToComplete(order);
                         }}
-                        className="p-1.5 px-3 rounded-xl bg-[#0e6c4a] hover:bg-[#012d1d] text-white flex items-center gap-1.5 text-xs font-extrabold transition-all shadow-2xs border border-[#a0f4c8]/30 cursor-pointer active:scale-98"
+                        className="p-1.5 px-3 rounded-xl bg-[#0e6c4a] hover:bg-[#012d1d] text-white flex items-center gap-1.5 text-sm font-extrabold transition-all shadow-2xs border border-[#a0f4c8]/30 cursor-pointer active:scale-98"
                         title="Customer picked up order: mark as completed and archive from active list"
                       >
-                        <CheckCircle className="w-3.5 h-3.5 text-[#a0f4c8]" />
+                        <CheckCircle className="w-4 h-4 text-[#a0f4c8]" />
                         <span>Completed</span>
                       </button>
                     ) : (
@@ -733,10 +733,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                           e.stopPropagation();
                           handleReopenOrder(order);
                         }}
-                        className="p-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                        className="p-1.5 px-3 rounded-xl bg-emerald-50 hover:bg-emerald-100 text-emerald-800 border border-emerald-300 flex items-center gap-1.5 text-sm font-bold transition-all cursor-pointer shadow-2xs"
                         title="Restore order to Active orders list"
                       >
-                        <RotateCcw className="w-3.5 h-3.5 text-emerald-700" />
+                        <RotateCcw className="w-4 h-4 text-emerald-700" />
                         <span>Reopen to Active</span>
                       </button>
                     )}
@@ -747,10 +747,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         e.stopPropagation();
                         setOrderToDelete(order);
                       }}
-                      className="p-1.5 px-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
+                      className="p-1.5 px-2.5 rounded-xl bg-red-50 hover:bg-red-100 text-red-700 border border-red-200 flex items-center gap-1 text-sm font-bold transition-colors cursor-pointer"
                       title="Cancel or Delete this order"
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-red-600" />
+                      <Trash2 className="w-4 h-4 text-red-600" />
                       <span>Cancel / Delete</span>
                     </button>
 
@@ -761,10 +761,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                           e.stopPropagation();
                           setMapModalOrder(order);
                         }}
-                        className="p-1.5 px-2.5 rounded-xl bg-[#a0f4c8]/30 hover:bg-[#012d1d] text-[#012d1d] hover:text-[#a0f4c8] border border-[#0e6c4a]/30 flex items-center gap-1 text-xs font-bold transition-all cursor-pointer shadow-2xs"
+                        className="p-1.5 px-2.5 rounded-xl bg-[#a0f4c8]/30 hover:bg-[#012d1d] text-[#012d1d] hover:text-[#a0f4c8] border border-[#0e6c4a]/30 flex items-center gap-1 text-sm font-bold transition-all cursor-pointer shadow-2xs"
                         title="View Google Map with pins for all plant GPS locations in this order"
                       >
-                        <MapPin className="w-3.5 h-3.5 text-[#0e6c4a]" />
+                        <MapPin className="w-4 h-4 text-[#0e6c4a]" />
                         <span>GPS Map</span>
                         {(() => {
                           const gpsCount = (order.items || []).reduce((acc, it) => {
@@ -773,7 +773,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                             return acc;
                           }, 0);
                           return gpsCount > 0 ? (
-                            <span className="bg-[#012d1d] text-[#a0f4c8] text-[9px] font-black px-1.5 py-0.2 rounded-full">
+                            <span className="bg-[#012d1d] text-[#a0f4c8] text-[11px] font-black px-1.5 py-0.2 rounded-full">
                               {gpsCount}
                             </span>
                           ) : null;
@@ -788,10 +788,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         onSelectOrder(order);
                         onNavigate('holding_location');
                       }}
-                      className="p-1.5 px-2.5 rounded-xl bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] flex items-center gap-1 text-xs font-bold transition-colors cursor-pointer"
+                      className="p-1.5 px-2.5 rounded-xl bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#012d1d] flex items-center gap-1 text-sm font-bold transition-colors cursor-pointer"
                       title="Change holding area"
                     >
-                      <MapPin className="w-3.5 h-3.5" />
+                      <MapPin className="w-4 h-4" />
                       <span>Change Zone</span>
                     </button>
 
@@ -802,10 +802,10 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                         onSelectOrder(order);
                         onNavigate('finalization');
                       }}
-                      className="p-1.5 px-3 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white flex items-center gap-1 text-xs font-extrabold shadow-2xs transition-all cursor-pointer"
+                      className="p-1.5 px-3 rounded-xl bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white flex items-center gap-1 text-sm font-extrabold shadow-2xs transition-all cursor-pointer"
                     >
                       <span>View & Edit</span>
-                      <ChevronRight className="w-3.5 h-3.5" />
+                      <ChevronRight className="w-4 h-4" />
                     </button>
                   </div>
                 </div>
@@ -833,8 +833,8 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                 <CheckCircle className="w-6 h-6 text-emerald-700" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-extrabold text-base text-[#1a1c1a]">Customer Picked Up Order?</h3>
-                <p className="text-xs text-[#717973] mt-0.5">
+                <h3 className="font-extrabold text-lg text-[#1a1c1a]">Customer Picked Up Order?</h3>
+                <p className="text-sm text-[#717973] mt-0.5">
                   Order <span className="font-bold text-[#012d1d]">#{orderToComplete.id}</span> • {orderToComplete.customerName || 'Walk In Customer'} (${(typeof orderToComplete.total === 'number' ? orderToComplete.total : parseFloat(orderToComplete.total || '0') || 0).toFixed(2)})
                 </p>
               </div>
@@ -847,15 +847,15 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
               </button>
             </div>
 
-            <div className="bg-[#f3f4f0] p-3.5 rounded-xl border border-[#e2e3df] text-xs text-[#414844] flex flex-col gap-2">
-              <div className="flex items-center justify-between font-bold text-[#012d1d] border-b border-[#e2e3df] pb-2">
+            <div className="bg-[#f3f4f0] p-3.5 rounded-xl border border-[#e2e3df] text-sm text-[#414844] flex flex-col gap-2">
+              <div className="flex items-center justify-between font-bold text-[#012d1d] border-b border-[#e2e3df] pb-2 text-sm">
                 <span>Items: {orderToComplete.itemsCount ?? (orderToComplete.items?.length || 0)} plants</span>
                 <span>Zone: {orderToComplete.holdingLocation || 'Staging Bay'}</span>
               </div>
-              <p className="text-[11px] text-[#525a55] leading-relaxed">
+              <p className="text-xs text-[#525a55] leading-relaxed">
                 Confirming completion marks this order as <strong>Customer Picked Up</strong> and archives it from the active order queue.
               </p>
-              <div className="bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg p-2 text-[11px] font-medium flex items-center gap-1.5">
+              <div className="bg-emerald-50 text-emerald-900 border border-emerald-200 rounded-lg p-2 text-xs font-medium flex items-center gap-1.5">
                 <Archive className="w-4 h-4 text-emerald-700 shrink-0" />
                 <span>The order is safely saved in the <strong>Completed (Archived)</strong> tab for sales records and history (not deleted).</span>
               </div>
@@ -865,7 +865,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
               <button
                 type="button"
                 onClick={() => handleConfirmComplete(orderToComplete)}
-                className="flex-1 bg-[#0e6c4a] hover:bg-[#012d1d] text-white font-extrabold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                className="flex-1 bg-[#0e6c4a] hover:bg-[#012d1d] text-white font-extrabold py-2.5 px-3 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
                 <CheckCircle className="w-4 h-4 text-[#a0f4c8]" />
                 <span>Complete & Archive</span>
@@ -874,7 +874,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
               <button
                 type="button"
                 onClick={() => setOrderToComplete(null)}
-                className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] font-bold py-2.5 px-4 rounded-xl text-xs transition-colors cursor-pointer"
+                className="bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] font-bold py-2.5 px-4 rounded-xl text-sm transition-colors cursor-pointer"
               >
                 Cancel
               </button>
@@ -901,8 +901,8 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
                 <AlertTriangle className="w-6 h-6" />
               </div>
               <div className="min-w-0 flex-1">
-                <h3 className="font-extrabold text-base text-[#1a1c1a]">Cancel or Delete Order?</h3>
-                <p className="text-xs text-[#717973] mt-0.5">
+                <h3 className="font-extrabold text-lg text-[#1a1c1a]">Cancel or Delete Order?</h3>
+                <p className="text-sm text-[#717973] mt-0.5">
                   Order <span className="font-bold text-[#012d1d]">#{orderToDelete.id}</span> • {orderToDelete.customerName || 'Walk In Customer'} (${(typeof orderToDelete.total === 'number' ? orderToDelete.total : parseFloat(orderToDelete.total || '0') || 0).toFixed(2)})
                 </p>
               </div>
@@ -915,9 +915,9 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
               </button>
             </div>
 
-            <div className="bg-[#f3f4f0] p-3 rounded-xl border border-[#e2e3df] text-xs text-[#414844] space-y-1">
+            <div className="bg-[#f3f4f0] p-3 rounded-xl border border-[#e2e3df] text-sm text-[#414844] space-y-1">
               <p className="font-bold text-[#1a1c1a]">Choose an action:</p>
-              <ul className="list-disc list-inside space-y-0.5 text-[11px] text-[#717973]">
+              <ul className="list-disc list-inside space-y-0.5 text-xs text-[#717973]">
                 <li><strong className="text-red-700">Delete Permanently:</strong> Completely removes this order from the system and database.</li>
                 <li><strong className="text-amber-800">Mark as Cancelled:</strong> Keeps the record in system history with a "Cancelled" status for bookkeeping.</li>
               </ul>
@@ -927,7 +927,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
               <button
                 type="button"
                 onClick={() => handleConfirmDelete(orderToDelete.id)}
-                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                className="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 px-3 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
                 <Trash2 className="w-4 h-4" />
                 <span>Delete Permanently</span>
@@ -936,7 +936,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
               <button
                 type="button"
                 onClick={() => handleMarkAsCancelled(orderToDelete)}
-                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-3 rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
+                className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-bold py-2.5 px-3 rounded-xl text-sm flex items-center justify-center gap-1.5 transition-colors cursor-pointer shadow-2xs"
               >
                 <X className="w-4 h-4" />
                 <span>Mark as Cancelled</span>
@@ -946,7 +946,7 @@ export const OrdersScreen: React.FC<OrdersScreenProps> = ({
             <button
               type="button"
               onClick={() => setOrderToDelete(null)}
-              className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] font-bold py-2 rounded-xl text-xs transition-colors cursor-pointer"
+              className="w-full bg-[#f3f4f0] hover:bg-[#e2e3df] text-[#414844] font-bold py-2 rounded-xl text-sm transition-colors cursor-pointer"
             >
               Keep Order (Go Back)
             </button>

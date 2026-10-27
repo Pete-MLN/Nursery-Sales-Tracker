@@ -338,65 +338,63 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
           Select a designated zone or click <span className="font-bold text-[#012d1d]">"Edit" (pencil)</span> on any location to customize its name and description.
         </p>
 
+      {/* Active Order & Confirmation Action Card */}
+      <div className="mt-3 p-3.5 sm:p-4 bg-[#f3f4f0] border border-[#c1c8c2] rounded-2xl flex flex-col gap-3.5 shadow-xs">
         {activeOrder && (
-          <div className="mt-3 p-3.5 sm:p-4 bg-[#f3f4f0] border border-[#c1c8c2] rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-3.5 shadow-xs">
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4">
-              <div className="flex items-center gap-2">
-                <span className="font-bold text-sm sm:text-base text-[#012d1d]">
-                  Order: <span className="underline">{activeOrder.id}</span>
-                </span>
-                <span className="font-semibold text-xs sm:text-sm text-[#414844]">{activeOrder.customerName}</span>
-              </div>
-              
-              {activeOrder.items && activeOrder.items.length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setIsPlantMapOpen(true)}
-                  className="px-3 py-1.5 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs w-fit"
-                  title="View Google Map with pins for plant GPS locations"
-                >
-                  <MapPin className="w-3.5 h-3.5" />
-                  <span>View Plant GPS Map</span>
-                </button>
-              )}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 sm:gap-4 pb-2 border-b border-[#c1c8c2]/50">
+            <div className="flex items-center gap-2">
+              <span className="font-bold text-sm sm:text-base text-[#012d1d]">
+                Order: <span className="underline">{activeOrder.id}</span>
+              </span>
+              <span className="font-semibold text-xs sm:text-sm text-[#414844]">{activeOrder.customerName}</span>
             </div>
-
-            {/* Top Copy of Confirm & Continue Button in the same size */}
-            <button
-              id="confirm-location-btn-top"
-              type="button"
-              onClick={handleConfirm}
-              className="w-full sm:w-auto min-w-[260px] bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-[#a0f4c8] hover:text-white py-4 px-7 rounded-xl font-extrabold text-sm uppercase tracking-wider shadow-lg transition-all flex justify-center items-center gap-2.5 cursor-pointer border border-[#a0f4c8]/30 shrink-0"
-            >
-              <CheckCircle className="w-5 h-5 text-[#a0f4c8]" />
-              <span>Confirm & Continue to Finalize</span>
-            </button>
+            
+            {activeOrder.items && activeOrder.items.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setIsPlantMapOpen(true)}
+                className="px-3 py-1.5 rounded-lg bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 shadow-2xs w-fit"
+                title="View Google Map with pins for plant GPS locations"
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>View Plant GPS Map</span>
+              </button>
+            )}
           </div>
         )}
 
-        {/* Customer Took Order Bypass Option */}
-        <div className="mt-3 p-3.5 bg-emerald-50/90 border border-emerald-300 rounded-xl flex items-center justify-between gap-3 flex-wrap shadow-2xs">
-          <div className="flex items-center gap-2.5 min-w-0 flex-1">
-            <div className="p-2 bg-emerald-100 text-emerald-800 rounded-lg shrink-0">
-              <CheckCircle2 className="w-5 h-5 text-emerald-700" />
-            </div>
-            <div>
-              <p className="text-xs font-bold text-emerald-950">Customer taking order right now?</p>
-              <p className="text-[11px] text-emerald-800">Skip staging and mark whole order as taken by customer</p>
-            </div>
-          </div>
+        <div className="flex flex-col gap-2.5 items-stretch w-full">
+          {/* Primary Confirm & Continue Button */}
+          <button
+            id="confirm-location-btn-top"
+            type="button"
+            onClick={handleConfirm}
+            className="w-full bg-[#012d1d] hover:bg-[#0e6c4a] active:scale-[0.98] text-[#a0f4c8] hover:text-white py-3.5 px-6 rounded-xl font-extrabold text-sm uppercase tracking-wider shadow-md transition-all flex justify-center items-center gap-2.5 cursor-pointer border border-[#a0f4c8]/30"
+          >
+            <CheckCircle className="w-5 h-5 text-[#a0f4c8]" />
+            <span>Confirm & Continue to Finalize</span>
+          </button>
+
+          {/* Customer Took All (Skip Holding) Button under Confirm & Continue on same card */}
           <button
             type="button"
             onClick={() => {
               onConfirmLocation('Taken by Customer / No Holding Area');
               onNavigate('finalization');
             }}
-            className="px-3.5 py-2 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white rounded-xl text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center gap-1.5 shrink-0 border border-[#a0f4c8]/30"
+            className="w-full py-2.5 px-4 bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] hover:text-white rounded-xl text-xs font-extrabold shadow-sm transition-all cursor-pointer flex items-center justify-center gap-2 border border-[#a0f4c8]/30"
           >
+            <CheckCircle2 className="w-4 h-4 text-[#a0f4c8]" />
             <span>Customer Took All (Skip Holding)</span>
             <span>→</span>
           </button>
+
+          {/* Explanation Text under the button */}
+          <p className="text-[11px] text-center text-[#0e6c4a] font-semibold">
+            Skip staging and mark whole order as taken by customer
+          </p>
         </div>
+      </div>
       </div>
 
       {/* Search & Category Filter Controls */}

@@ -2057,10 +2057,10 @@ export const ScanScreen: React.FC<ScanScreenProps> = ({
             <div className="flex items-center gap-2">
               <button
                 type="submit"
-                className="flex-1 sm:flex-none bg-[#012d1d] hover:bg-[#0e6c4a] text-[#a0f4c8] text-sm font-extrabold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
+                className="flex-1 sm:flex-none bg-[#a0f4c8] hover:bg-[#87e8b6] text-[#19724f] text-sm font-extrabold px-4 py-3 rounded-xl transition-all flex items-center justify-center gap-1.5 shrink-0 cursor-pointer shadow-2xs"
               >
-                <Search className="w-4 h-4 text-[#a0f4c8]" />
-                <span>Search</span>
+                <Search className="w-4 h-4 text-[#19724f] border-[#19724f]" />
+                <span className="text-[#19724f]">Search</span>
               </button>
 
               <button

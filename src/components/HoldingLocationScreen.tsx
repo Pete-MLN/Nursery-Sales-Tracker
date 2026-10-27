@@ -329,28 +329,6 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
             <Package className="w-3.5 h-3.5 text-[#0e6c4a]" />
             <span>Placement Routing</span>
           </div>
-
-          {/* Quick Header Actions */}
-          <div className="flex items-center gap-2.5">
-            <button
-              onClick={handleOpenCreate}
-              type="button"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#012d1d] text-[#a0f4c8] hover:bg-[#0e6c4a] text-[22px] font-bold transition-colors cursor-pointer shadow-2xs"
-              title="Add a new custom holding location"
-            >
-              <Plus className="w-5 h-5 shrink-0" />
-              <span>Add Zone</span>
-            </button>
-            <button
-              onClick={handleReset}
-              type="button"
-              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#e7e9e5] text-[#414844] hover:text-[#012d1d] hover:bg-[#dbe0dc] text-[22px] font-semibold transition-colors cursor-pointer"
-              title="Reset location names and descriptions to defaults"
-            >
-              <RotateCcw className="w-5 h-5 shrink-0" />
-              <span className="hidden sm:inline">Reset Defaults</span>
-            </button>
-          </div>
         </div>
 
         <h2 className="text-2xl md:text-3xl font-extrabold text-[#1a1c1a] tracking-tight">
@@ -475,19 +453,40 @@ export const HoldingLocationScreen: React.FC<HoldingLocationScreenProps> = ({
           })}
         </div>
 
-        {/* Results summary bar */}
-        <div className="flex items-center justify-between text-xs text-[#717973] px-1 pt-1 border-t border-[#f0f2ee]">
+        {/* Results summary & Action Buttons at Bottom of Card */}
+        <div className="flex items-center justify-between text-xs text-[#717973] px-1 pt-2.5 border-t border-[#f0f2ee] flex-wrap gap-2.5">
           <span>
             Showing <strong className="text-[#012d1d]">{filteredAreas.length}</strong> of {areas.length} locations
           </span>
-          {searchQuery && (
-            <button 
-              onClick={() => setSearchQuery('')}
-              className="text-[#012d1d] font-bold hover:underline"
+
+          <div className="flex items-center gap-2 flex-wrap">
+            <button
+              onClick={handleOpenCreate}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#012d1d] text-[#a0f4c8] hover:bg-[#0e6c4a] text-[20px] font-bold transition-colors cursor-pointer shadow-2xs"
+              title="Add a new custom holding location"
             >
-              Clear search
+              <Plus className="w-4 h-4 shrink-0" />
+              <span>Add Zone</span>
             </button>
-          )}
+            <button
+              onClick={handleReset}
+              type="button"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-[#e7e9e5] text-[#414844] hover:text-[#012d1d] hover:bg-[#dbe0dc] text-[20px] font-semibold transition-colors cursor-pointer"
+              title="Reset location names and descriptions to defaults"
+            >
+              <RotateCcw className="w-4 h-4 shrink-0" />
+              <span>Reset Defaults</span>
+            </button>
+            {searchQuery && (
+              <button 
+                onClick={() => setSearchQuery('')}
+                className="text-[#012d1d] font-bold hover:underline ml-1"
+              >
+                Clear search
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
